@@ -3,20 +3,20 @@ import type { Knex } from 'knex';
 export async function up(knex: Knex): Promise<void> {
   // Add phase/curriculum columns to lessons table
   await knex.schema.table('lessons', (table) => {
-    table.integer('phase').nullable(); // 1, 2, 3, 4
-    table.integer('week_number').nullable(); // 1-52
-    table.integer('lesson_order').nullable(); // Order within week
-    table.string('theme_category').nullable(); // food, family, travel, work, etc.
-    table.enum('lesson_type', ['foundation', 'listening_comprehension', 'shadowing', 'conversation', 'media']).defaultTo('listening_comprehension');
-    table.integer('prerequisite_vocabulary_count').defaultTo(0); // How many recognized words needed to unlock
+    table.integer('phase').nullable();
+    table.integer('week_number').nullable();
+    table.integer('lesson_order').nullable();
+    table.string('theme_category').nullable();
+    table.string('lesson_type').defaultTo('listening_comprehension');
+    table.integer('prerequisite_vocabulary_count').defaultTo(0);
     table.index(['phase', 'week_number', 'lesson_order']);
   });
 
   // Add mastery tracking to vocabulary
   await knex.schema.table('vocabulary', (table) => {
-    table.integer('passive_encounters').defaultTo(0); // Count of times heard/read
+    table.integer('passive_encounters').defaultTo(0);
     table.timestamp('passive_encounters_updated_at').nullable();
-    table.enum('mastery_level', ['new', 'learning', 'review', 'mastered']).defaultTo('new'); // SM-2 state
+    table.string('mastery_level').defaultTo('new');
   });
 
   // Create table to log every passive encounter

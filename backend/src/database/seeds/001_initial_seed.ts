@@ -2,15 +2,15 @@ import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function seed(knex: Knex): Promise<void> {
-  // Clear existing CONTENT only. User accounts and their progress are
-  // intentionally left untouched so re-seeding never destroys a real user.
-  await knex('story_comprehension').del();
-  await knex('story_blocks').del();
-  await knex('stories').del();
-  await knex('comprehension_questions').del();
-  await knex('lesson_segments').del();
-  await knex('vocabulary').del();
-  await knex('lessons').del();
+  // Idempotent: skip entirely if lessons already exist.
+  // Seed 002 (Phase 1) handles migrating old data to the new curriculum.
+  const [{ count }] = await knex('lessons').count('id as count');
+  if (Number(count) > 0) {
+    console.log(`Seed 001 skipped: ${count} lessons already exist`);
+    return;
+  }
+
+  console.log('Seed 001: populating initial vocabulary and lessons...');
 
   // ---------------------------------------------------------------------------
   // Vocabulary (70 most frequent Spanish words)

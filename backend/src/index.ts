@@ -91,18 +91,24 @@ const start = async (): Promise<void> => {
       logger.info('Database schema up to date');
     }
 
-    // Seed when there are no lessons yet. The seed only touches content
-    // tables (never users or their progress), so this is safe to run on a
-    // database that already has registered users.
+    // Seed when there are no lessons yet OR when Phase 1 lessons are missing.
+    // The seed only touches content tables (never users or their progress),
+    // so this is safe to run on a database that already has registered users.
     const [{ count }] = await knexInstance('lessons').count('id as count');
-    if (Number(count) === 0) {
-      logger.info('No lessons found — seeding initial content...');
+    const phase1Lesson = await knexInstance('lessons')
+      .where('title', 'Phonetics & First Sounds')
+      .first();
+
+    if (Number(count) === 0 || !phase1Lesson) {
+      logger.info(
+        `Seeding content (lessons=${count}, phase1Exists=${!!phase1Lesson})...`
+      );
       await knexInstance.seed.run({
         directory: path.join(__dirname, 'database/seeds'),
       });
       logger.info('Seed data inserted');
     } else {
-      logger.info(`Content already seeded (${count} lessons)`);
+      logger.info(`Content already seeded (${count} lessons, Phase 1 present)`);
     }
 
     // One-off data hygiene: earlier seeds stored non-existent placeholder

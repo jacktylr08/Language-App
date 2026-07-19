@@ -12,13 +12,47 @@ export async function seed(knex: Knex): Promise<void> {
     return;
   }
 
-  // Delete old lessons to make room for Phase 1
+  // Delete old lessons to make room for Phase 1.
+  // Null out foreign key references first to avoid constraint errors.
   console.log('Clearing old lessons to seed Phase 1 curriculum...');
-  await knex('comprehension_questions').del();
-  await knex('lesson_segments').del();
-  await knex('story_comprehension').del();
-  await knex('story_blocks').del();
-  await knex('stories').del();
+
+  // Null out lesson references in user_vocabulary_progress
+  try {
+    await knex('user_vocabulary_progress').update({
+      first_encountered_lesson_id: null,
+    });
+  } catch (err) {
+    console.log('user_vocabulary_progress cleanup skipped:', err);
+  }
+
+  // Null out lesson references in vocabulary (lesson_ids array)
+  try {
+    await knex.raw(`UPDATE vocabulary SET lesson_ids = '{}'`);
+  } catch (err) {
+    console.log('vocabulary lesson_ids cleanup skipped:', err);
+  }
+
+  // Delete content in FK dependency order
+  const contentTables = [
+    'comprehension_questions',
+    'lesson_segments',
+    'story_comprehension',
+    'story_blocks',
+    'stories',
+    'lesson_progress',
+    'lesson_phases',
+    'vocabulary_encounters',
+  ];
+
+  for (const table of contentTables) {
+    try {
+      await knex(table).del();
+    } catch (err) {
+      console.log(`Skipping ${table}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Now safe to delete lessons
   await knex('lessons').del();
 
   // ============================================================================
