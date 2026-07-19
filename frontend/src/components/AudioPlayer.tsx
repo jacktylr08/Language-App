@@ -32,11 +32,13 @@ export function AudioPlayer({ audioUrl, onTimeUpdate }: AudioPlayerProps) {
       onpause: () => setIsPlaying(false),
     });
 
-    // Handle errors
+    // Handle errors. NOTE: Howler's event is 'playerror' (single "r").
+    // Using an unknown event name makes Howler.on() dereference an
+    // undefined listener array and throw, which crashed the whole page.
     howlerRef.current.on('loaderror', () => {
       setError('Failed to load audio');
     });
-    howlerRef.current.on('playererror', () => {
+    howlerRef.current.on('playerror', () => {
       setError('Failed to play audio');
     });
 

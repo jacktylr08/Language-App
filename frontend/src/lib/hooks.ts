@@ -5,7 +5,12 @@ import { isAuthenticated } from './auth';
 
 export function useRequireAuth() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hydrate } = useAuth();
+
+  // Read auth from localStorage only after mount to avoid hydration mismatch.
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated()) {
@@ -16,9 +21,13 @@ export function useRequireAuth() {
   return { user, isLoading };
 }
 
-export function useRedirectIfAuthenticated(redirectTo = '/dashboard') {
+export function useRedirectIfAuthenticated(redirectTo = '/lessons') {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hydrate } = useAuth();
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated() && user) {

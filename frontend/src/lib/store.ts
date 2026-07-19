@@ -20,24 +20,28 @@ interface AuthStore {
   logout: () => void;
   setUser: (user: User | null) => void;
   getCurrentUser: () => Promise<void>;
+  hydrate: () => void;
   clearError: () => void;
 }
 
 export const useAuth = create<AuthStore>((set) => {
-  // Initialize from localStorage
-  const storedAuth = getAuth();
-  if (storedAuth) {
-    set({
-      user: storedAuth.user,
-      accessToken: storedAuth.accessToken,
-    });
-  }
-
   return {
-    user: storedAuth?.user || null,
-    accessToken: storedAuth?.accessToken || null,
-    isLoading: false,
+    // Start unauthenticated so the first client render matches the server
+    // render (which has no localStorage). hydrate() fills this in after mount,
+    // avoiding React hydration mismatches.
+    user: null,
+    accessToken: null,
+    isLoading: true,
     error: null,
+
+    hydrate: () => {
+      const stored = getAuth();
+      set({
+        user: stored?.user || null,
+        accessToken: stored?.accessToken || null,
+        isLoading: false,
+      });
+    },
 
     login: async (email: string, password: string) => {
       set({ isLoading: true, error: null });

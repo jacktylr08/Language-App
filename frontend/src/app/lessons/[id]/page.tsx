@@ -121,13 +121,13 @@ export default function LessonDetailPage() {
         <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">{lesson.title}</h1>
         <p className="text-slate-600 dark:text-slate-400 mb-8">{lesson.description}</p>
 
-        {/* Audio player */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Listen</h2>
-          {lesson.audio_url && (
+        {/* Audio player — only shown when the lesson has real audio */}
+        {lesson.audio_url && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Listen</h2>
             <AudioPlayer audioUrl={lesson.audio_url} onTimeUpdate={setCurrentTime} />
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Transcript toggle */}
         <div className="mb-8">

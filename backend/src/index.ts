@@ -104,6 +104,16 @@ const start = async (): Promise<void> => {
     } else {
       logger.info(`Content already seeded (${count} lessons)`);
     }
+
+    // One-off data hygiene: earlier seeds stored non-existent placeholder
+    // audio URLs, which render a broken player. Null them out so the
+    // lesson UI cleanly omits the audio section. Idempotent.
+    const cleaned = await knexInstance('lessons')
+      .where('audio_url', 'like', '%audio.placeholder.com%')
+      .update({ audio_url: null });
+    if (cleaned > 0) {
+      logger.info(`Cleared ${cleaned} placeholder audio URL(s)`);
+    }
   } catch (error) {
     logger.error(
       `Database setup failed — API will not work until this is fixed: ${
