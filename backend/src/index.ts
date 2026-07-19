@@ -116,6 +116,8 @@ const start = async (): Promise<void> => {
     // lesson UI cleanly omits the audio section. Idempotent.
     const cleaned = await knexInstance('lessons')
       .where('audio_url', 'like', '%audio.placeholder.com%')
+      .orWhere('audio_url', 'like', '/audio/lesson-%')
+      .orWhere('audio_url', 'like', 'https://example.com/audio/%')
       .update({ audio_url: null });
     if (cleaned > 0) {
       logger.info(`Cleared ${cleaned} placeholder audio URL(s)`);

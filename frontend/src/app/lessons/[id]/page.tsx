@@ -6,6 +6,8 @@ import { useParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { SpeechAudioPlayer } from '@/components/SpeechAudioPlayer';
+import { getAudioScript } from '@/lib/audio-scripts';
 
 interface VocabularyItem {
   id: string;
@@ -214,22 +216,38 @@ export default function Phase1LessonPage() {
         )}
 
         {/* SECTION 2: Audio Listening */}
-        {lesson.audio_url && (
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-              🎧 Listen
-            </h2>
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
-              <AudioPlayer
-                audioUrl={lesson.audio_url}
-                onTimeUpdate={setCurrentTime}
-              />
-              <p className="text-xs text-slate-500 mt-4 text-center">
-                💡 Use the speed control in the player to adjust playback speed (0.75x, 1.0x, 1.25x)
-              </p>
-            </div>
-          </section>
-        )}
+        {(() => {
+          const script = getAudioScript(lesson.title);
+          if (script) {
+            return (
+              <section className="mb-12">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+                  🎧 Listen
+                </h2>
+                <SpeechAudioPlayer script={script} />
+                <p className="text-xs text-slate-500 mt-4 text-center">
+                  💡 Listen multiple times at different speeds. Focus on the sounds, not translation.
+                </p>
+              </section>
+            );
+          }
+          if (lesson.audio_url) {
+            return (
+              <section className="mb-12">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+                  🎧 Listen
+                </h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+                  <AudioPlayer
+                    audioUrl={lesson.audio_url}
+                    onTimeUpdate={setCurrentTime}
+                  />
+                </div>
+              </section>
+            );
+          }
+          return null;
+        })()}
 
         {/* SECTION 3: Transcript */}
         <section className="mb-12">
