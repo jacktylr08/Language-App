@@ -1,11 +1,15 @@
 import { Router, Response } from 'express';
 import { Lesson } from '@/models/Lesson';
+import { LessonSegment } from '@/models/LessonSegment';
+import { ComprehensionQuestion } from '@/models/ComprehensionQuestion';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
+import { lessonProgress } from '@/services/lesson-progress';
+import { auth } from '@/services/auth';
 import { logger } from '@/utils/logger';
 
 const router = Router();
 
-// List lessons
+// List lessons (public, no auth required)
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { level, phase, theme, limit = 20, offset = 0 } = req.query;
@@ -25,6 +29,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const lessons = await query
       .limit(parseInt(limit as string))
       .offset(parseInt(offset as string))
+      .orderBy('level', 'asc')
       .orderBy('created_at', 'asc');
 
     const total = await Lesson.query()
@@ -36,6 +41,32 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch lessons';
     logger.error('Get lessons error:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Get available lessons for authenticated user
+router.get('/available', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { phase, limit = 20 } = req.query;
+
+    const user = await auth.getUserById(req.userId!);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const lessons = await lessonProgress.getAvailableLessons(
+      req.userId!,
+      user.created_at!,
+      phase as string | undefined,
+      parseInt(limit as string)
+    );
+
+    res.json({ lessons });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch available lessons';
+    logger.error('Get available lessons error:', message);
     res.status(500).json({ error: message });
   }
 });
@@ -55,7 +86,20 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    res.json(lesson);
+    // Fetch related content
+    const segments = await LessonSegment.query()
+      .where('lesson_id', id)
+      .orderBy('sequence_order', 'asc');
+
+    const questions = await ComprehensionQuestion.query()
+      .where('lesson_id', id)
+      .orderBy('sequence_order', 'asc');
+
+    res.json({
+      ...lesson,
+      segments,
+      questions,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch lesson';
     logger.error('Get lesson error:', message);
@@ -93,15 +137,29 @@ router.post('/:id/start', verifyToken, async (req: AuthRequest, res: Response): 
   try {
     const { id } = req.params;
 
-    const lesson = await Lesson.query().findById(id);
-    if (!lesson) {
-      res.status(404).json({ error: 'Lesson not found' });
+    const user = await auth.getUserById(req.userId!);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
       return;
     }
 
-    // TODO: Create/update lesson_progress record
-    // For now, just acknowledge
-    res.json({ success: true, lessonId: id, userId: req.userId });
+    // Check if can start
+    const canStart = await lessonProgress.canStartLesson(req.userId!, id, user.created_at!);
+    if (!canStart.canStart) {
+      res.status(403).json({ error: canStart.reason });
+      return;
+    }
+
+    const progress = await lessonProgress.startLesson(req.userId!, id);
+
+    res.json({
+      success: true,
+      progress: {
+        id: progress.id,
+        status: progress.status,
+        startedAt: progress.started_at,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to start lesson';
     logger.error('Start lesson error:', message);
@@ -114,15 +172,18 @@ router.post('/:id/complete', verifyToken, async (req: AuthRequest, res: Response
   try {
     const { id } = req.params;
 
-    const lesson = await Lesson.query().findById(id);
-    if (!lesson) {
-      res.status(404).json({ error: 'Lesson not found' });
-      return;
-    }
+    const progress = await lessonProgress.completeLesson(req.userId!, id);
 
-    // TODO: Update lesson_progress, extract vocabulary, trigger SR engine
-    // For now, just acknowledge
-    res.json({ success: true, lessonId: id, userId: req.userId });
+    res.json({
+      success: true,
+      progress: {
+        id: progress.id,
+        status: progress.status,
+        completedAt: progress.completed_at,
+        extractedVocabularyCount: progress.extracted_vocabulary_count,
+        extractedVocabularyIds: progress.extracted_vocabulary_ids,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to complete lesson';
     logger.error('Complete lesson error:', message);
