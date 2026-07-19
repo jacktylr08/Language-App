@@ -20,10 +20,10 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
       query = query.where('level', parseInt(level as string));
     }
     if (phase) {
-      query = query.where('curriculum_phase', phase as string);
+      query = query.where('lesson_type', phase as string);
     }
     if (theme) {
-      query = query.where('theme', theme as string);
+      query = query.where('theme_category', theme as string);
     }
 
     const lessons = await query

@@ -246,7 +246,7 @@ export const lessonProgress = {
       .orderBy('created_at', 'asc');
 
     if (phase) {
-      query = query.where('curriculum_phase', phase);
+      query = query.where('lesson_type', phase);
     }
 
     const lessons = await query.limit(limit);
