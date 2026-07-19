@@ -2,12 +2,24 @@ import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function seed(knex: Knex): Promise<void> {
-  // Only seed if lesson_phases table is empty (idempotent)
-  const existingPhase1 = await knex('lesson_phases').where('phase', 1).first();
-  if (existingPhase1) {
+  // Check if Phase 1 lessons already exist (by checking for our first lesson)
+  const existingLesson = await knex('lessons')
+    .where('title', 'Phonetics & First Sounds')
+    .first();
+
+  if (existingLesson) {
     console.log('Phase 1 lessons already seeded; skipping');
     return;
   }
+
+  // Delete old lessons to make room for Phase 1
+  console.log('Clearing old lessons to seed Phase 1 curriculum...');
+  await knex('comprehension_questions').del();
+  await knex('lesson_segments').del();
+  await knex('story_comprehension').del();
+  await knex('story_blocks').del();
+  await knex('stories').del();
+  await knex('lessons').del();
 
   // ============================================================================
   // PHASE 1: FOUNDATION (Weeks 1-4)
@@ -18,9 +30,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'Phonetics & First Sounds',
       description: 'Introduce Spanish phonetics and greetings. Learn hola, adiós, sí, no, and basic politeness.',
-      audio_url: 'https://example.com/audio/lesson-1-phonetics.mp3', // Will be generated
+      audio_url: '/audio/lesson-1.mp3',
       audio_duration_seconds: 90,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 1,
       lesson_order: 1,
       theme_category: 'phonetics',
@@ -30,9 +46,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'R Sounds & Verbs',
       description: 'Spanish /r/ vs /rr/ pronunciation. Introduce ser (to be) conjugation via listening.',
-      audio_url: 'https://example.com/audio/lesson-2-r-sounds.mp3',
+      audio_url: '/audio/lesson-2.mp3',
       audio_duration_seconds: 120,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 1,
       lesson_order: 2,
       theme_category: 'phonetics',
@@ -42,9 +62,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'First Verbs & Daily Actions',
       description: 'Common action verbs (hablar, comer, vivir, tener, estar, ir, hacer) in context.',
-      audio_url: 'https://example.com/audio/lesson-3-verbs.mp3',
+      audio_url: '/audio/lesson-3.mp3',
       audio_duration_seconds: 150,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 2,
       lesson_order: 1,
       theme_category: 'verbs',
@@ -54,9 +78,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'Family & Relationships',
       description: 'Family vocabulary (padre, madre, hermano, hermana) and possessive adjectives.',
-      audio_url: 'https://example.com/audio/lesson-4-family.mp3',
+      audio_url: '/audio/lesson-4.mp3',
       audio_duration_seconds: 120,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 2,
       lesson_order: 2,
       theme_category: 'family',
@@ -66,9 +94,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'Common Nouns & Places',
       description: 'Essential nouns (house, day, time, food, water) and location descriptions.',
-      audio_url: 'https://example.com/audio/lesson-5-nouns.mp3',
+      audio_url: '/audio/lesson-5.mp3',
       audio_duration_seconds: 120,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 3,
       lesson_order: 1,
       theme_category: 'nouns',
@@ -78,9 +110,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'Adjectives & Descriptions',
       description: 'Basic adjectives (good, bad, big, small, new, old) and colors.',
-      audio_url: 'https://example.com/audio/lesson-6-adjectives.mp3',
+      audio_url: '/audio/lesson-6.mp3',
       audio_duration_seconds: 150,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 3,
       lesson_order: 2,
       theme_category: 'adjectives',
@@ -90,9 +126,13 @@ export async function seed(knex: Knex): Promise<void> {
       id: uuidv4(),
       title: 'Consolidation & Review',
       description: 'Mix all 100 words from Weeks 1-3 in context. Complex comprehension tasks.',
-      audio_url: 'https://example.com/audio/lesson-7-review.mp3',
+      audio_url: '/audio/lesson-7.mp3',
       audio_duration_seconds: 180,
-      curriculum_phase: 1,
+      level: 1,
+      curriculum_phase: 'foundation',
+      content_type: 'listening',
+      published: true,
+      phase: 1,
       week_number: 4,
       lesson_order: 1,
       theme_category: 'review',
