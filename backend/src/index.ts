@@ -91,17 +91,18 @@ const start = async (): Promise<void> => {
       logger.info('Database schema up to date');
     }
 
-    // Seed only when the vocabulary table is empty, so redeploys
-    // never wipe user progress.
-    const [{ count }] = await knexInstance('vocabulary').count('id as count');
+    // Seed when there are no lessons yet. The seed only touches content
+    // tables (never users or their progress), so this is safe to run on a
+    // database that already has registered users.
+    const [{ count }] = await knexInstance('lessons').count('id as count');
     if (Number(count) === 0) {
-      logger.info('Empty database detected — seeding initial content...');
+      logger.info('No lessons found — seeding initial content...');
       await knexInstance.seed.run({
         directory: path.join(__dirname, 'database/seeds'),
       });
       logger.info('Seed data inserted');
     } else {
-      logger.info(`Database already seeded (${count} vocabulary entries)`);
+      logger.info(`Content already seeded (${count} lessons)`);
     }
   } catch (error) {
     logger.error(

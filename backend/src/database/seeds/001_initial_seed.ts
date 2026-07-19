@@ -1,22 +1,20 @@
 import type { Knex } from 'knex';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function seed(knex: Knex): Promise<void> {
-  // Clear existing data (development only)
+  // Clear existing CONTENT only. User accounts and their progress are
+  // intentionally left untouched so re-seeding never destroys a real user.
   await knex('story_comprehension').del();
   await knex('story_blocks').del();
   await knex('stories').del();
   await knex('comprehension_questions').del();
   await knex('lesson_segments').del();
-  await knex('vocabulary_review_history').del();
-  await knex('review_queue').del();
-  await knex('lesson_progress').del();
-  await knex('user_vocabulary_progress').del();
   await knex('vocabulary').del();
   await knex('lessons').del();
-  await knex('user_acquisition_metrics').del();
-  await knex('users').del();
 
-  // Comprehensive vocabulary (100+ most frequent Spanish words)
+  // ---------------------------------------------------------------------------
+  // Vocabulary (70 most frequent Spanish words)
+  // ---------------------------------------------------------------------------
   const vocabulary = [
     // Articles & Pronouns
     { spanish: 'el', english: ['the'], part_of_speech: 'article', frequency_rank: 1, ipa_pronunciation: 'el', example_sentence_spanish: 'El gato es grande.', example_sentence_english: 'The cat is big.', category: 'article_definite' },
@@ -99,233 +97,152 @@ export async function seed(knex: Knex): Promise<void> {
     { spanish: 'perdón', english: ['sorry', 'excuse me'], part_of_speech: 'interjection', frequency_rank: 70, ipa_pronunciation: 'per-DON', example_sentence_spanish: 'Perdón, no entiendo.', example_sentence_english: 'Sorry, I don\'t understand.', category: 'politeness' },
   ];
 
-  const vocabIds = await knex('vocabulary').insert(vocabulary).returning('id');
+  await knex('vocabulary').insert(vocabulary);
 
-  // Foundation Lessons (unlock immediately)
+  // ---------------------------------------------------------------------------
+  // Lessons — stable UUIDs so segments/questions/prereqs can reference them.
+  // calendar_unlock_day gates each lesson: day 0 is available immediately,
+  // later lessons unlock on subsequent days and via prerequisites.
+  // ---------------------------------------------------------------------------
+  const L1 = uuidv4();
+  const L2 = uuidv4();
+  const L3 = uuidv4();
+  const L4 = uuidv4();
+  const L5 = uuidv4();
+
   const lessons = [
+    { id: L1, title: 'Greetings & Introductions', description: 'Learn basic Spanish greetings and how to introduce yourself.', level: 1, curriculum_phase: 'foundation', content_type: 'listening', theme: 'greetings', prerequisites: [], calendar_unlock_day: 0, estimated_duration_minutes: 15, audio_url: 'https://audio.placeholder.com/lesson1.mp3', audio_duration_seconds: 150, published: true },
+    { id: L2, title: 'Numbers & Time', description: 'Master Spanish numbers 0-100 and telling time.', level: 1, curriculum_phase: 'foundation', content_type: 'listening', theme: 'numbers', prerequisites: [L1], calendar_unlock_day: 1, estimated_duration_minutes: 15, audio_url: 'https://audio.placeholder.com/lesson2.mp3', audio_duration_seconds: 190, published: true },
+    { id: L3, title: 'Common Objects & Places', description: 'Learn vocabulary for everyday objects and locations.', level: 1, curriculum_phase: 'foundation', content_type: 'listening', theme: 'objects', prerequisites: [L2], calendar_unlock_day: 2, estimated_duration_minutes: 20, audio_url: 'https://audio.placeholder.com/lesson3.mp3', audio_duration_seconds: 210, published: true },
+    { id: L4, title: 'Ser vs Estar (To Be)', description: 'Understand the difference between permanent and temporary "to be".', level: 2, curriculum_phase: 'core', content_type: 'listening', theme: 'verbs', prerequisites: [L3], calendar_unlock_day: 3, estimated_duration_minutes: 25, audio_url: 'https://audio.placeholder.com/lesson4.mp3', audio_duration_seconds: 245, published: true },
+    { id: L5, title: 'Present Tense Conjugation', description: 'Learn how to conjugate regular -AR, -ER, -IR verbs in present tense.', level: 2, curriculum_phase: 'core', content_type: 'listening', theme: 'verbs', prerequisites: [L4], calendar_unlock_day: 4, estimated_duration_minutes: 25, audio_url: 'https://audio.placeholder.com/lesson5.mp3', audio_duration_seconds: 275, published: true },
+  ];
+
+  await knex('lessons').insert(lessons);
+
+  // ---------------------------------------------------------------------------
+  // Lesson segments (transcript lines). start_ms/end_ms accumulate per lesson.
+  // ---------------------------------------------------------------------------
+  type SegSpec = { es: string; en: string; dur: number };
+  const segmentsByLesson: Array<{ lessonId: string; segs: SegSpec[] }> = [
     {
-      id: 'lesson-001',
-      title: 'Greetings & Introductions',
-      description: 'Learn basic Spanish greetings and how to introduce yourself.',
-      phase: 'foundation',
-      order: 1,
-      difficulty: 1,
-      prerequisites: [],
-      calendar_unlock_day: 0,
-      thumbnail_url: 'https://via.placeholder.com/300x200?text=Saludos',
-      estimated_duration_minutes: 15,
-      vocabulary_count: 10,
+      lessonId: L1,
+      segs: [
+        { es: 'Hola. Buenos días. Buenas tardes.', en: 'Hello. Good morning. Good afternoon.', dur: 45 },
+        { es: 'Me llamo... Mucho gusto.', en: 'My name is... Nice to meet you.', dur: 50 },
+        { es: '¿Cómo estás? Bien. Muy bien.', en: 'How are you? Well. Very well.', dur: 55 },
+      ],
     },
     {
-      id: 'lesson-002',
-      title: 'Numbers & Time',
-      description: 'Master Spanish numbers 0-100 and telling time.',
-      phase: 'foundation',
-      order: 2,
-      difficulty: 1,
-      prerequisites: ['lesson-001'],
-      calendar_unlock_day: 1,
-      thumbnail_url: 'https://via.placeholder.com/300x200?text=Números',
-      estimated_duration_minutes: 15,
-      vocabulary_count: 15,
+      lessonId: L2,
+      segs: [
+        { es: 'Cero, uno, dos, tres, cuatro, cinco, seis, siete, ocho, nueve, diez.', en: 'Zero, one, two, three, four, five, six, seven, eight, nine, ten.', dur: 60 },
+        { es: 'Veinte, treinta, cuarenta, cincuenta, sesenta, setenta, ochenta, noventa, cien.', en: 'Twenty, thirty, forty, fifty, sixty, seventy, eighty, ninety, one hundred.', dur: 60 },
+        { es: '¿Qué hora es? Son las tres.', en: 'What time is it? It is three o\'clock.', dur: 70 },
+      ],
     },
     {
-      id: 'lesson-003',
-      title: 'Common Objects & Places',
-      description: 'Learn vocabulary for everyday objects and locations.',
-      phase: 'foundation',
-      order: 3,
-      difficulty: 1,
-      prerequisites: ['lesson-002'],
-      calendar_unlock_day: 2,
-      thumbnail_url: 'https://via.placeholder.com/300x200?text=Objetos',
-      estimated_duration_minutes: 20,
-      vocabulary_count: 20,
+      lessonId: L3,
+      segs: [
+        { es: 'Casa, puerta, ventana, mesa, silla, cama.', en: 'House, door, window, table, chair, bed.', dur: 65 },
+        { es: 'Tienda, parque, biblioteca, hospital, escuela.', en: 'Store, park, library, hospital, school.', dur: 70 },
+        { es: 'Pan, agua, café, leche, manzana, naranja.', en: 'Bread, water, coffee, milk, apple, orange.', dur: 75 },
+      ],
     },
     {
-      id: 'lesson-004',
-      title: 'Ser vs Estar (To Be)',
-      description: 'Understand the difference between permanent and temporary "to be".',
-      phase: 'core',
-      order: 1,
-      difficulty: 2,
-      prerequisites: ['lesson-003'],
-      calendar_unlock_day: 3,
-      thumbnail_url: 'https://via.placeholder.com/300x200?text=Verbos',
-      estimated_duration_minutes: 25,
-      vocabulary_count: 10,
+      lessonId: L4,
+      segs: [
+        { es: 'Yo soy ingeniero. Ella es mexicana.', en: 'I am an engineer. She is Mexican. SER is used for permanent characteristics.', dur: 80 },
+        { es: 'Estoy en la casa. Estoy feliz.', en: 'I am at home. I am happy. ESTAR is used for location and temporary states.', dur: 80 },
+        { es: 'María es alta. María está feliz.', en: 'María is tall (permanent). María is happy (temporary). Notice the difference!', dur: 85 },
+      ],
     },
     {
-      id: 'lesson-005',
-      title: 'Present Tense Conjugation',
-      description: 'Learn how to conjugate regular -AR, -ER, -IR verbs in present tense.',
-      phase: 'core',
-      order: 2,
-      difficulty: 2,
-      prerequisites: ['lesson-004'],
-      calendar_unlock_day: 4,
-      thumbnail_url: 'https://via.placeholder.com/300x200?text=Conjugación',
-      estimated_duration_minutes: 25,
-      vocabulary_count: 15,
+      lessonId: L5,
+      segs: [
+        { es: 'Hablar, comer, vivir.', en: 'To speak, to eat, to live. Regular verbs follow predictable patterns: -AR, -ER, -IR.', dur: 90 },
+        { es: 'Hablo, hablas, habla, hablamos, habláis, hablan.', en: 'I speak, you speak, he/she speaks, we speak, you all speak, they speak.', dur: 90 },
+        { es: 'Como, comes, come. Vivo, vives, vive.', en: 'I eat, you eat, he/she eats. I live, you live, he/she lives.', dur: 95 },
+      ],
     },
   ];
 
-  const lessonIds = await knex('lessons').insert(lessons).returning('id');
+  const segmentRows: any[] = [];
+  for (const { lessonId, segs } of segmentsByLesson) {
+    let cursorMs = 0;
+    segs.forEach((seg, idx) => {
+      const startMs = cursorMs;
+      const endMs = cursorMs + seg.dur * 1000;
+      cursorMs = endMs;
+      segmentRows.push({
+        lesson_id: lessonId,
+        start_ms: startMs,
+        end_ms: endMs,
+        spanish_text: seg.es,
+        english_text: seg.en,
+        sequence_order: idx + 1,
+      });
+    });
+  }
 
-  // Lesson Segments with audio
-  const segments = [
-    // Lesson 1 segments
-    { lesson_id: 'lesson-001', order: 1, title: 'Basic Greetings', content_text: 'Hola means hello. Buenos días means good morning. Buenas tardes means good afternoon.', audio_url: 'https://audio.placeholder.com/lesson1-segment1.mp3', duration_seconds: 45 },
-    { lesson_id: 'lesson-001', order: 2, title: 'Saying Your Name', content_text: 'Me llamo... means My name is... Mucho gusto means Nice to meet you.', audio_url: 'https://audio.placeholder.com/lesson1-segment2.mp3', duration_seconds: 50 },
-    { lesson_id: 'lesson-001', order: 3, title: 'Common Responses', content_text: '¿Cómo estás? means How are you? Bien means well. Muy bien means very well.', audio_url: 'https://audio.placeholder.com/lesson1-segment3.mp3', duration_seconds: 55 },
+  await knex('lesson_segments').insert(segmentRows);
 
-    // Lesson 2 segments
-    { lesson_id: 'lesson-002', order: 1, title: 'Numbers 0-20', content_text: 'Cero, uno, dos, tres, cuatro, cinco, seis, siete, ocho, nueve, diez, once, doce...', audio_url: 'https://audio.placeholder.com/lesson2-segment1.mp3', duration_seconds: 60 },
-    { lesson_id: 'lesson-002', order: 2, title: 'Numbers 20-100', content_text: 'Veinte, treinta, cuarenta, cincuenta, sesenta, setenta, ochenta, noventa, ciento...', audio_url: 'https://audio.placeholder.com/lesson2-segment2.mp3', duration_seconds: 60 },
-    { lesson_id: 'lesson-002', order: 3, title: 'Telling Time', content_text: 'La hora means the hour. ¿Qué hora es? means What time is it? Son las tres means It is 3 o\'clock.', audio_url: 'https://audio.placeholder.com/lesson2-segment3.mp3', duration_seconds: 70 },
-
-    // Lesson 3 segments
-    { lesson_id: 'lesson-003', order: 1, title: 'Household Objects', content_text: 'Casa (house), puerta (door), ventana (window), mesa (table), silla (chair), cama (bed)...', audio_url: 'https://audio.placeholder.com/lesson3-segment1.mp3', duration_seconds: 65 },
-    { lesson_id: 'lesson-003', order: 2, title: 'Places in Town', content_text: 'Tienda (store), parque (park), biblioteca (library), hospital (hospital), escuela (school)...', audio_url: 'https://audio.placeholder.com/lesson3-segment2.mp3', duration_seconds: 70 },
-    { lesson_id: 'lesson-003', order: 3, title: 'Food & Drinks', content_text: 'Pan (bread), agua (water), café (coffee), leche (milk), manzana (apple), naranja (orange)...', audio_url: 'https://audio.placeholder.com/lesson3-segment3.mp3', duration_seconds: 75 },
-
-    // Lesson 4 segments
-    { lesson_id: 'lesson-004', order: 1, title: 'Introduction to SER', content_text: 'SER is used for permanent characteristics: Yo soy ingeniero (I am an engineer). She is mexican: Ella es mexicana.', audio_url: 'https://audio.placeholder.com/lesson4-segment1.mp3', duration_seconds: 80 },
-    { lesson_id: 'lesson-004', order: 2, title: 'Introduction to ESTAR', content_text: 'ESTAR is used for location and temporary state: Estoy en la casa (I am at home). Estoy feliz (I am happy).', audio_url: 'https://audio.placeholder.com/lesson4-segment2.mp3', duration_seconds: 80 },
-    { lesson_id: 'lesson-004', order: 3, title: 'Comparing SER and ESTAR', content_text: 'Maria es alta (permanent - Maria IS tall). Maria está feliz (temporary - Maria IS happy). Notice the difference!', audio_url: 'https://audio.placeholder.com/lesson4-segment3.mp3', duration_seconds: 85 },
-
-    // Lesson 5 segments
-    { lesson_id: 'lesson-005', order: 1, title: 'Present Tense Basics', content_text: 'Regular verbs follow predictable patterns. -AR verbs: hablar (to speak), -ER verbs: comer (to eat), -IR verbs: vivir (to live).', audio_url: 'https://audio.placeholder.com/lesson5-segment1.mp3', duration_seconds: 90 },
-    { lesson_id: 'lesson-005', order: 2, title: 'Conjugating -AR Verbs', content_text: 'Hablo, hablas, habla, hablamos, habláis, hablan. Example: Yo hablo español.', audio_url: 'https://audio.placeholder.com/lesson5-segment2.mp3', duration_seconds: 90 },
-    { lesson_id: 'lesson-005', order: 3, title: 'Conjugating -ER & -IR Verbs', content_text: 'COMER: Como, comes, come. VIVIR: Vivo, vives, vive. Practice these common conjugations.', audio_url: 'https://audio.placeholder.com/lesson5-segment3.mp3', duration_seconds: 95 },
-  ];
-
-  await knex('lesson_segments').insert(segments);
-
-  // Comprehension Questions
+  // ---------------------------------------------------------------------------
+  // Comprehension questions
+  // ---------------------------------------------------------------------------
   const questions = [
-    { lesson_id: 'lesson-001', question_es: '¿Cómo se dice "good morning" en español?', question_en: 'How do you say "good morning" in Spanish?', answer: 'Buenos días', type: 'fill_blank', segment_order: 1 },
-    { lesson_id: 'lesson-001', question_es: '¿Qué significa "mucho gusto"?', question_en: 'What does "mucho gusto" mean?', answer: 'Nice to meet you', type: 'multiple_choice', segment_order: 1 },
-    { lesson_id: 'lesson-001', question_es: '¿Cómo preguntas "¿How are you?" en español?', question_en: 'How do you ask "How are you?" in Spanish?', answer: '¿Cómo estás?', type: 'fill_blank', segment_order: 3 },
+    // Lesson 1
+    { lesson_id: L1, question_type: 'short_answer', question_english: 'How do you say "good morning" in Spanish?', question_spanish: '¿Cómo se dice "good morning" en español?', options: null, correct_answer: null, acceptable_answers: ['Buenos días', 'buenos dias'], sequence_order: 1 },
+    { lesson_id: L1, question_type: 'multiple_choice', question_english: 'What does "mucho gusto" mean?', question_spanish: '¿Qué significa "mucho gusto"?', options: ['Nice to meet you', 'Good morning', 'Thank you', 'Goodbye'], correct_answer: 0, acceptable_answers: null, sequence_order: 2 },
+    { lesson_id: L1, question_type: 'short_answer', question_english: 'How do you ask "How are you?" in Spanish?', question_spanish: '¿Cómo preguntas "How are you?" en español?', options: null, correct_answer: null, acceptable_answers: ['¿Cómo estás?', 'como estas'], sequence_order: 3 },
 
-    { lesson_id: 'lesson-002', question_es: '¿Cuál es el número después de "nueve"?', question_en: 'What is the number after "nueve"?', answer: 'Diez', type: 'multiple_choice', segment_order: 1 },
-    { lesson_id: 'lesson-002', question_es: '¿Cómo preguntas qué hora es?', question_en: 'How do you ask what time it is?', answer: '¿Qué hora es?', type: 'fill_blank', segment_order: 3 },
+    // Lesson 2
+    { lesson_id: L2, question_type: 'multiple_choice', question_english: 'What is the number after "nueve"?', question_spanish: '¿Cuál es el número después de "nueve"?', options: ['Diez', 'Ocho', 'Once', 'Veinte'], correct_answer: 0, acceptable_answers: null, sequence_order: 1 },
+    { lesson_id: L2, question_type: 'short_answer', question_english: 'How do you ask what time it is?', question_spanish: '¿Cómo preguntas qué hora es?', options: null, correct_answer: null, acceptable_answers: ['¿Qué hora es?', 'que hora es'], sequence_order: 2 },
 
-    { lesson_id: 'lesson-003', question_es: '¿Cómo se dice "table" en español?', question_en: 'How do you say "table" in Spanish?', answer: 'Mesa', type: 'fill_blank', segment_order: 1 },
+    // Lesson 3
+    { lesson_id: L3, question_type: 'short_answer', question_english: 'How do you say "table" in Spanish?', question_spanish: '¿Cómo se dice "table" en español?', options: null, correct_answer: null, acceptable_answers: ['Mesa', 'mesa', 'la mesa'], sequence_order: 1 },
 
-    { lesson_id: 'lesson-004', question_es: '¿Cuándo usas SER en lugar de ESTAR?', question_en: 'When do you use SER instead of ESTAR?', answer: 'For permanent characteristics', type: 'multiple_choice', segment_order: 1 },
+    // Lesson 4
+    { lesson_id: L4, question_type: 'multiple_choice', question_english: 'When do you use SER instead of ESTAR?', question_spanish: '¿Cuándo usas SER en lugar de ESTAR?', options: ['For permanent characteristics', 'For location', 'For temporary states', 'For emotions'], correct_answer: 0, acceptable_answers: null, sequence_order: 1 },
 
-    { lesson_id: 'lesson-005', question_es: '¿Cuál es la conjugación correcta: "Yo _____ español"?', question_en: 'What is the correct conjugation: "Yo _____ español" (hablo/hablas)?', answer: 'hablo', type: 'fill_blank', segment_order: 2 },
+    // Lesson 5
+    { lesson_id: L5, question_type: 'short_answer', question_english: 'What is the correct conjugation: "Yo _____ español" (hablo/hablas)?', question_spanish: '¿Cuál es la conjugación correcta: "Yo _____ español"?', options: null, correct_answer: null, acceptable_answers: ['hablo'], sequence_order: 2 },
   ];
 
   await knex('comprehension_questions').insert(questions);
 
-  // Stories for reading practice
+  // ---------------------------------------------------------------------------
+  // Stories & story blocks
+  // ---------------------------------------------------------------------------
+  const S1 = uuidv4();
+  const S2 = uuidv4();
+  const S3 = uuidv4();
+
   const stories = [
-    {
-      id: 'story-001',
-      title: 'El Gato y el Ratón',
-      description: 'A classic story about a cat and mouse.',
-      difficulty: 1,
-      theme: 'animals',
-      language_level: 'beginner',
-      reading_time_minutes: 10,
-    },
-    {
-      id: 'story-002',
-      title: 'Un Día en la Ciudad',
-      description: 'A young woman\'s day in Madrid exploring the city.',
-      difficulty: 2,
-      theme: 'daily_life',
-      language_level: 'beginner_intermediate',
-      reading_time_minutes: 15,
-    },
-    {
-      id: 'story-003',
-      title: 'La Familia García',
-      description: 'Meet the García family and their weekend activities.',
-      difficulty: 2,
-      theme: 'family',
-      language_level: 'beginner_intermediate',
-      reading_time_minutes: 12,
-    },
+    { id: S1, title: 'El Gato y el Ratón', description: 'A classic story about a cat and mouse.', difficulty_level: 1, reading_time_minutes: 10, theme: 'animals', published: true },
+    { id: S2, title: 'Un Día en la Ciudad', description: 'A young woman\'s day in Madrid exploring the city.', difficulty_level: 2, reading_time_minutes: 15, theme: 'daily_life', published: true },
+    { id: S3, title: 'La Familia García', description: 'Meet the García family and their weekend activities.', difficulty_level: 2, reading_time_minutes: 12, theme: 'family', published: true },
   ];
 
-  const storyIds = await knex('stories').insert(stories).returning('id');
+  await knex('stories').insert(stories);
 
-  // Story blocks (chapters/sections)
   const storyBlocks = [
-    {
-      story_id: 'story-001',
-      order: 1,
-      title: 'El Encuentro',
-      text_es: 'En una casa pequeña, vivía un gato muy inteligente. Un día, vio un ratón en la cocina. El gato pensó: "¡Qué buena cena!" Pero el ratón era muy rápido y astuto.',
-      text_en: 'In a small house, there lived a very intelligent cat. One day, he saw a mouse in the kitchen. The cat thought: "What a good dinner!" But the mouse was very fast and clever.',
-    },
-    {
-      story_id: 'story-001',
-      order: 2,
-      title: 'La Persecución',
-      text_es: 'El gato empezó a perseguir al ratón por toda la casa. Corrieron por la sala, la cocina y el dormitorio. El ratón corría muy rápido, saltaba sobre las mesas y se escondía en los rincones.',
-      text_en: 'The cat began to chase the mouse all over the house. They ran through the living room, the kitchen, and the bedroom. The mouse ran very fast, jumped over tables, and hid in corners.',
-    },
-    {
-      story_id: 'story-001',
-      order: 3,
-      title: 'El Final',
-      text_es: 'Finalmente, el ratón encontró un agujero pequeño en la pared. Se metió dentro rápidamente. El gato no podía entrar. El ratón estaba seguro en su casa. El gato se fue a dormir, cansado. Y el ratón sonrió con satisfacción.',
-      text_en: 'Finally, the mouse found a small hole in the wall. He quickly squeezed inside. The cat couldn\'t get in. The mouse was safe in his home. The cat went to sleep, exhausted. And the mouse smiled with satisfaction.',
-    },
+    { story_id: S1, sequence_order: 1, spanish: 'En una casa pequeña, vivía un gato muy inteligente. Un día, vio un ratón en la cocina. El gato pensó: "¡Qué buena cena!" Pero el ratón era muy rápido y astuto.', english: 'In a small house, there lived a very intelligent cat. One day, he saw a mouse in the kitchen. The cat thought: "What a good dinner!" But the mouse was very fast and clever.' },
+    { story_id: S1, sequence_order: 2, spanish: 'El gato empezó a perseguir al ratón por toda la casa. Corrieron por la sala, la cocina y el dormitorio. El ratón corría muy rápido, saltaba sobre las mesas y se escondía en los rincones.', english: 'The cat began to chase the mouse all over the house. They ran through the living room, the kitchen, and the bedroom. The mouse ran very fast, jumped over tables, and hid in corners.' },
+    { story_id: S1, sequence_order: 3, spanish: 'Finalmente, el ratón encontró un agujero pequeño en la pared. Se metió dentro rápidamente. El gato no podía entrar. El ratón estaba seguro en su casa. El gato se fue a dormir, cansado. Y el ratón sonrió con satisfacción.', english: 'Finally, the mouse found a small hole in the wall. He quickly squeezed inside. The cat couldn\'t get in. The mouse was safe in his home. The cat went to sleep, exhausted. And the mouse smiled with satisfaction.' },
 
-    {
-      story_id: 'story-002',
-      order: 1,
-      title: 'La Mañana',
-      text_es: 'María se despertó a las 7 de la mañana en su apartamento en Madrid. Tomó un café con pan y mermelada. Luego se preparó para el día. Hace un día hermoso, pensó. Las calles están llenas de vida y color.',
-      text_en: 'María woke up at 7 in the morning in her apartment in Madrid. She had coffee with bread and jam. Then she prepared for the day. It\'s a beautiful day, she thought. The streets are full of life and color.',
-    },
-    {
-      story_id: 'story-002',
-      order: 2,
-      title: 'La Exploración',
-      text_es: 'María caminó por las calles de Madrid. Visitó el Parque del Retiro, donde hay árboles verdes y flores bonitas. Vio a muchas personas: algunos leían libros, otros jugaban, muchos simplemente descansaban bajo el sol.',
-      text_en: 'María walked through the streets of Madrid. She visited Retiro Park, where there are green trees and beautiful flowers. She saw many people: some were reading books, others were playing, many were simply resting under the sun.',
-    },
-    {
-      story_id: 'story-002',
-      order: 3,
-      title: 'La Tarde',
-      text_es: 'Por la tarde, María entró en una pequeña café. Pidió un café y un sándwich. Se sentó en una mesa junto a la ventana y observó a las personas que pasaban. Pensó que la vida en Madrid era hermosa y emocionante.',
-      text_en: 'In the afternoon, María went into a small café. She ordered a coffee and a sandwich. She sat at a table by the window and watched the people passing by. She thought that life in Madrid was beautiful and exciting.',
-    },
+    { story_id: S2, sequence_order: 1, spanish: 'María se despertó a las 7 de la mañana en su apartamento en Madrid. Tomó un café con pan y mermelada. Luego se preparó para el día. Hace un día hermoso, pensó. Las calles están llenas de vida y color.', english: 'María woke up at 7 in the morning in her apartment in Madrid. She had coffee with bread and jam. Then she prepared for the day. It\'s a beautiful day, she thought. The streets are full of life and color.' },
+    { story_id: S2, sequence_order: 2, spanish: 'María caminó por las calles de Madrid. Visitó el Parque del Retiro, donde hay árboles verdes y flores bonitas. Vio a muchas personas: algunos leían libros, otros jugaban, muchos simplemente descansaban bajo el sol.', english: 'María walked through the streets of Madrid. She visited Retiro Park, where there are green trees and beautiful flowers. She saw many people: some were reading books, others were playing, many were simply resting under the sun.' },
+    { story_id: S2, sequence_order: 3, spanish: 'Por la tarde, María entró en un pequeño café. Pidió un café y un sándwich. Se sentó en una mesa junto a la ventana y observó a las personas que pasaban. Pensó que la vida en Madrid era hermosa y emocionante.', english: 'In the afternoon, María went into a small café. She ordered a coffee and a sandwich. She sat at a table by the window and watched the people passing by. She thought that life in Madrid was beautiful and exciting.' },
 
-    {
-      story_id: 'story-003',
-      order: 1,
-      title: 'Sábado por la Mañana',
-      text_es: 'La familia García se reunió el sábado por la mañana. Papá preparó el desayuno: huevos, pan tostado y jugo de naranja. Mamá puso la mesa. Los niños, Juan y Sofia, estaban muy felices. "¡Qué delicioso!" dijeron.',
-      text_en: 'The García family gathered on Saturday morning. Dad prepared breakfast: eggs, toast, and orange juice. Mom set the table. The children, Juan and Sofia, were very happy. "How delicious!" they said.',
-    },
-    {
-      story_id: 'story-003',
-      order: 2,
-      title: 'El Parque',
-      text_es: 'Después del desayuno, fueron al parque. Juan y Sofia jugaron en el patio de juegos mientras los padres se sentaban en un banco. Jugaron al fútbol, corrieron y rieron mucho. Fue un día perfecto para la familia.',
-      text_en: 'After breakfast, they went to the park. Juan and Sofia played on the playground while their parents sat on a bench. They played soccer, ran, and laughed a lot. It was a perfect day for the family.',
-    },
-    {
-      story_id: 'story-003',
-      order: 3,
-      title: 'La Noche',
-      text_es: 'Por la noche, toda la familia se sentó en el sofá. Vieron una película juntos y comieron palomitas. Fue una día maravilloso lleno de amor y alegría. Todos dijeron: "¡Fue el mejor sábado!"',
-      text_en: 'At night, the whole family sat on the couch. They watched a movie together and ate popcorn. It was a wonderful day full of love and joy. Everyone said: "It was the best Saturday!"',
-    },
+    { story_id: S3, sequence_order: 1, spanish: 'La familia García se reunió el sábado por la mañana. Papá preparó el desayuno: huevos, pan tostado y jugo de naranja. Mamá puso la mesa. Los niños, Juan y Sofía, estaban muy felices. "¡Qué delicioso!" dijeron.', english: 'The García family gathered on Saturday morning. Dad prepared breakfast: eggs, toast, and orange juice. Mom set the table. The children, Juan and Sofía, were very happy. "How delicious!" they said.' },
+    { story_id: S3, sequence_order: 2, spanish: 'Después del desayuno, fueron al parque. Juan y Sofía jugaron en el patio de juegos mientras los padres se sentaban en un banco. Jugaron al fútbol, corrieron y rieron mucho. Fue un día perfecto para la familia.', english: 'After breakfast, they went to the park. Juan and Sofía played on the playground while their parents sat on a bench. They played soccer, ran, and laughed a lot. It was a perfect day for the family.' },
+    { story_id: S3, sequence_order: 3, spanish: 'Por la noche, toda la familia se sentó en el sofá. Vieron una película juntos y comieron palomitas. Fue un día maravilloso lleno de amor y alegría. Todos dijeron: "¡Fue el mejor sábado!"', english: 'At night, the whole family sat on the couch. They watched a movie together and ate popcorn. It was a wonderful day full of love and joy. Everyone said: "It was the best Saturday!"' },
   ];
 
   await knex('story_blocks').insert(storyBlocks);
 
   console.log('✅ Seed data inserted successfully!');
-  console.log(`📚 Lessons created: ${lessons.length}`);
-  console.log(`📖 Stories created: ${stories.length}`);
-  console.log(`💬 Vocabulary items: ${vocabulary.length}`);
+  console.log(`📚 Vocabulary: ${vocabulary.length}, Lessons: ${lessons.length}, Stories: ${stories.length}`);
 }
