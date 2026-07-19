@@ -13,10 +13,51 @@ interface Lesson {
   curriculum_phase: string;
   content_type: string;
   estimated_duration_minutes: number;
+  theme_category?: string;
+  week_number?: number;
   canStart: boolean;
   unlockReason?: string;
   userProgress?: { status: string };
 }
+
+const themeColors: Record<string, { bg: string; border: string; badge: string; text: string }> = {
+  phonetics: {
+    bg: 'bg-slate-50 dark:bg-slate-800/50',
+    border: 'border-slate-300 dark:border-slate-600',
+    badge: 'bg-slate-500 text-white',
+    text: 'text-slate-900 dark:text-slate-100',
+  },
+  verbs: {
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    border: 'border-purple-300 dark:border-purple-700',
+    badge: 'bg-purple-600 text-white',
+    text: 'text-purple-900 dark:text-purple-100',
+  },
+  family: {
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    border: 'border-red-300 dark:border-red-700',
+    badge: 'bg-red-600 text-white',
+    text: 'text-red-900 dark:text-red-100',
+  },
+  nouns: {
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    border: 'border-blue-300 dark:border-blue-700',
+    badge: 'bg-blue-600 text-white',
+    text: 'text-blue-900 dark:text-blue-100',
+  },
+  adjectives: {
+    bg: 'bg-cyan-50 dark:bg-cyan-900/20',
+    border: 'border-cyan-300 dark:border-cyan-700',
+    badge: 'bg-cyan-600 text-white',
+    text: 'text-cyan-900 dark:text-cyan-100',
+  },
+  review: {
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    border: 'border-green-300 dark:border-green-700',
+    badge: 'bg-green-600 text-white',
+    text: 'text-green-900 dark:text-green-100',
+  },
+};
 
 export default function LessonsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
@@ -117,56 +158,69 @@ export default function LessonsPage() {
             <p className="mt-4 text-slate-600">Loading lessons...</p>
           </div>
         ) : lessons.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-slate-600 dark:text-slate-400">No lessons available yet</p>
+          <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg">
+            <p className="text-slate-600 dark:text-slate-400 text-lg">No lessons available yet</p>
+            <p className="text-slate-500 dark:text-slate-500 text-sm mt-2">Check back soon!</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-              >
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex-1">
-                      {lesson.title}
-                    </h3>
-                    {lesson.userProgress?.status === 'completed' && (
-                      <span className="text-sm bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 px-2 py-1 rounded">
-                        ✓ Done
-                      </span>
-                    )}
+          <div className="space-y-8">
+            {/* Group lessons by week */}
+            {[1, 2, 3, 4].map((week) => {
+              const weekLessons = lessons.filter((l) => l.week_number === week);
+              if (weekLessons.length === 0) return null;
+
+              return (
+                <div key={week}>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                    📚 Week {week}
+                  </h2>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {weekLessons.map((lesson) => {
+                      const theme = themeColors[lesson.theme_category || 'phonetics'] || themeColors.phonetics;
+
+                      return (
+                        <Link
+                          key={lesson.id}
+                          href={`/lessons/${lesson.id}`}
+                          className={`group rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all border-2 ${theme.bg} ${theme.border}`}
+                        >
+                          <div className="p-6">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <div className="flex gap-2 mb-2">
+                                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${theme.badge}`}>
+                                    {lesson.theme_category?.toUpperCase() || 'LESSON'}
+                                  </span>
+                                  {lesson.userProgress?.status === 'completed' && (
+                                    <span className="px-3 py-1 text-xs font-bold bg-green-500 text-white rounded-full">
+                                      ✓ DONE
+                                    </span>
+                                  )}
+                                </div>
+                                <h3 className={`text-lg font-bold ${theme.text} group-hover:underline`}>
+                                  {lesson.title}
+                                </h3>
+                              </div>
+                            </div>
+
+                            <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 line-clamp-2">
+                              {lesson.description || 'Learn and practice Spanish'}
+                            </p>
+
+                            <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
+                              <span>🎧 {lesson.estimated_duration_minutes} min</span>
+                              <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 font-semibold">
+                                Start →
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
                   </div>
-
-                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">
-                    {lesson.description || 'No description'}
-                  </p>
-
-                  <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    <span>Level {lesson.level}</span>
-                    <span>{lesson.estimated_duration_minutes} min</span>
-                  </div>
-
-                  {lesson.canStart ? (
-                    <Link
-                      href={`/lessons/${lesson.id}`}
-                      className="block w-full text-center py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-                    >
-                      {lesson.userProgress?.status === 'in_progress' ? 'Continue' : 'Start'}
-                    </Link>
-                  ) : (
-                    <button
-                      disabled
-                      className="w-full py-2 px-4 bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-400 font-semibold rounded-lg cursor-not-allowed"
-                      title={lesson.unlockReason}
-                    >
-                      {lesson.unlockReason || 'Locked'}
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
