@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { api } from '@/lib/api';
+import { TutorChat } from '@/components/TutorChat';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpeechAudioPlayer } from '@/components/SpeechAudioPlayer';
 import { getAudioScript } from '@/lib/audio-scripts';
@@ -31,6 +32,7 @@ interface Lesson {
   audio_url: string;
   audio_duration_seconds: number;
   curriculum_phase?: number;
+  phase?: number;
   week_number?: number;
   theme_category?: string;
   theme_color?: string;
@@ -133,6 +135,11 @@ export default function Phase1LessonPage() {
         </div>
       </div>
     );
+  }
+
+  // Use TutorChat for Phase 1 lessons (interactive AI tutoring)
+  if (lesson.phase === 1) {
+    return <TutorChat lessonId={lesson.id} lessonTitle={lesson.title} />;
   }
 
   return (

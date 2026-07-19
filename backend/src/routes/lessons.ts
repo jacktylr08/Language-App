@@ -5,7 +5,9 @@ import { ComprehensionQuestion } from '@/models/ComprehensionQuestion';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
 import { lessonProgress } from '@/services/lesson-progress';
 import { auth } from '@/services/auth';
+import { tutorService } from '@/services/tutor-service';
 import { logger } from '@/utils/logger';
+import { knexInstance } from '@/config/database';
 
 const router = Router();
 
@@ -187,6 +189,149 @@ router.post('/:id/complete', verifyToken, async (req: AuthRequest, res: Response
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to complete lesson';
     logger.error('Complete lesson error:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// ===== TUTOR ENDPOINTS =====
+
+// Get or create a tutor conversation
+router.get('/:id/tutor/conversation', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id: lessonId } = req.params;
+    const userId = req.userId!;
+
+    const conversation = await tutorService.getOrCreateConversation(userId, lessonId);
+    const messages = await tutorService.getConversationMessages(conversation.id);
+
+    res.json({
+      conversationId: conversation.id,
+      messages,
+      performanceScore: conversation.performance_score,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to get conversation';
+    logger.error('Get tutor conversation error:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Send message to tutor
+router.post('/:id/tutor/message', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id: lessonId } = req.params;
+    const userId = req.userId!;
+    const { message, conversationId } = req.body;
+
+    if (!message || !conversationId) {
+      res.status(400).json({ error: 'Missing message or conversationId' });
+      return;
+    }
+
+    // Verify conversation
+    const conversation = await knexInstance('tutor_conversations')
+      .where({
+        id: conversationId,
+        user_id: userId,
+        lesson_id: lessonId,
+      })
+      .first();
+
+    if (!conversation) {
+      res.status(404).json({ error: 'Conversation not found' });
+      return;
+    }
+
+    // Get lesson context
+    const context = await tutorService.getLessonContext(lessonId);
+    if (!context) {
+      res.status(404).json({ error: 'Lesson not found' });
+      return;
+    }
+
+    // Store user message
+    await tutorService.addMessage(conversationId, 'user', message);
+
+    // Generate tutor response
+    const tutorResponse = await tutorService.generateTutorResponse(
+      message,
+      conversationId,
+      context,
+      'beginner'
+    );
+
+    // Store tutor message
+    await tutorService.addMessage(conversationId, 'assistant', tutorResponse, 'feedback');
+
+    res.json({
+      conversationId,
+      tutorResponse,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to generate tutor response';
+    logger.error('Tutor message error:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Record performance
+router.post('/:id/tutor/performance', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id: lessonId } = req.params;
+    const userId = req.userId!;
+    const { conversationId, vocabularyId, correct, userResponse, feedback } = req.body;
+
+    if (!conversationId || userResponse === undefined || correct === undefined) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    // Verify conversation
+    const conversation = await knexInstance('tutor_conversations')
+      .where({
+        id: conversationId,
+        user_id: userId,
+        lesson_id: lessonId,
+      })
+      .first();
+
+    if (!conversation) {
+      res.status(404).json({ error: 'Conversation not found' });
+      return;
+    }
+
+    // Record performance
+    await tutorService.recordPerformance(conversationId, vocabularyId, correct, userResponse, null, feedback);
+
+    // Get updated performance score
+    const updated = await knexInstance('tutor_conversations')
+      .where({ id: conversationId })
+      .select('performance_score')
+      .first();
+
+    res.json({
+      success: true,
+      performanceScore: updated?.performance_score,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to record performance';
+    logger.error('Record performance error:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Get tutor performance analytics
+router.get('/:id/tutor/performance', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id: lessonId } = req.params;
+    const userId = req.userId!;
+
+    const performance = await tutorService.getLessonPerformance(userId, lessonId);
+
+    res.json(performance);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to get performance';
+    logger.error('Get performance error:', message);
     res.status(500).json({ error: message });
   }
 });
