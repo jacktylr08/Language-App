@@ -30,10 +30,14 @@ export function AudioPlayer({ audioUrl, onTimeUpdate }: AudioPlayerProps) {
       onplay: () => setIsPlaying(true),
       onstop: () => setIsPlaying(false),
       onpause: () => setIsPlaying(false),
-      onerror: (id, error) => {
-        setError('Failed to load audio');
-        console.error('Howler error:', error);
-      },
+    });
+
+    // Handle errors
+    howlerRef.current.on('loaderror', () => {
+      setError('Failed to load audio');
+    });
+    howlerRef.current.on('playererror', () => {
+      setError('Failed to play audio');
     });
 
     // Update current time

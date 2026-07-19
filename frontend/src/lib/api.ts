@@ -58,11 +58,11 @@ class ApiClient {
     );
   }
 
-  get = this.client.get;
-  post = this.client.post;
-  put = this.client.put;
-  patch = this.client.patch;
-  delete = this.client.delete;
+  get = (url: string, config?: any) => this.client.get(url, config);
+  post = (url: string, data?: any, config?: any) => this.client.post(url, data, config);
+  put = (url: string, data?: any, config?: any) => this.client.put(url, data, config);
+  patch = (url: string, data?: any, config?: any) => this.client.patch(url, data, config);
+  delete = (url: string, config?: any) => this.client.delete(url, config);
 }
 
 export const api = new ApiClient();
