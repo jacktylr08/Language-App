@@ -1,8 +1,9 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { getAuth, setAuth, clearAuth } from './auth';
 
-// Use the production backend URL directly if env var isn't available
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hospitable-insight-production-550c.up.railway.app/api/v1' || 'http://localhost:3001/api/v1';
+// Production backend URL - baked in at build time
+const PROD_API_URL = 'https://hospitable-insight-production-550c.up.railway.app/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || PROD_API_URL;
 
 class ApiClient {
   private client: AxiosInstance;
