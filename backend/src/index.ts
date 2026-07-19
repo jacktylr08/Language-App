@@ -1,4 +1,5 @@
 import express, { Express, Request, Response } from 'express';
+import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { logger } from '@/utils/logger';
@@ -50,23 +51,64 @@ app.use(errorHandler);
 
 // Start server
 const start = async (): Promise<void> => {
-  try {
-    // Initialize Redis
-    await initRedis();
-    logger.info('Redis connected');
+  // Listen immediately so the platform health check can reach /health
+  // even while the database is still coming up.
+  app.listen(port, () => {
+    logger.info(`Server running on port ${port}`);
+    logger.info(`Environment: ${process.env.NODE_ENV}`);
+  });
 
-    // Test database connection
+  if (!process.env.DATABASE_URL) {
+    logger.warn(
+      'DATABASE_URL is not set — falling back to localhost. On Railway, add a variable DATABASE_URL = ${{Postgres.DATABASE_URL}}'
+    );
+  }
+  if (!process.env.REDIS_URL) {
+    logger.warn(
+      'REDIS_URL is not set — falling back to localhost. On Railway, add a variable REDIS_URL = ${{Redis.REDIS_URL}}'
+    );
+  }
+
+  // Redis is non-fatal: the app works without cache.
+  initRedis()
+    .then(() => logger.info('Redis connected'))
+    .catch((err) =>
+      logger.warn(`Redis unavailable — continuing without cache: ${err.message}`)
+    );
+
+  // Database: connect, migrate, and seed automatically.
+  try {
     await knexInstance.raw('SELECT 1');
     logger.info('Database connected');
 
-    // Start Express server
-    app.listen(port, () => {
-      logger.info(`Server running on http://localhost:${port}`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
+    const migrationsDir = path.join(__dirname, 'database/migrations');
+    const [batch, applied] = await knexInstance.migrate.latest({
+      directory: migrationsDir,
     });
+    if (applied.length > 0) {
+      logger.info(`Ran ${applied.length} migration(s) (batch ${batch})`);
+    } else {
+      logger.info('Database schema up to date');
+    }
+
+    // Seed only when the vocabulary table is empty, so redeploys
+    // never wipe user progress.
+    const [{ count }] = await knexInstance('vocabulary').count('id as count');
+    if (Number(count) === 0) {
+      logger.info('Empty database detected — seeding initial content...');
+      await knexInstance.seed.run({
+        directory: path.join(__dirname, 'database/seeds'),
+      });
+      logger.info('Seed data inserted');
+    } else {
+      logger.info(`Database already seeded (${count} vocabulary entries)`);
+    }
   } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
+    logger.error(
+      `Database setup failed — API will not work until this is fixed: ${
+        error instanceof Error ? error.message : error
+      }`
+    );
   }
 };
 
