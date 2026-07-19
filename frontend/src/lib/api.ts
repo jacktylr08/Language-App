@@ -1,9 +1,10 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { getAuth, setAuth, clearAuth } from './auth';
 
-// Production backend URL - baked in at build time
-const PROD_API_URL = 'https://hospitable-insight-production-550c.up.railway.app/api/v1';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || PROD_API_URL;
+// NEXT_PUBLIC_API_URL is injected at build time via next.config.js
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://hospitable-insight-production-550c.up.railway.app/api/v1';
 
 class ApiClient {
   private client: AxiosInstance;
