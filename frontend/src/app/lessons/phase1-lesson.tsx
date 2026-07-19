@@ -60,7 +60,6 @@ export default function Phase1LessonPage() {
   const [showTranscript, setShowTranscript] = useState(false);
   const [showStory, setShowStory] = useState(true);
   const [vocabularyExpanded, setVocabularyExpanded] = useState<string | null>(null);
-  const [audioSpeed, setAudioSpeed] = useState(1.0);
   const [currentTime, setCurrentTime] = useState(0);
   const [lessonCompleted, setLessonCompleted] = useState(false);
 
@@ -224,26 +223,10 @@ export default function Phase1LessonPage() {
               <AudioPlayer
                 audioUrl={lesson.audio_url}
                 onTimeUpdate={setCurrentTime}
-                audioSpeed={audioSpeed}
               />
-
-              {/* Speed Control */}
-              <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Speed:</span>
-                {[0.75, 1.0, 1.25].map((speed) => (
-                  <button
-                    key={speed}
-                    onClick={() => setAudioSpeed(speed)}
-                    className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${
-                      audioSpeed === speed
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600'
-                    }`}
-                  >
-                    {speed}x
-                  </button>
-                ))}
-              </div>
+              <p className="text-xs text-slate-500 mt-4 text-center">
+                💡 Use the speed control in the player to adjust playback speed (0.75x, 1.0x, 1.25x)
+              </p>
             </div>
           </section>
         )}
