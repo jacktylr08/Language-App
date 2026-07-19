@@ -58,7 +58,16 @@ export const useAuth = create<AuthStore>((set) => {
           isLoading: false,
         });
       } catch (error: any) {
-        const message = error.response?.data?.error || 'Login failed';
+        let message: string;
+        if (error.response?.data?.error) {
+          message = error.response.data.error;
+        } else if (error.response) {
+          message = `Server error (${error.response.status})`;
+        } else if (error.request) {
+          message = `Can't reach API. Check NEXT_PUBLIC_API_URL. (${error.message})`;
+        } else {
+          message = error.message || 'Login failed';
+        }
         set({ error: message, isLoading: false });
         throw error;
       }
@@ -83,7 +92,16 @@ export const useAuth = create<AuthStore>((set) => {
           isLoading: false,
         });
       } catch (error: any) {
-        const message = error.response?.data?.error || 'Registration failed';
+        let message: string;
+        if (error.response?.data?.error) {
+          message = error.response.data.error;
+        } else if (error.response) {
+          message = `Server error (${error.response.status})`;
+        } else if (error.request) {
+          message = `Can't reach API. Check NEXT_PUBLIC_API_URL. (${error.message})`;
+        } else {
+          message = error.message || 'Registration failed';
+        }
         set({ error: message, isLoading: false });
         throw error;
       }
