@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsx build-script.ts",
     "start": "node dist/index.js",
     "db:migrate": "knex migrate:latest --env production",
     "db:migrate:dev": "knex migrate:latest --env development",
@@ -24,7 +24,7 @@
     "dotenv": "^16.3.1",
     "pg": "^8.11.2",
     "redis": "^4.6.10",
-    "jsonwebtoken": "^9.1.0",
+    "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
     "joi": "^17.11.0",
     "axios": "^1.6.0",
