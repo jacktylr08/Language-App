@@ -15,7 +15,11 @@ const compilerOptions: ts.CompilerOptions = {
   resolveJsonModule: true,
   moduleResolution: ts.ModuleResolutionKind.NodeJs,
   allowJs: true,
-  lib: ['ES2020']
+  lib: ['ES2020'],
+  baseUrl: './src',
+  paths: {
+    '@/*': ['./*']
+  }
 };
 
 const rootDir = path.join(__dirname, 'src');
