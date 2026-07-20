@@ -16,6 +16,11 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const changePasswordSchema = Joi.object({
+  currentPassword: Joi.string().allow('').optional(),
+  newPassword: Joi.string().min(8).required(),
+});
+
 // Register
 router.post('/register', async (req, res: Response): Promise<void> => {
   try {
@@ -99,6 +104,31 @@ router.get('/me', verifyToken, async (req: AuthRequest, res: Response): Promise<
     const message = err instanceof Error ? err.message : 'Failed to get user';
     logger.error('Get user error:', message);
     res.status(500).json({ error: message });
+  }
+});
+
+// Change password (requires auth; current password optional)
+router.post('/change-password', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { error, value } = changePasswordSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({ error: error.details[0].message });
+      return;
+    }
+
+    await auth.changePassword(
+      req.userId!,
+      value.newPassword,
+      value.currentPassword || undefined
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to change password';
+    logger.error('Change password error:', message);
+    // "incorrect" / "different" are user errors → 400
+    const status = /incorrect|different|not found/i.test(message) ? 400 : 500;
+    res.status(status).json({ error: message });
   }
 });
 

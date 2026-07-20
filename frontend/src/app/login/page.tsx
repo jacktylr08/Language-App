@@ -97,6 +97,17 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <details className="mt-5 text-sm">
+          <summary className="text-center text-ink-soft dark:text-stone-400 cursor-pointer hover:text-ink dark:hover:text-stone-200 select-none">
+            Forgotten your password?
+          </summary>
+          <p className="mt-3 rounded-xl bg-saffron-400/10 border border-saffron-400/25 px-4 py-3 text-ink-soft dark:text-stone-300 leading-relaxed">
+            If you’re still signed in on any device or browser tab, open{' '}
+            <span className="font-semibold text-ink dark:text-white">Account &amp; settings</span> and
+            set a new password there — you won’t need the old one. It’ll apply here straight away.
+          </p>
+        </details>
+
         <div className="mt-6 text-center">
           <p className="text-stone-600 dark:text-stone-400">
             Don't have an account?{' '}

@@ -190,15 +190,17 @@ export default function LessonsPage() {
             >
               ⚡ {progress.xp}
             </span>
-            <button
-              onClick={() => {
-                localStorage.removeItem('language-app-auth');
-                window.location.href = '/login';
-              }}
-              className="hidden sm:block text-stone-400 hover:text-ink dark:hover:text-stone-200 font-medium pl-1"
+            <Link
+              href="/account"
+              title="Account & settings"
+              aria-label="Account and settings"
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
             >
-              Sign out
-            </button>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 12a4 4 0 100-8 4 4 0 000 8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 20c0-3.314 3.582-6 8-6s8 2.686 8 6" />
+              </svg>
+            </Link>
           </div>
         </div>
       </nav>

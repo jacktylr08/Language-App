@@ -120,4 +120,46 @@ export const auth = {
   async getUserById(userId: string): Promise<User | undefined> {
     return User.query().findById(userId).where('deleted_at', null);
   },
+
+  /**
+   * Change a user's password.
+   *
+   * The caller is already authenticated (a valid JWT reached this endpoint),
+   * which is itself proof of session ownership — so `currentPassword` is
+   * optional. When supplied it is verified for extra safety; when omitted
+   * (the "I forgot my password but I'm still logged in" case) the valid
+   * session authorizes the reset. Auth here is Bearer-token based, not
+   * cookie based, so this is not exposed to CSRF.
+   */
+  async changePassword(
+    userId: string,
+    newPassword: string,
+    currentPassword?: string
+  ): Promise<void> {
+    const user = await User.query().findById(userId).where('deleted_at', null);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (currentPassword) {
+      const valid = await this.comparePassword(currentPassword, user.password_hash);
+      if (!valid) {
+        throw new Error('Current password is incorrect');
+      }
+    }
+
+    // Reject reusing the same password
+    const sameAsOld = await this.comparePassword(newPassword, user.password_hash);
+    if (sameAsOld) {
+      throw new Error('New password must be different from your current password');
+    }
+
+    const passwordHash = await this.hashPassword(newPassword);
+    await user.$query().update({
+      password_hash: passwordHash,
+      updated_at: new Date().toISOString(),
+    });
+
+    logger.info(`Password changed for user: ${user.email}`);
+  },
 };
