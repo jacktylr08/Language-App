@@ -96,7 +96,7 @@ export function AudioPlayer({ audioUrl, onTimeUpdate }: AudioPlayerProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+    <div className="bg-white dark:bg-stone-800 p-6 rounded-lg shadow-lg">
       {/* Play/Pause */}
       <div className="flex items-center justify-center mb-6">
         <button
@@ -123,23 +123,23 @@ export function AudioPlayer({ audioUrl, onTimeUpdate }: AudioPlayerProps) {
           max={duration || 0}
           value={currentTime}
           onChange={(e) => handleSeek(parseFloat(e.target.value))}
-          className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          className="w-full h-2 bg-stone-200 dark:bg-stone-600 rounded-lg appearance-none cursor-pointer accent-blue-600"
         />
       </div>
 
       {/* Time display */}
-      <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400 mb-4">
+      <div className="flex justify-between items-center text-sm text-stone-600 dark:text-stone-400 mb-4">
         <span>{formatTime(currentTime)}</span>
         <span>{formatTime(duration)}</span>
       </div>
 
       {/* Speed control */}
       <div className="flex items-center justify-center gap-2">
-        <label className="text-sm text-slate-600 dark:text-slate-400">Speed:</label>
+        <label className="text-sm text-stone-600 dark:text-stone-400">Speed:</label>
         <select
           value={speed}
           onChange={(e) => setSpeed(parseFloat(e.target.value))}
-          className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+          className="px-3 py-1 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-900 dark:text-white text-sm"
         >
           <option value={0.75}>0.75x</option>
           <option value={1.0}>1.0x</option>

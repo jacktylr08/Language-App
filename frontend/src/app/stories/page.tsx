@@ -65,15 +65,15 @@ export default function StoriesPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading...</p>
+          <p className="mt-4 text-stone-600">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <nav className="bg-white dark:bg-slate-800 shadow">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-900">
+      <nav className="bg-white dark:bg-stone-800 shadow">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold text-blue-600">
             Aprende Español
@@ -81,13 +81,13 @@ export default function StoriesPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/lessons"
-              className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className="text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
             >
               Lessons
             </Link>
             <Link
               href="/practice"
-              className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className="text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
             >
               Practice
             </Link>
@@ -96,7 +96,7 @@ export default function StoriesPage() {
                 localStorage.removeItem('language-app-auth');
                 window.location.href = '/login';
               }}
-              className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className="px-4 py-2 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
             >
               Sign Out
             </button>
@@ -106,8 +106,8 @@ export default function StoriesPage() {
 
       <main className="max-w-6xl mx-auto px-6 py-12">
         <div className="mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">Spanish Stories</h1>
-          <p className="text-slate-600 dark:text-slate-400">
+          <h1 className="text-4xl font-bold text-stone-900 dark:text-white mb-4">Spanish Stories</h1>
+          <p className="text-stone-600 dark:text-stone-400">
             Improve your reading comprehension through authentic stories
           </p>
         </div>
@@ -125,7 +125,7 @@ export default function StoriesPage() {
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               difficulty === null
                 ? 'bg-blue-600 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
             }`}
           >
             All Levels
@@ -137,7 +137,7 @@ export default function StoriesPage() {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 difficulty === level
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
               }`}
             >
               Level {level}
@@ -148,11 +148,11 @@ export default function StoriesPage() {
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-4 text-slate-600">Loading stories...</p>
+            <p className="mt-4 text-stone-600">Loading stories...</p>
           </div>
         ) : stories.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-slate-600 dark:text-slate-400">No stories available yet</p>
+            <p className="text-stone-600 dark:text-stone-400">No stories available yet</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -161,18 +161,18 @@ export default function StoriesPage() {
               .map((story) => (
                 <div
                   key={story.id}
-                  className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+                  className="bg-white dark:bg-stone-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
                 >
                   <div className="p-6">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2">
                       {story.title}
                     </h3>
 
-                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">
+                    <p className="text-stone-600 dark:text-stone-400 text-sm mb-4">
                       {story.description || 'A story in Spanish'}
                     </p>
 
-                    <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    <div className="flex justify-between text-sm text-stone-500 dark:text-stone-400 mb-4">
                       <span>Level {story.difficulty_level}</span>
                       {story.reading_time_minutes && (
                         <span>~{story.reading_time_minutes} min</span>

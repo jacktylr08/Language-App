@@ -8,8 +8,8 @@ export default function PracticePage() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
+      <div className="flex items-center justify-center min-h-screen bg-paper dark:bg-paper-dark">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
       </div>
     );
   }

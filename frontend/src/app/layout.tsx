@@ -1,12 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
-
 export const metadata: Metadata = {
-  title: 'Spanish Learning App',
-  description: 'Learn Spanish through evidence-based language acquisition',
+  title: 'Aprende — Learn Spanish for real',
+  description:
+    'Interactive Spanish lessons that teach, test and adapt to you — from first words to real conversations.',
 };
 
 export default function RootLayout({
@@ -16,10 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <main className="min-h-screen bg-white dark:bg-slate-900">
-          {children}
-        </main>
+      <body className="font-sans">
+        <div className="ambient" aria-hidden="true" />
+        <main className="min-h-screen">{children}</main>
       </body>
     </html>
   );

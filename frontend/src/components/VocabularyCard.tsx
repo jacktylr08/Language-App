@@ -118,7 +118,7 @@ export function VocabularyCard({
       {/* Quality buttons */}
       {isFlipped && !disabled && (
         <div className="mt-8">
-          <p className="text-center text-slate-700 dark:text-slate-300 mb-4 font-medium">
+          <p className="text-center text-stone-700 dark:text-stone-300 mb-4 font-medium">
             How well did you know this?
           </p>
           <div className="grid grid-cols-3 gap-2">

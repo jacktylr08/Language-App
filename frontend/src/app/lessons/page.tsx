@@ -9,17 +9,18 @@ import {
   currentStreak,
   todaysXp,
   knownWordCount,
+  masteredWordCount,
   lessonStars,
   ProgressState,
 } from '@/lib/progress';
 
 const themeAccents: Record<string, string> = {
-  phonetics: 'from-slate-400 to-slate-500',
+  phonetics: 'from-stone-400 to-stone-600',
   verbs: 'from-violet-400 to-purple-600',
   family: 'from-rose-400 to-red-500',
   nouns: 'from-sky-400 to-blue-600',
   adjectives: 'from-cyan-400 to-teal-500',
-  review: 'from-amber-400 to-orange-500',
+  review: 'from-saffron-400 to-terra-500',
   grammar: 'from-indigo-400 to-indigo-600',
   conversation: 'from-pink-400 to-rose-500',
 };
@@ -34,8 +35,8 @@ export default function LessonsPage() {
 
   if (authLoading || !progress) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
       </div>
     );
   }
@@ -44,7 +45,9 @@ export default function LessonsPage() {
   const xpToday = todaysXp(progress);
   const goalPct = Math.min(100, Math.round((xpToday / progress.dailyGoal) * 100));
   const wordsKnown = knownWordCount(progress);
+  const wordsMastered = masteredWordCount(progress);
   const lessonsDone = curriculum.filter((l) => progress.lessons[l.slug]?.completed).length;
+  const coursePct = Math.round((lessonsDone / curriculum.length) * 100);
 
   // A lesson unlocks when the previous one is completed
   const isUnlocked = (index: number): boolean => {
@@ -57,19 +60,134 @@ export default function LessonsPage() {
 
   const weeks = Array.from(new Set(curriculum.map((l) => l.week))).sort((a, b) => a - b);
 
+  const sidebar = (
+    <div className="space-y-4">
+      {/* Daily goal */}
+      <div className="surface p-5">
+        <div className="flex items-center gap-4">
+          <div className="relative w-16 h-16 shrink-0">
+            <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+              <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4.5" className="stroke-stone-200 dark:stroke-stone-700" />
+              <circle
+                cx="18"
+                cy="18"
+                r="15.5"
+                fill="none"
+                strokeWidth="4.5"
+                strokeLinecap="round"
+                className="stroke-saffron-500 transition-all duration-700"
+                strokeDasharray={`${(goalPct / 100) * 97.4} 97.4`}
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-xl">
+              {goalPct >= 100 ? '🎉' : '🎯'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-extrabold text-ink dark:text-white leading-tight">
+              {goalPct >= 100 ? 'Goal smashed!' : 'Daily goal'}
+            </p>
+            <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5">
+              {xpToday} / {progress.dailyGoal} XP today
+            </p>
+            <div className="mt-2 h-1.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-saffron-500 transition-all duration-700"
+                style={{ width: `${goalPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="surface p-5">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <p className="text-2xl font-extrabold text-terra-500">{streak}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-0.5">
+              🔥 streak
+            </p>
+          </div>
+          <div className="border-x border-stone-100 dark:border-stone-800">
+            <p className="text-2xl font-extrabold text-brand-600 dark:text-brand-400">{wordsKnown}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-0.5">
+              words
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-extrabold text-saffron-500">{progress.xp}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-0.5">
+              ⚡ total xp
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-800">
+          <div className="flex justify-between text-xs font-semibold text-ink-soft dark:text-stone-400 mb-1.5">
+            <span>Course progress</span>
+            <span>
+              {lessonsDone}/{curriculum.length} lessons
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all duration-700"
+              style={{ width: `${Math.max(coursePct, 2)}%` }}
+            />
+          </div>
+          {wordsMastered > 0 && (
+            <p className="text-xs text-ink-soft dark:text-stone-400 mt-2">
+              ✨ {wordsMastered} words fully mastered
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Smart practice */}
+      {lessonsDone > 0 && (
+        <Link
+          href="/practice"
+          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+        >
+          <div className="absolute -right-6 -top-8 text-[96px] opacity-15 rotate-12 select-none" aria-hidden>
+            🧠
+          </div>
+          <p className="font-extrabold text-white text-lg">Smart Practice</p>
+          <p className="text-brand-100 text-sm mt-1 leading-snug">
+            A session built from the words your memory is about to drop.
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
+            Start review
+            <span className="transition-transform group-hover:translate-x-1">→</span>
+          </span>
+        </Link>
+      )}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
-      {/* Sticky header with stats */}
-      <nav className="sticky top-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="text-xl font-extrabold text-emerald-500">
+    <div className="min-h-screen pb-24">
+      {/* Header */}
+      <nav className="sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
+        <div className="max-w-5xl mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
+          <Link href="/" className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
             Aprende
           </Link>
-          <div className="flex items-center gap-4 text-sm font-extrabold">
-            <span className={`flex items-center gap-1 ${streak > 0 ? 'text-orange-500' : 'text-slate-400'}`} title="Day streak">
+          <div className="flex items-center gap-3 text-sm font-extrabold">
+            <span
+              className={`flex items-center gap-1 rounded-full px-3 py-1.5 ${
+                streak > 0
+                  ? 'bg-terra-500/10 text-terra-500'
+                  : 'bg-stone-100 dark:bg-stone-800 text-stone-400'
+              }`}
+              title="Day streak"
+            >
               🔥 {streak}
             </span>
-            <span className="flex items-center gap-1 text-amber-500" title="Total XP">
+            <span
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 bg-saffron-500/10 text-saffron-600 dark:text-saffron-400"
+              title="Total XP"
+            >
               ⚡ {progress.xp}
             </span>
             <button
@@ -77,7 +195,7 @@ export default function LessonsPage() {
                 localStorage.removeItem('language-app-auth');
                 window.location.href = '/login';
               }}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium"
+              className="hidden sm:block text-stone-400 hover:text-ink dark:hover:text-stone-200 font-medium pl-1"
             >
               Sign out
             </button>
@@ -85,172 +203,148 @@ export default function LessonsPage() {
         </div>
       </nav>
 
-      <main className="max-w-2xl mx-auto px-4 pt-6">
-        {/* Daily goal + stats */}
-        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 mb-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            {/* Goal ring */}
-            <div className="relative w-16 h-16 shrink-0">
-              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-                <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" className="stroke-slate-200 dark:stroke-slate-700" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.5"
-                  fill="none"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  className="stroke-emerald-500 transition-all duration-700"
-                  strokeDasharray={`${(goalPct / 100) * 97.4} 97.4`}
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-lg">
-                {goalPct >= 100 ? '🎉' : '🎯'}
-              </span>
-            </div>
-            <div className="flex-1">
-              <p className="font-extrabold text-slate-900 dark:text-white">
-                {goalPct >= 100 ? 'Daily goal smashed!' : 'Daily goal'}
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {xpToday} / {progress.dailyGoal} XP today
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-extrabold text-slate-900 dark:text-white">{wordsKnown}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">words known</p>
-            </div>
-          </div>
-        </div>
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 pt-8">
+        {/* Page hero */}
+        <header className="mb-8 lg:mb-10">
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400 mb-2">
+            Your course
+          </p>
+          <h1 className="font-display text-4xl lg:text-5xl font-black text-ink dark:text-white leading-[1.05]">
+            The road to Spanish
+          </h1>
+          <p className="text-ink-soft dark:text-stone-400 mt-2 max-w-lg">
+            Twenty-four weeks, six phases — from your first{' '}
+            <em className="font-display">hola</em> to real conversations.
+          </p>
+        </header>
 
-        {/* Smart practice card */}
-        {lessonsDone > 0 && (
-          <Link
-            href="/practice"
-            className="block bg-gradient-to-r from-sky-500 to-indigo-500 rounded-3xl p-5 mb-8 shadow-lg shadow-sky-500/20 hover:shadow-xl transition-all active:scale-[0.99] group"
-          >
-            <div className="flex items-center gap-4">
-              <span className="text-4xl">🧠</span>
-              <div className="flex-1">
-                <p className="font-extrabold text-white text-lg">Smart Practice</p>
-                <p className="text-sky-100 text-sm">
-                  Review the words you&apos;re about to forget — personalised to you
-                </p>
-              </div>
-              <span className="text-white text-2xl group-hover:translate-x-1 transition-transform">→</span>
-            </div>
-          </Link>
-        )}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
+          {/* Mobile stats */}
+          <div className="lg:hidden mb-8">{sidebar}</div>
 
-        {/* Learning path */}
-        {weeks.map((week, wi) => {
-          const phase = phaseForWeek(week);
-          const prevPhase = wi > 0 ? phaseForWeek(weeks[wi - 1]) : null;
-          const isNewPhase = !prevPhase || prevPhase.number !== phase.number;
-          return (
-          <section key={week} className="mb-8">
-            {isNewPhase && (
-              <div className="mt-10 mb-6 text-center">
-                <p className="text-xs font-extrabold text-emerald-500 uppercase tracking-widest">
-                  Phase {phase.number}
-                </p>
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                  {phase.title}
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{phase.subtitle}</p>
-              </div>
-            )}
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-sm font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                Week {week}
-              </h2>
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-            </div>
-
-            <div className="space-y-4">
-              {curriculum
-                .filter((l) => l.week === week)
-                .map((lesson) => {
-                  const index = curriculum.findIndex((c) => c.slug === lesson.slug);
-                  const record = progress.lessons[lesson.slug];
-                  const unlocked = isUnlocked(index);
-                  const isCurrent = index === currentIndex;
-                  const stars = lessonStars(record);
-                  const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
-
-                  const card = (
-                    <div
-                      className={`relative rounded-3xl border-2 p-5 transition-all ${
-                        !unlocked
-                          ? 'bg-slate-100 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60 opacity-60'
-                          : isCurrent
-                            ? 'bg-white dark:bg-slate-800 border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-500/10 animate-glow-pulse'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-md active:scale-[0.99]'
-                      }`}
-                    >
+          {/* Learning path */}
+          <div>
+            {weeks.map((week, wi) => {
+              const phase = phaseForWeek(week);
+              const prevPhase = wi > 0 ? phaseForWeek(weeks[wi - 1]) : null;
+              const isNewPhase = !prevPhase || prevPhase.number !== phase.number;
+              return (
+                <section key={week} className="mb-8">
+                  {isNewPhase && (
+                    <div className={`${wi === 0 ? 'mb-6' : 'mt-14 mb-6'}`}>
                       <div className="flex items-center gap-4">
-                        <div
-                          className={`w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-3xl bg-gradient-to-br ${
-                            unlocked ? accent : 'from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700'
-                          }`}
-                        >
-                          {unlocked ? lesson.emoji : '🔒'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-extrabold text-slate-900 dark:text-white truncate">
-                            {lesson.title}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                            {lesson.subtitle}
-                          </p>
-                          {record?.completed && (
-                            <p className="text-amber-400 text-sm mt-0.5" aria-label={`${stars} stars`}>
-                              {'★'.repeat(stars)}
-                              <span className="text-slate-300 dark:text-slate-600">
-                                {'★'.repeat(3 - stars)}
-                              </span>
-                              <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">
-                                best {record.bestAccuracy}%
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                        {unlocked && (
-                          <span
-                            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-extrabold ${
-                              isCurrent
-                                ? 'bg-emerald-500 text-white'
-                                : record?.completed
-                                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent to-stone-300 dark:to-stone-700" />
+                        <p className="text-[11px] font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-[0.25em]">
+                          Phase {phase.number}
+                        </p>
+                        <div className="flex-1 h-px bg-gradient-to-l from-transparent to-stone-300 dark:to-stone-700" />
+                      </div>
+                      <h2 className="font-display text-3xl font-black text-ink dark:text-white text-center mt-2">
+                        {phase.title}
+                      </h2>
+                      <p className="text-sm text-ink-soft dark:text-stone-400 text-center mt-1">
+                        {phase.subtitle}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mb-4">
+                    <h3 className="text-[11px] font-extrabold text-stone-400 dark:text-stone-500 uppercase tracking-[0.2em]">
+                      Week {week}
+                    </h3>
+                    <div className="flex-1 h-px bg-stone-200/80 dark:bg-stone-800" />
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {curriculum
+                      .filter((l) => l.week === week)
+                      .map((lesson) => {
+                        const index = curriculum.findIndex((c) => c.slug === lesson.slug);
+                        const record = progress.lessons[lesson.slug];
+                        const unlocked = isUnlocked(index);
+                        const isCurrent = index === currentIndex;
+                        const stars = lessonStars(record);
+                        const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
+
+                        const card = (
+                          <div
+                            className={`relative rounded-3xl p-5 transition-all duration-200 ${
+                              !unlocked
+                                ? 'bg-paper-soft dark:bg-paper-dark-soft/60 border border-stone-200/60 dark:border-stone-800/60 opacity-55 saturate-50'
+                                : isCurrent
+                                  ? 'bg-white dark:bg-paper-dark-soft border-2 border-brand-400 dark:border-brand-500 shadow-card animate-glow-pulse'
+                                  : 'surface hover:shadow-card-hover hover:-translate-y-0.5 active:translate-y-0 active:shadow-card'
                             }`}
                           >
-                            {isCurrent ? 'START' : record?.completed ? 'REDO' : 'START'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`relative w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-[28px] bg-gradient-to-br ${
+                                  unlocked
+                                    ? accent
+                                    : 'from-stone-300 to-stone-400 dark:from-stone-700 dark:to-stone-800'
+                                } shadow-inner ring-1 ring-black/5`}
+                              >
+                                <span className="drop-shadow-sm">{unlocked ? lesson.emoji : '🔒'}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-extrabold text-ink dark:text-white truncate text-[15px]">
+                                  {lesson.title}
+                                </p>
+                                <p className="text-sm text-ink-soft dark:text-stone-400 truncate mt-0.5">
+                                  {lesson.subtitle}
+                                </p>
+                                {record?.completed && (
+                                  <p className="text-saffron-500 text-[13px] mt-1 tracking-wide" aria-label={`${stars} stars`}>
+                                    {'★'.repeat(stars)}
+                                    <span className="text-stone-300 dark:text-stone-600">
+                                      {'★'.repeat(3 - stars)}
+                                    </span>
+                                    <span className="text-xs text-stone-400 dark:text-stone-500 ml-2 font-semibold">
+                                      best {record.bestAccuracy}%
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                              {unlocked && (
+                                <span
+                                  className={`shrink-0 px-4 py-2 rounded-xl text-[13px] font-extrabold tracking-wide ${
+                                    isCurrent
+                                      ? 'btn-primary px-5'
+                                      : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300'
+                                  }`}
+                                >
+                                  {isCurrent ? 'START' : record?.completed ? 'REDO' : 'START'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
 
-                  return unlocked ? (
-                    <Link key={lesson.slug} href={`/lessons/${lesson.slug}`} className="block">
-                      {card}
-                    </Link>
-                  ) : (
-                    <div key={lesson.slug} title="Complete the previous lesson to unlock">
-                      {card}
-                    </div>
-                  );
-                })}
-            </div>
-          </section>
-          );
-        })}
+                        return unlocked ? (
+                          <Link key={lesson.slug} href={`/lessons/${lesson.slug}`} className="block">
+                            {card}
+                          </Link>
+                        ) : (
+                          <div key={lesson.slug} title="Complete the previous lesson to unlock">
+                            {card}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </section>
+              );
+            })}
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-10">
-          24 weeks · 6 phases · from first words to real conversations 🇪🇸
-        </p>
-      </main>
+            <p className="text-center text-xs text-stone-400 dark:text-stone-600 mt-12 font-medium">
+              24 weeks · 6 phases · from first words to real conversations&nbsp;🇪🇸
+            </p>
+          </div>
+
+          {/* Desktop sidebar */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-20">{sidebar}</div>
+          </aside>
+        </div>
+      </div>
     </div>
   );
 }

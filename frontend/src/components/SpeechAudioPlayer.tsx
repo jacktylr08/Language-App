@@ -144,13 +144,13 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
   const progress = sentences.length > 0 ? (currentIndex / sentences.length) * 100 : 0;
 
   return (
-    <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+    <div className="bg-white dark:bg-stone-800 p-6 rounded-lg shadow-lg">
       {/* Play/Restart buttons */}
       <div className="flex items-center justify-center gap-4 mb-6">
         <button
           onClick={handlePlay}
           disabled={!voicesReady}
-          className="flex items-center justify-center w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white transition-colors shadow-lg"
+          className="flex items-center justify-center w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-stone-400 text-white transition-colors shadow-lg"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
@@ -166,7 +166,7 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
         <button
           onClick={handleRestart}
           disabled={!voicesReady}
-          className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-stone-200 dark:bg-stone-700 hover:bg-stone-300 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-200 transition-colors"
           aria-label="Restart"
           title="Restart from beginning"
         >
@@ -178,13 +178,13 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
 
       {/* Progress bar */}
       <div className="mb-4">
-        <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-600 transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-2">
+        <div className="flex justify-between text-xs text-stone-500 dark:text-stone-400 mt-2">
           <span>
             Sentence {currentIndex + 1} of {sentences.length}
           </span>
@@ -195,7 +195,7 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
       {/* Current sentence highlight */}
       {isPlaying && sentences[currentIndex] && (
         <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded border-l-4 border-blue-600">
-          <p className="text-slate-900 dark:text-slate-100 italic">
+          <p className="text-stone-900 dark:text-stone-100 italic">
             "{sentences[currentIndex]}"
           </p>
         </div>
@@ -203,7 +203,7 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
 
       {/* Speed control */}
       <div className="flex items-center justify-center gap-2">
-        <label className="text-sm text-slate-600 dark:text-slate-400 font-semibold">
+        <label className="text-sm text-stone-600 dark:text-stone-400 font-semibold">
           Speed:
         </label>
         <div className="flex gap-1">
@@ -214,7 +214,7 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
               className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                 speed === s
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  : 'bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-600'
               }`}
             >
               {s}x
@@ -223,7 +223,7 @@ export function SpeechAudioPlayer({ script, onSentenceChange }: SpeechAudioPlaye
         </div>
       </div>
 
-      <p className="text-xs text-slate-500 dark:text-slate-500 text-center mt-4">
+      <p className="text-xs text-stone-500 dark:text-stone-500 text-center mt-4">
         🎧 Native browser-powered Castilian Spanish
       </p>
     </div>

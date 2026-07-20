@@ -143,26 +143,26 @@ export function TutorChat({ lessonId, lessonTitle }: TutorChatProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-900">
+      <div className="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-slate-600 dark:text-slate-400">Loading tutor...</p>
+          <p className="mt-4 text-stone-600 dark:text-stone-400">Loading tutor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="flex flex-col h-screen bg-stone-50 dark:bg-stone-900">
       {/* Header */}
-      <nav className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
+      <nav className="bg-white dark:bg-stone-800 shadow-sm border-b border-stone-200 dark:border-stone-700">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
                 {lessonTitle}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+              <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
                 AI Language Tutor • Performance: {performanceScore}%
               </p>
             </div>
@@ -191,7 +191,7 @@ export function TutorChat({ lessonId, lessonTitle }: TutorChatProps) {
                 className={`max-w-2xl px-4 py-3 rounded-lg ${
                   message.role === 'user'
                     ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-none'
+                    : 'bg-white dark:bg-stone-800 text-stone-900 dark:text-white border border-stone-200 dark:border-stone-700 rounded-bl-none'
                 }`}
               >
                 <p className="text-sm md:text-base whitespace-pre-wrap">{message.content}</p>
@@ -201,11 +201,11 @@ export function TutorChat({ lessonId, lessonTitle }: TutorChatProps) {
 
           {sending && (
             <div className="flex justify-start">
-              <div className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg rounded-bl-none">
+              <div className="bg-white dark:bg-stone-800 text-stone-900 dark:text-white border border-stone-200 dark:border-stone-700 px-4 py-3 rounded-lg rounded-bl-none">
                 <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200"></div>
+                  <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-200"></div>
                 </div>
               </div>
             </div>
@@ -216,7 +216,7 @@ export function TutorChat({ lessonId, lessonTitle }: TutorChatProps) {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+      <div className="border-t border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg">
         <div className="max-w-4xl mx-auto px-6 py-4 w-full">
           <div className="flex gap-3">
             <input
@@ -226,17 +226,17 @@ export function TutorChat({ lessonId, lessonTitle }: TutorChatProps) {
               onKeyPress={handleKeyPress}
               disabled={sending}
               placeholder="Type your response or question..."
-              className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="flex-1 px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || sending}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-semibold rounded-lg transition-colors"
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-stone-400 text-white font-semibold rounded-lg transition-colors"
             >
               Send
             </button>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-2">
             💡 Tip: Ask questions, respond to the tutor, or practice what you've learned.
           </p>
         </div>

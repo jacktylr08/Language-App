@@ -281,8 +281,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
   if (queue.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
+      <div className="flex min-h-screen items-center justify-center bg-paper dark:bg-paper-dark">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
       </div>
     );
   }
@@ -291,25 +291,27 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   if (!started) {
     const p = loadProgress();
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="min-h-screen bg-paper dark:bg-paper-dark flex flex-col">
         <TopExitBar onExit={() => router.push('/lessons')} />
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
-            <div className="text-7xl mb-6 animate-pop">{lesson?.emoji || '⚡'}</div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
+            <div className="mx-auto mb-6 w-24 h-24 rounded-[28px] bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-5xl shadow-glow ring-1 ring-black/5 animate-pop">
+              <span className="drop-shadow-sm">{lesson?.emoji || '⚡'}</span>
+            </div>
+            <h1 className="font-display text-4xl font-black text-ink dark:text-white mb-3 leading-tight">
               {mode === 'practice' ? 'Smart Practice' : lesson?.title}
             </h1>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
+            <p className="text-ink-soft dark:text-stone-400 mb-6">
               {mode === 'practice'
                 ? 'A personalised session targeting the words your memory is about to drop.'
                 : lesson?.description}
             </p>
             {mode === 'lesson' && lesson && !lesson.isReview && (
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 mb-4 text-left">
-                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">
+              <div className="surface p-4 mb-4 text-left">
+                <p className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-2">
                   In this lesson
                 </p>
-                <ul className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
+                <ul className="space-y-1.5 text-sm text-stone-700 dark:text-stone-300">
                   {(lesson.grammar ?? []).map((g, i) => (
                     <li key={i}>📖 {g.title}</li>
                   ))}
@@ -321,8 +323,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                 </ul>
               </div>
             )}
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 mb-8 text-left">
-              <p className="text-sm text-amber-900 dark:text-amber-200">
+            <div className="rounded-2xl bg-saffron-400/10 border border-saffron-400/30 p-4 mb-8 text-left">
+              <p className="text-sm text-saffron-600 dark:text-saffron-300">
                 <span className="font-bold">💡 Tip:</span>{' '}
                 {mode === 'practice'
                   ? 'Reviewing a word right before you forget it is what moves it to long-term memory.'
@@ -331,11 +333,11 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             </div>
             <button
               onClick={() => setStarted(true)}
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white text-lg font-extrabold rounded-2xl shadow-lg shadow-emerald-500/30 transition-all"
+              className="btn-primary w-full py-4 text-lg"
             >
               {mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
             </button>
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
               {total} exercises · 🔥 {currentStreak(p)} day streak
             </p>
           </div>
@@ -349,37 +351,37 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     const accuracy = stats.answered > 0 ? Math.round((stats.firstTryCorrect / stats.answered) * 100) : 100;
     const p = loadProgress();
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center px-6">
+      <div className="min-h-screen bg-paper dark:bg-paper-dark flex items-center justify-center px-6">
         <div className="max-w-md w-full text-center">
           <div className="text-7xl mb-4 animate-bounce-slow">
             {accuracy >= 95 ? '🏆' : accuracy >= 80 ? '🎉' : '💪'}
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
+          <h1 className="font-display text-5xl font-black text-ink dark:text-white mb-3">
             {accuracy >= 95 ? '¡Perfecto!' : accuracy >= 80 ? '¡Muy bien!' : '¡Bien hecho!'}
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mb-8">
+          <p className="text-ink-soft dark:text-stone-400 mb-8">
             {mode === 'practice' ? 'Practice session complete' : `${lesson?.title} complete`}
           </p>
 
           <div className="grid grid-cols-3 gap-3 mb-8">
-            <StatCard label="XP earned" value={`+${stats.xp}`} color="text-amber-500" delay="0ms" />
-            <StatCard label="Accuracy" value={`${accuracy}%`} color="text-emerald-500" delay="150ms" />
-            <StatCard label="Best combo" value={`${stats.bestCombo}x`} color="text-sky-500" delay="300ms" />
+            <StatCard label="XP earned" value={`+${stats.xp}`} color="text-saffron-500" delay="0ms" />
+            <StatCard label="Accuracy" value={`${accuracy}%`} color="text-brand-500" delay="150ms" />
+            <StatCard label="Best combo" value={`${stats.bestCombo}x`} color="text-terra-500" delay="300ms" />
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 mb-8 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-3">
+          <div className="surface p-4 mb-8 flex items-center justify-center gap-3">
             <span className="text-3xl">🔥</span>
             <div className="text-left">
-              <p className="font-extrabold text-slate-900 dark:text-white text-lg">
+              <p className="font-extrabold text-stone-900 dark:text-white text-lg">
                 {currentStreak(p)} day streak
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Come back tomorrow to keep it alive</p>
+              <p className="text-xs text-stone-500 dark:text-stone-400">Come back tomorrow to keep it alive</p>
             </div>
           </div>
 
           <button
             onClick={() => router.push('/lessons')}
-            className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white text-lg font-extrabold rounded-2xl shadow-lg shadow-emerald-500/30 transition-all"
+            className="btn-primary w-full py-4 text-lg"
           >
             CONTINUE
           </button>
@@ -391,23 +393,28 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const progressPct = total > 0 ? (index / total) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+    <div className="min-h-screen bg-paper dark:bg-paper-dark flex flex-col">
       {/* Top bar: exit + progress + combo */}
       <div className="px-4 pt-4 pb-2 max-w-2xl mx-auto w-full flex items-center gap-3">
         <button
           onClick={() => router.push('/lessons')}
-          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl leading-none p-1"
+          className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-2xl leading-none p-1"
           aria-label="Quit lesson"
         >
           ✕
         </button>
-        <div className="flex-1 h-4 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div className="flex-1 h-3.5 bg-stone-200/80 dark:bg-stone-800 rounded-full overflow-hidden shadow-inner">
           <div
-            className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+            className="h-full progress-shimmer rounded-full transition-all duration-500"
             style={{ width: `${Math.max(progressPct, 3)}%` }}
           />
         </div>
-        <div className={`flex items-center gap-1 font-extrabold text-sm ${combo >= 3 ? 'text-orange-500 animate-pop' : 'text-slate-400'}`} key={combo}>
+        <div
+          className={`flex items-center gap-1 font-extrabold text-sm rounded-full px-2.5 py-1 ${
+            combo >= 3 ? 'bg-terra-500/10 text-terra-500 animate-pop' : 'text-stone-400'
+          }`}
+          key={combo}
+        >
           🔥 {combo}
         </div>
       </div>
@@ -415,7 +422,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       {/* Exercise area */}
       <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 pb-40 pt-4">
         {current.isRetry && (
-          <p className="text-center text-xs font-bold text-orange-500 uppercase tracking-wide mb-2">
+          <p className="text-center text-xs font-extrabold text-terra-500 uppercase tracking-[0.15em] mb-2">
             ↻ Let&apos;s try this one again
           </p>
         )}
@@ -446,17 +453,17 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
         {current.type === 'build_sentence' && current.build && current.tiles && (
           <div className="flex-1 flex flex-col justify-center">
-            <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
+            <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
               Build the sentence
             </p>
-            <p className="text-center text-2xl font-extrabold text-slate-900 dark:text-white mb-6">
+            <p className="font-display text-center text-3xl font-black text-ink dark:text-white mb-6 leading-snug">
               &ldquo;{current.build.en}&rdquo;
             </p>
 
             {/* Answer line */}
-            <div className="min-h-[64px] bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 p-3 mb-6 flex flex-wrap gap-2 items-center justify-center">
+            <div className="min-h-[68px] bg-white/70 dark:bg-paper-dark-soft/70 rounded-2xl border-2 border-dashed border-stone-300 dark:border-stone-700 p-3 mb-6 flex flex-wrap gap-2 items-center justify-center">
               {pickedTiles.length === 0 && (
-                <span className="text-slate-400 dark:text-slate-500 text-sm">
+                <span className="text-stone-400 dark:text-stone-500 text-sm">
                   Tap the words below in order
                 </span>
               )}
@@ -466,7 +473,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   onClick={() =>
                     !feedback && setPickedTiles((p) => p.filter((_, i) => i !== pos))
                   }
-                  className="px-3 py-2 rounded-xl bg-emerald-500 text-white font-bold shadow-sm active:scale-95 transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-brand-500 text-white font-bold shadow-[0_2px_0_0_#1B6141] active:translate-y-0.5 active:shadow-none transition-all"
                 >
                   {current.tiles![tileIdx]}
                 </button>
@@ -482,10 +489,10 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                     key={i}
                     onClick={() => !feedback && !used && setPickedTiles((p) => [...p, i])}
                     disabled={used || !!feedback}
-                    className={`px-3 py-2 rounded-xl border-2 font-bold transition-all active:scale-95 ${
+                    className={`px-3.5 py-2 rounded-xl border-2 font-bold transition-all ${
                       used
-                        ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-transparent select-none'
-                        : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 hover:border-emerald-400'
+                        ? 'bg-stone-100 dark:bg-stone-800/60 border-stone-200 dark:border-stone-800 text-transparent select-none shadow-none'
+                        : 'bg-white dark:bg-paper-dark-soft border-stone-200 dark:border-stone-700 text-ink dark:text-stone-100 hover:border-brand-400 shadow-[0_2px_0_0_#E7E5E4] dark:shadow-[0_2px_0_0_#44403C] active:translate-y-0.5 active:shadow-none'
                     }`}
                   >
                     {tile}
@@ -498,7 +505,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               <button
                 onClick={submitBuild}
                 disabled={pickedTiles.length === 0}
-                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 text-white font-extrabold rounded-2xl transition-all active:scale-[0.98]"
+                className="btn-primary w-full py-4"
               >
                 CHECK
               </button>
@@ -538,10 +545,10 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
         {current.type === 'type_es' && (
           <div className="flex-1 flex flex-col justify-center">
-            <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
+            <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
               Type this in Spanish
             </p>
-            <p className="text-center text-3xl font-extrabold text-slate-900 dark:text-white mb-8">
+            <p className="font-display text-center text-4xl font-black text-ink dark:text-white mb-8">
               {current.word.en}
             </p>
             <input
@@ -555,7 +562,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="w-full text-xl px-5 py-4 rounded-2xl border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors"
+              className="w-full text-xl px-5 py-4 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark-soft text-ink dark:text-white shadow-card dark:shadow-card-dark focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
             />
             <div className="flex flex-wrap gap-2 mt-3 justify-center">
               {ACCENT_CHARS.map((ch) => (
@@ -566,7 +573,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                     inputRef.current?.focus();
                   }}
                   disabled={!!feedback}
-                  className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-lg font-bold text-slate-700 dark:text-slate-200 hover:border-emerald-500 active:scale-95 transition-all"
+                  className="w-10 h-10 rounded-xl bg-white dark:bg-paper-dark-soft border border-stone-200 dark:border-stone-700 text-lg font-bold text-ink-soft dark:text-stone-200 shadow-[0_2px_0_0_#E7E5E4] dark:shadow-[0_2px_0_0_#44403C] hover:border-brand-400 hover:text-brand-600 active:translate-y-0.5 active:shadow-none transition-all"
                 >
                   {ch}
                 </button>
@@ -576,7 +583,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               <button
                 onClick={submitTyped}
                 disabled={!typed.trim()}
-                className="mt-6 w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 text-white font-extrabold rounded-2xl transition-all active:scale-[0.98]"
+                className="mt-6 btn-primary w-full py-4"
               >
                 CHECK
               </button>
@@ -606,49 +613,49 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
         {current.type === 'speak' && (
           <div className="flex-1 flex flex-col justify-center items-center">
-            <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
+            <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
               Say this out loud
             </p>
             <button
               onClick={() => speak(current.word.es)}
               className="text-center mb-1 group"
             >
-              <span className="text-3xl font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
+              <span className="font-display text-4xl font-black text-ink dark:text-white group-hover:text-brand-500 transition-colors">
                 🔊 {current.word.es}
               </span>
             </button>
-            <p className="text-slate-500 dark:text-slate-400 italic mb-1">{current.word.pron}</p>
-            <p className="text-slate-600 dark:text-slate-300 mb-8">&ldquo;{current.word.en}&rdquo;</p>
+            <p className="text-stone-500 dark:text-stone-400 italic mb-1">{current.word.pron}</p>
+            <p className="text-stone-600 dark:text-stone-300 mb-8">&ldquo;{current.word.en}&rdquo;</p>
 
             <button
               onClick={startListening}
               disabled={!!feedback || listening}
-              className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl shadow-lg transition-all active:scale-95 ${
+              className={`w-24 h-24 rounded-[32px] flex items-center justify-center text-4xl transition-all active:scale-95 ${
                 listening
-                  ? 'bg-red-500 text-white animate-pulse-ring'
-                  : 'bg-sky-500 hover:bg-sky-600 text-white shadow-sky-500/30'
+                  ? 'bg-terra-500 text-white animate-pulse-ring'
+                  : 'bg-gradient-to-br from-sky-400 to-blue-600 hover:brightness-105 text-white shadow-[0_4px_0_0_#1D4ED8,0_16px_32px_-8px_rgba(37,99,235,0.5)] active:translate-y-1 active:shadow-[0_1px_0_0_#1D4ED8]'
               }`}
               aria-label="Hold to speak"
             >
               🎤
             </button>
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
               {listening ? 'Listening… speak now' : 'Tap the mic, then speak'}
             </p>
             {spokenText === '__none__' && !feedback && (
-              <p className="mt-2 text-sm text-orange-500 font-semibold">
+              <p className="mt-2 text-sm text-terra-500 font-semibold">
                 Didn&apos;t catch that — try again, a bit louder
               </p>
             )}
             {spokenText && spokenText !== '__none__' && (
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
                 Heard: <span className="font-bold">&ldquo;{spokenText}&rdquo;</span>
               </p>
             )}
             {!feedback && (
               <button
                 onClick={handleSkipSpeaking}
-                className="mt-6 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline"
+                className="mt-6 text-sm text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 underline"
               >
                 Can&apos;t speak right now
               </button>
@@ -662,7 +669,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           current.type === 'dialogue_slide') && (
           <button
             onClick={handleContinue}
-            className="mt-6 w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/30"
+            className="mt-6 btn-primary w-full py-4"
           >
             GOT IT
           </button>
@@ -672,21 +679,29 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       {/* Feedback sheet */}
       {feedback && (
         <div
-          className={`fixed bottom-0 left-0 right-0 animate-slide-up border-t-2 ${
+          className={`fixed bottom-0 left-0 right-0 animate-slide-up rounded-t-[28px] shadow-[0_-12px_40px_-12px_rgba(33,29,25,0.25)] ${
             feedback.kind === 'correct'
-              ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800'
-              : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900'
+              ? 'bg-brand-50 dark:bg-brand-900 border-t border-brand-200 dark:border-brand-700'
+              : 'bg-[#FBEFE9] dark:bg-[#3A1F14] border-t border-terra-300/60 dark:border-terra-600/50'
           }`}
         >
           <div className="max-w-2xl mx-auto px-6 py-5">
             <div className="flex items-start gap-3 mb-4">
-              <span className="text-3xl">{feedback.kind === 'correct' ? '✅' : '❌'}</span>
+              <span
+                className={`flex w-11 h-11 shrink-0 items-center justify-center rounded-2xl text-2xl ${
+                  feedback.kind === 'correct'
+                    ? 'bg-brand-500/15 text-brand-600'
+                    : 'bg-terra-500/15 text-terra-500'
+                }`}
+              >
+                {feedback.kind === 'correct' ? '✓' : '✕'}
+              </span>
               <div>
                 <p
                   className={`text-xl font-extrabold ${
                     feedback.kind === 'correct'
-                      ? 'text-emerald-700 dark:text-emerald-300'
-                      : 'text-red-700 dark:text-red-300'
+                      ? 'text-brand-700 dark:text-brand-200'
+                      : 'text-terra-600 dark:text-terra-300'
                   }`}
                 >
                   {feedback.kind === 'correct'
@@ -696,10 +711,10 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                     : 'Not quite'}
                 </p>
                 {feedback.kind === 'correct' && feedback.note && (
-                  <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">{feedback.note}</p>
+                  <p className="text-sm text-brand-700 dark:text-brand-200 mt-1">{feedback.note}</p>
                 )}
                 {feedback.kind === 'wrong' && feedback.correctAnswer && (
-                  <div className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  <div className="text-sm text-terra-600 dark:text-terra-300 mt-1">
                     <p>
                       Correct answer: <span className="font-bold">{feedback.correctAnswer}</span>
                     </p>
@@ -718,10 +733,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             <button
               ref={continueRef}
               onClick={handleContinue}
-              className={`w-full py-4 text-white font-extrabold rounded-2xl transition-all active:scale-[0.98] shadow-lg ${
-                feedback.kind === 'correct'
-                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'
-                  : 'bg-red-500 hover:bg-red-600 shadow-red-500/30'
+              className={`w-full py-4 text-lg ${
+                feedback.kind === 'correct' ? 'btn-primary' : 'btn-danger'
               }`}
             >
               CONTINUE
@@ -740,7 +753,7 @@ function TopExitBar({ onExit }: { onExit: () => void }) {
     <div className="px-4 pt-4 max-w-2xl mx-auto w-full">
       <button
         onClick={onExit}
-        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl leading-none p-1"
+        className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-2xl leading-none p-1"
         aria-label="Back"
       >
         ✕
@@ -752,11 +765,11 @@ function TopExitBar({ onExit }: { onExit: () => void }) {
 function StatCard({ label, value, color, delay }: { label: string; value: string; color: string; delay: string }) {
   return (
     <div
-      className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 animate-pop"
+      className="bg-white dark:bg-stone-800 rounded-2xl p-4 border border-stone-200 dark:border-stone-700 animate-pop"
       style={{ animationDelay: delay, animationFillMode: 'backwards' }}
     >
-      <p className={`text-2xl font-extrabold ${color}`}>{value}</p>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{label}</p>
+      <p className={`font-display text-3xl font-black ${color}`}>{value}</p>
+      <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">{label}</p>
     </div>
   );
 }
@@ -764,27 +777,27 @@ function StatCard({ label, value, color, delay }: { label: string; value: string
 function TeachCard({ word }: { word: VocabItem }) {
   return (
     <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-4">
+      <p className="text-center text-sm font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-4">
         ✨ New word
       </p>
-      <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-slate-200 dark:border-slate-700 p-8 text-center shadow-sm">
+      <div className="surface p-8 text-center">
         <button onClick={() => speak(word.es)} className="group">
-          <p className="text-4xl font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
+          <p className="font-display text-5xl font-black text-ink dark:text-white group-hover:text-brand-500 transition-colors leading-tight">
             🔊 {word.es}
           </p>
         </button>
-        <p className="text-slate-500 dark:text-slate-400 italic mt-2">{word.pron}</p>
-        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-4">{word.en}</p>
-        <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+        <p className="text-stone-500 dark:text-stone-400 italic mt-2">{word.pron}</p>
+        <p className="text-2xl font-extrabold text-brand-600 dark:text-brand-400 mt-4">{word.en}</p>
+        <div className="mt-6 pt-6 border-t border-stone-200 dark:border-stone-700">
           <button onClick={() => speak(word.exampleEs)} className="group text-left w-full">
-            <p className="text-lg text-slate-800 dark:text-slate-200 group-hover:text-emerald-500 transition-colors">
+            <p className="text-lg text-stone-800 dark:text-stone-200 group-hover:text-brand-500 transition-colors">
               🔉 {word.exampleEs}
             </p>
           </button>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{word.exampleEn}</p>
+          <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{word.exampleEn}</p>
         </div>
       </div>
-      <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-4">
+      <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-4">
         Tap anything with a speaker to hear it again
       </p>
     </div>
@@ -797,31 +810,31 @@ function GrammarSlideCard({ slide }: { slide: GrammarSlide }) {
       <p className="text-center text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-4">
         📖 Grammar — read this like your teacher explaining
       </p>
-      <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-indigo-200 dark:border-indigo-900 p-6 shadow-sm">
-        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-4">{slide.title}</h2>
+      <div className="surface !border-indigo-200/70 dark:!border-indigo-900/60 p-6 md:p-7">
+        <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-4">{slide.title}</h2>
         <div className="space-y-3 mb-5">
           {slide.body.split('\n\n').map((para, i) => (
-            <p key={i} className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+            <p key={i} className="text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-line">
               {para}
             </p>
           ))}
         </div>
-        <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
+        <div className="border-t border-stone-200 dark:border-stone-700 pt-4 space-y-2">
           {slide.examples.map((ex, i) => (
             <button
               key={i}
               onClick={() => speak(ex.es)}
-              className="w-full text-left group flex items-baseline gap-3 rounded-xl px-3 py-2 hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors"
+              className="w-full text-left group flex items-baseline gap-3 rounded-xl px-3 py-2 hover:bg-indigo-50 dark:hover:bg-stone-700/50 transition-colors"
             >
-              <span className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-500 transition-colors">
+              <span className="font-bold text-stone-900 dark:text-white group-hover:text-indigo-500 transition-colors">
                 🔉 {ex.es}
               </span>
-              <span className="text-sm text-slate-500 dark:text-slate-400">{ex.en}</span>
+              <span className="text-sm text-stone-500 dark:text-stone-400">{ex.en}</span>
             </button>
           ))}
         </div>
       </div>
-      <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-4">
+      <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-4">
         Tap any example to hear it — questions on this are coming next
       </p>
     </div>
@@ -849,10 +862,10 @@ function DialogueCard({ dialogue }: { dialogue: DialogueTurn[] }) {
       <p className="text-center text-sm font-bold text-pink-600 dark:text-pink-400 uppercase tracking-wide mb-4">
         💬 Real conversation — listen and follow
       </p>
-      <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-pink-200 dark:border-pink-900 p-5 shadow-sm space-y-3">
+      <div className="surface !border-pink-200/70 dark:!border-pink-900/60 p-5 space-y-3">
         <button
           onClick={playAll}
-          className="w-full py-2.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold transition-all active:scale-[0.98]"
+          className="btn-3d w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-[0_3px_0_0_#BE185D] active:shadow-none"
         >
           {playing ? '⏸ Stop' : '▶ Play the whole conversation'}
         </button>
@@ -864,22 +877,22 @@ function DialogueCard({ dialogue }: { dialogue: DialogueTurn[] }) {
               onClick={() => speak(turn.es, 0.85)}
               className={`block w-full text-left rounded-2xl px-4 py-3 transition-colors ${
                 isYou
-                  ? 'bg-emerald-50 dark:bg-emerald-900/20 ml-6 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                  : 'bg-slate-50 dark:bg-slate-700/40 mr-6 hover:bg-slate-100 dark:hover:bg-slate-700/70'
+                  ? 'bg-brand-50 dark:bg-brand-900/20 ml-6 hover:bg-brand-100 dark:hover:bg-brand-900/40'
+                  : 'bg-stone-50 dark:bg-stone-700/40 mr-6 hover:bg-stone-100 dark:hover:bg-stone-700/70'
               }`}
             >
-              <span className={`text-xs font-bold uppercase tracking-wide ${isYou ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+              <span className={`text-xs font-bold uppercase tracking-wide ${isYou ? 'text-brand-600 dark:text-brand-400' : 'text-stone-400'}`}>
                 {isYou ? 'You' : turn.speaker}
               </span>
-              <span className="block font-semibold text-slate-900 dark:text-white mt-0.5">
+              <span className="block font-semibold text-stone-900 dark:text-white mt-0.5">
                 {turn.es}
               </span>
-              <span className="block text-sm text-slate-500 dark:text-slate-400">{turn.en}</span>
+              <span className="block text-sm text-stone-500 dark:text-stone-400">{turn.en}</span>
             </button>
           );
         })}
       </div>
-      <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-4">
+      <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-4">
         Tap any line to hear it — your lines are highlighted in green
       </p>
     </div>
@@ -887,21 +900,17 @@ function DialogueCard({ dialogue }: { dialogue: DialogueTurn[] }) {
 }
 
 function optionClasses(option: string, selected: string | null, feedback: Feedback, correctAnswer: string): string {
-  const base =
-    'w-full px-5 py-4 rounded-2xl border-2 text-left text-lg font-semibold transition-all active:scale-[0.98] ';
+  const base = 'w-full px-5 py-4 text-left text-lg font-semibold ';
   if (!feedback) {
-    return (
-      base +
-      'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-700'
-    );
+    return base + 'option-tile';
   }
   if (option === correctAnswer) {
-    return base + 'bg-emerald-100 dark:bg-emerald-900/50 border-emerald-500 text-emerald-800 dark:text-emerald-200';
+    return base + 'option-tile option-tile-correct';
   }
   if (option === selected) {
-    return base + 'bg-red-100 dark:bg-red-900/40 border-red-400 text-red-700 dark:text-red-300 animate-shake';
+    return base + 'option-tile option-tile-wrong animate-shake';
   }
-  return base + 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500';
+  return base + 'option-tile option-tile-faded';
 }
 
 function ChoiceExercise({
@@ -927,27 +936,29 @@ function ChoiceExercise({
   onSpeak?: () => void;
   smallPrompt?: boolean;
 }) {
-  const promptSize = smallPrompt ? 'text-xl leading-snug' : 'text-3xl';
+  const promptSize = smallPrompt
+    ? 'text-xl leading-snug'
+    : 'font-display text-4xl font-black leading-tight';
   return (
     <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
+      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
         {instruction}
       </p>
       {onSpeak ? (
         <button onClick={onSpeak} className="group mb-8">
-          <p className={`text-center ${promptSize} font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors`}>
+          <p className={`text-center ${promptSize} font-extrabold text-ink dark:text-white group-hover:text-brand-500 transition-colors`}>
             🔊 {prompt}
           </p>
         </button>
       ) : (
-        <p className={`text-center ${promptSize} font-extrabold text-slate-900 dark:text-white mb-8 ${promptLang === 'en' ? '' : ''}`}>
+        <p className={`text-center ${promptSize} font-extrabold text-ink dark:text-white mb-8 ${promptLang === 'en' ? '' : ''}`}>
           {prompt}
         </p>
       )}
       <div className="grid gap-3">
         {options.map((option, i) => (
           <button key={option} onClick={() => onSelect(option)} disabled={!!feedback} className={optionClasses(option, selected, feedback, correctAnswer)}>
-            <span className="inline-flex w-6 h-6 mr-3 rounded-md border border-current text-xs items-center justify-center opacity-50">
+            <span className="inline-flex w-6 h-6 mr-3 rounded-lg bg-black/5 dark:bg-white/10 text-xs font-bold items-center justify-center opacity-70">
               {i + 1}
             </span>
             {option}
@@ -977,20 +988,20 @@ function ListeningExercise({
 }) {
   return (
     <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-6">
+      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-6">
         🎧 {instruction}
       </p>
       <div className="flex items-center justify-center gap-4 mb-8">
         <button
           onClick={() => onPlay()}
-          className="w-20 h-20 rounded-3xl bg-sky-500 hover:bg-sky-600 text-white text-3xl flex items-center justify-center shadow-lg shadow-sky-500/30 transition-all active:scale-95"
+          className="btn-3d w-20 h-20 rounded-[26px] bg-gradient-to-br from-sky-400 to-blue-600 text-white text-3xl flex items-center justify-center shadow-[0_4px_0_0_#1D4ED8,0_16px_32px_-10px_rgba(37,99,235,0.5)] active:shadow-[0_1px_0_0_#1D4ED8]"
           aria-label="Play audio"
         >
           🔊
         </button>
         <button
           onClick={() => onPlay(0.6)}
-          className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-2xl flex items-center justify-center hover:border-sky-400 transition-all active:scale-95"
+          className="btn-3d w-14 h-14 rounded-2xl bg-white dark:bg-paper-dark-soft border-2 border-stone-200 dark:border-stone-700 text-2xl flex items-center justify-center shadow-[0_3px_0_0_#E7E5E4] dark:shadow-[0_3px_0_0_#44403C] hover:border-sky-400 active:shadow-none"
           aria-label="Play slowly"
           title="Play slowly"
         >
@@ -1000,7 +1011,7 @@ function ListeningExercise({
       <div className="grid gap-3">
         {options.map((option, i) => (
           <button key={option} onClick={() => onSelect(option)} disabled={!!feedback} className={optionClasses(option, selected, feedback, correctAnswer)}>
-            <span className="inline-flex w-6 h-6 mr-3 rounded-md border border-current text-xs items-center justify-center opacity-50">
+            <span className="inline-flex w-6 h-6 mr-3 rounded-lg bg-black/5 dark:bg-white/10 text-xs font-bold items-center justify-center opacity-70">
               {i + 1}
             </span>
             {option}
@@ -1028,19 +1039,19 @@ function FillBlankExercise({
   const shown = feedback || selected ? selected ?? '' : '_____';
   return (
     <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-6">
+      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-6">
         Complete the sentence
       </p>
-      <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-slate-200 dark:border-slate-700 p-6 mb-2 text-center">
-        <p className="text-2xl font-bold text-slate-900 dark:text-white leading-relaxed">
+      <div className="surface p-6 mb-2 text-center">
+        <p className="font-display text-3xl font-black text-ink dark:text-white leading-relaxed">
           {parts[0]}
           <span
             className={`inline-block min-w-[80px] border-b-4 mx-1 px-1 ${
               feedback
                 ? feedback.kind === 'correct'
-                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                  : 'border-red-400 text-red-500'
-                : 'border-slate-400 text-slate-400'
+                  ? 'border-brand-500 text-brand-600 dark:text-brand-400'
+                  : 'border-terra-400 text-terra-500'
+                : 'border-stone-300 dark:border-stone-600 text-stone-400'
             }`}
           >
             {shown}
@@ -1048,7 +1059,7 @@ function FillBlankExercise({
           {parts[1]}
         </p>
       </div>
-      <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-6 italic">
+      <p className="text-center text-sm text-stone-500 dark:text-stone-400 mb-6 italic">
         &ldquo;{sentence.en}&rdquo;
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -1089,23 +1100,25 @@ function MatchPairsExercise({
   );
 
   const btnClass = (side: 'es' | 'en', value: string, pairKey: string) => {
-    const base =
-      'w-full px-3 py-4 rounded-2xl border-2 font-semibold transition-all active:scale-[0.97] text-center ';
+    const base = 'w-full px-3 py-4 font-semibold text-center ';
     if (matched.has(pairKey)) {
-      return base + 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-400 dark:text-emerald-600 pointer-events-none opacity-60';
+      return base + 'option-tile option-tile-correct pointer-events-none opacity-50';
     }
     if (shake === value) {
-      return base + 'bg-red-100 dark:bg-red-900/40 border-red-400 text-red-600 animate-shake';
+      return base + 'option-tile option-tile-wrong animate-shake';
     }
     if (selection && selection.side === side && selection.value === value) {
-      return base + 'bg-sky-100 dark:bg-sky-900/40 border-sky-500 text-sky-700 dark:text-sky-300';
+      return (
+        base +
+        'option-tile !border-sky-400 !bg-sky-50 dark:!bg-sky-900/30 !text-sky-700 dark:!text-sky-300'
+      );
     }
-    return base + 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 hover:border-sky-400';
+    return base + 'option-tile';
   };
 
   return (
     <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-6">
+      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-6">
         Match the pairs
       </p>
       <div className="grid grid-cols-2 gap-3">
