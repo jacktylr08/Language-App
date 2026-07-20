@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRequireAuth } from '@/lib/hooks';
-import { curriculum } from '@/lib/curriculum';
+import { curriculum, phaseForWeek } from '@/lib/curriculum';
 import {
   loadProgress,
   currentStreak,
@@ -143,8 +143,23 @@ export default function LessonsPage() {
         )}
 
         {/* Learning path */}
-        {weeks.map((week) => (
+        {weeks.map((week, wi) => {
+          const phase = phaseForWeek(week);
+          const prevPhase = wi > 0 ? phaseForWeek(weeks[wi - 1]) : null;
+          const isNewPhase = !prevPhase || prevPhase.number !== phase.number;
+          return (
           <section key={week} className="mb-8">
+            {isNewPhase && (
+              <div className="mt-10 mb-6 text-center">
+                <p className="text-xs font-extrabold text-emerald-500 uppercase tracking-widest">
+                  Phase {phase.number}
+                </p>
+                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                  {phase.title}
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{phase.subtitle}</p>
+              </div>
+            )}
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-sm font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                 Week {week}
@@ -229,10 +244,11 @@ export default function LessonsPage() {
                 })}
             </div>
           </section>
-        ))}
+          );
+        })}
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-10">
-          Weeks 9+ (past tense, future plans, real conversations) coming as you progress
+          24 weeks · 6 phases · from first words to real conversations 🇪🇸
         </p>
       </main>
     </div>

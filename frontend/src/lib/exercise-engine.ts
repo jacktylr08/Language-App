@@ -72,8 +72,22 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function pickDistractors(word: VocabItem, pool: VocabItem[], count: number): VocabItem[] {
-  const others = pool.filter((w) => w.id !== word.id);
-  return shuffle(others).slice(0, count);
+  // Exclude the word itself AND anything whose displayed text would collide
+  // with it (or with another picked distractor) — duplicate options confuse
+  // the learner and break option rendering.
+  const seen = new Set([word.es.toLowerCase(), word.en.toLowerCase()]);
+  const picked: VocabItem[] = [];
+  for (const w of shuffle(pool)) {
+    if (w.id === word.id) continue;
+    const es = w.es.toLowerCase();
+    const en = w.en.toLowerCase();
+    if (seen.has(es) || seen.has(en)) continue;
+    seen.add(es);
+    seen.add(en);
+    picked.push(w);
+    if (picked.length === count) break;
+  }
+  return picked;
 }
 
 function mcqEsEn(word: VocabItem, pool: VocabItem[]): Exercise {
@@ -114,9 +128,15 @@ function fillBlank(
     lessonVocab.find((w) => sentence.blank.toLowerCase().includes(w.es.replace(/^(el|la|yo|tú|él|ella|nosotros)\s+/i, '').toLowerCase())) ||
     lessonVocab[0];
   if (!anchor) return null;
-  const distractors = pickDistractors(anchor, pool, 3).map((w) =>
-    w.es.replace(/^(el|la)\s+/i, '')
-  );
+  const seen = new Set([sentence.blank.toLowerCase()]);
+  const distractors: string[] = [];
+  for (const w of pickDistractors(anchor, pool, 8)) {
+    const text = w.es.replace(/^(el|la)\s+/i, '');
+    if (seen.has(text.toLowerCase())) continue;
+    seen.add(text.toLowerCase());
+    distractors.push(text);
+    if (distractors.length === 3) break;
+  }
   return {
     type: 'fill_blank',
     word: anchor,
