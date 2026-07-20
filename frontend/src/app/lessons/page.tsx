@@ -1,228 +1,237 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRequireAuth } from '@/lib/hooks';
-import { api } from '@/lib/api';
+import { curriculum } from '@/lib/curriculum';
+import {
+  loadProgress,
+  currentStreak,
+  todaysXp,
+  knownWordCount,
+  lessonStars,
+  ProgressState,
+} from '@/lib/progress';
 
-interface Lesson {
-  id: string;
-  title: string;
-  description: string;
-  level: number;
-  curriculum_phase: string;
-  content_type: string;
-  estimated_duration_minutes: number;
-  theme_category?: string;
-  week_number?: number;
-  canStart: boolean;
-  unlockReason?: string;
-  userProgress?: { status: string };
-}
-
-const themeColors: Record<string, { bg: string; border: string; badge: string; text: string }> = {
-  phonetics: {
-    bg: 'bg-slate-50 dark:bg-slate-800/50',
-    border: 'border-slate-300 dark:border-slate-600',
-    badge: 'bg-slate-500 text-white',
-    text: 'text-slate-900 dark:text-slate-100',
-  },
-  verbs: {
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    border: 'border-purple-300 dark:border-purple-700',
-    badge: 'bg-purple-600 text-white',
-    text: 'text-purple-900 dark:text-purple-100',
-  },
-  family: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    border: 'border-red-300 dark:border-red-700',
-    badge: 'bg-red-600 text-white',
-    text: 'text-red-900 dark:text-red-100',
-  },
-  nouns: {
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    border: 'border-blue-300 dark:border-blue-700',
-    badge: 'bg-blue-600 text-white',
-    text: 'text-blue-900 dark:text-blue-100',
-  },
-  adjectives: {
-    bg: 'bg-cyan-50 dark:bg-cyan-900/20',
-    border: 'border-cyan-300 dark:border-cyan-700',
-    badge: 'bg-cyan-600 text-white',
-    text: 'text-cyan-900 dark:text-cyan-100',
-  },
-  review: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    border: 'border-green-300 dark:border-green-700',
-    badge: 'bg-green-600 text-white',
-    text: 'text-green-900 dark:text-green-100',
-  },
+const themeAccents: Record<string, string> = {
+  phonetics: 'from-slate-400 to-slate-500',
+  verbs: 'from-violet-400 to-purple-600',
+  family: 'from-rose-400 to-red-500',
+  nouns: 'from-sky-400 to-blue-600',
+  adjectives: 'from-cyan-400 to-teal-500',
+  review: 'from-amber-400 to-orange-500',
 };
 
 export default function LessonsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [phase, setPhase] = useState('foundation');
+  const [progress, setProgress] = useState<ProgressState | null>(null);
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    setProgress(loadProgress());
+  }, []);
 
-    const fetchLessons = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/lessons/available', {
-          params: { phase },
-        });
-        setLessons(response.data.lessons);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to load lessons');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLessons();
-  }, [authLoading, user, phase]);
-
-  if (authLoading) {
+  if (authLoading || !progress) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
       </div>
     );
   }
 
+  const streak = currentStreak(progress);
+  const xpToday = todaysXp(progress);
+  const goalPct = Math.min(100, Math.round((xpToday / progress.dailyGoal) * 100));
+  const wordsKnown = knownWordCount(progress);
+  const lessonsDone = curriculum.filter((l) => progress.lessons[l.slug]?.completed).length;
+
+  // A lesson unlocks when the previous one is completed
+  const isUnlocked = (index: number): boolean => {
+    if (index === 0) return true;
+    return !!progress.lessons[curriculum[index - 1].slug]?.completed;
+  };
+  const currentIndex = curriculum.findIndex(
+    (l, i) => isUnlocked(i) && !progress.lessons[l.slug]?.completed
+  );
+
+  const weeks = Array.from(new Set(curriculum.map((l) => l.week))).sort((a, b) => a - b);
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <nav className="bg-white dark:bg-slate-800 shadow">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-blue-600">
-            Aprende Español
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+      {/* Sticky header with stats */}
+      <nav className="sticky top-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="text-xl font-extrabold text-emerald-500">
+            Aprende
           </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-slate-600 dark:text-slate-400">{user?.email}</span>
+          <div className="flex items-center gap-4 text-sm font-extrabold">
+            <span className={`flex items-center gap-1 ${streak > 0 ? 'text-orange-500' : 'text-slate-400'}`} title="Day streak">
+              🔥 {streak}
+            </span>
+            <span className="flex items-center gap-1 text-amber-500" title="Total XP">
+              ⚡ {progress.xp}
+            </span>
             <button
               onClick={() => {
                 localStorage.removeItem('language-app-auth');
                 window.location.href = '/login';
               }}
-              className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium"
             >
-              Sign Out
+              Sign out
             </button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 py-12">
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
-            Spanish Lessons
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Choose a lesson to begin your learning journey
-          </p>
-        </div>
-
-        {/* Phase selector */}
-        <div className="mb-8 flex gap-2">
-          {['foundation', 'core', 'conversation', 'real_media'].map((p) => (
-            <button
-              key={p}
-              onClick={() => setPhase(p)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                phase === p
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-              }`}
-            >
-              {p.charAt(0).toUpperCase() + p.slice(1).replace('_', ' ')}
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div className="p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded-lg mb-8">
-            {error}
+      <main className="max-w-2xl mx-auto px-4 pt-6">
+        {/* Daily goal + stats */}
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 mb-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            {/* Goal ring */}
+            <div className="relative w-16 h-16 shrink-0">
+              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" className="stroke-slate-200 dark:stroke-slate-700" />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  fill="none"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  className="stroke-emerald-500 transition-all duration-700"
+                  strokeDasharray={`${(goalPct / 100) * 97.4} 97.4`}
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-lg">
+                {goalPct >= 100 ? '🎉' : '🎯'}
+              </span>
+            </div>
+            <div className="flex-1">
+              <p className="font-extrabold text-slate-900 dark:text-white">
+                {goalPct >= 100 ? 'Daily goal smashed!' : 'Daily goal'}
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {xpToday} / {progress.dailyGoal} XP today
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="font-extrabold text-slate-900 dark:text-white">{wordsKnown}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">words known</p>
+            </div>
           </div>
+        </div>
+
+        {/* Smart practice card */}
+        {lessonsDone > 0 && (
+          <Link
+            href="/practice"
+            className="block bg-gradient-to-r from-sky-500 to-indigo-500 rounded-3xl p-5 mb-8 shadow-lg shadow-sky-500/20 hover:shadow-xl transition-all active:scale-[0.99] group"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-4xl">🧠</span>
+              <div className="flex-1">
+                <p className="font-extrabold text-white text-lg">Smart Practice</p>
+                <p className="text-sky-100 text-sm">
+                  Review the words you&apos;re about to forget — personalised to you
+                </p>
+              </div>
+              <span className="text-white text-2xl group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </Link>
         )}
 
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-4 text-slate-600">Loading lessons...</p>
-          </div>
-        ) : lessons.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg">
-            <p className="text-slate-600 dark:text-slate-400 text-lg">No lessons available yet</p>
-            <p className="text-slate-500 dark:text-slate-500 text-sm mt-2">Check back soon!</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Group lessons by week */}
-            {[1, 2, 3, 4].map((week) => {
-              const weekLessons = lessons.filter((l) => l.week_number === week);
-              if (weekLessons.length === 0) return null;
+        {/* Learning path */}
+        {weeks.map((week) => (
+          <section key={week} className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-sm font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                Week {week}
+              </h2>
+              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+            </div>
 
-              return (
-                <div key={week}>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    📚 Week {week}
-                  </h2>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {weekLessons.map((lesson) => {
-                      const theme = themeColors[lesson.theme_category || 'phonetics'] || themeColors.phonetics;
+            <div className="space-y-4">
+              {curriculum
+                .filter((l) => l.week === week)
+                .map((lesson) => {
+                  const index = curriculum.findIndex((c) => c.slug === lesson.slug);
+                  const record = progress.lessons[lesson.slug];
+                  const unlocked = isUnlocked(index);
+                  const isCurrent = index === currentIndex;
+                  const stars = lessonStars(record);
+                  const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
 
-                      return (
-                        <Link
-                          key={lesson.id}
-                          href={`/lessons/${lesson.id}`}
-                          className={`group rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all border-2 ${theme.bg} ${theme.border}`}
+                  const card = (
+                    <div
+                      className={`relative rounded-3xl border-2 p-5 transition-all ${
+                        !unlocked
+                          ? 'bg-slate-100 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60 opacity-60'
+                          : isCurrent
+                            ? 'bg-white dark:bg-slate-800 border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-500/10 animate-glow-pulse'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-md active:scale-[0.99]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-3xl bg-gradient-to-br ${
+                            unlocked ? accent : 'from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700'
+                          }`}
                         >
-                          <div className="p-6">
-                            <div className="flex items-start justify-between mb-3">
-                              <div>
-                                <div className="flex gap-2 mb-2">
-                                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${theme.badge}`}>
-                                    {lesson.theme_category?.toUpperCase() || 'LESSON'}
-                                  </span>
-                                  {lesson.userProgress?.status === 'completed' && (
-                                    <span className="px-3 py-1 text-xs font-bold bg-green-500 text-white rounded-full">
-                                      ✓ DONE
-                                    </span>
-                                  )}
-                                </div>
-                                <h3 className={`text-lg font-bold ${theme.text} group-hover:underline`}>
-                                  {lesson.title}
-                                </h3>
-                              </div>
-                            </div>
-
-                            <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 line-clamp-2">
-                              {lesson.description || 'Learn and practice Spanish'}
-                            </p>
-
-                            <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
-                              <span>🎧 {lesson.estimated_duration_minutes} min</span>
-                              <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 font-semibold">
-                                Start →
+                          {unlocked ? lesson.emoji : '🔒'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-slate-900 dark:text-white truncate">
+                            {lesson.title}
+                          </p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                            {lesson.subtitle}
+                          </p>
+                          {record?.completed && (
+                            <p className="text-amber-400 text-sm mt-0.5" aria-label={`${stars} stars`}>
+                              {'★'.repeat(stars)}
+                              <span className="text-slate-300 dark:text-slate-600">
+                                {'★'.repeat(3 - stars)}
                               </span>
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                              <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">
+                                best {record.bestAccuracy}%
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                        {unlocked && (
+                          <span
+                            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-extrabold ${
+                              isCurrent
+                                ? 'bg-emerald-500 text-white'
+                                : record?.completed
+                                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                            }`}
+                          >
+                            {isCurrent ? 'START' : record?.completed ? 'REDO' : 'START'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+
+                  return unlocked ? (
+                    <Link key={lesson.slug} href={`/lessons/${lesson.slug}`} className="block">
+                      {card}
+                    </Link>
+                  ) : (
+                    <div key={lesson.slug} title="Complete the previous lesson to unlock">
+                      {card}
+                    </div>
+                  );
+                })}
+            </div>
+          </section>
+        ))}
+
+        <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-10">
+          Phase 2 (Core Vocabulary — 2,000 words) unlocks when you finish Phase 1
+        </p>
       </main>
     </div>
   );
