@@ -4,11 +4,25 @@
  * challenge round. Missed words are automatically re-queued.
  */
 
-import { CurriculumLesson, VocabItem, getPriorLessons, getAllVocab, getVocabById } from './curriculum';
+import {
+  CurriculumLesson,
+  VocabItem,
+  GrammarSlide,
+  ConceptCheck,
+  DialogueTurn,
+  SentenceBuild,
+  getPriorLessons,
+  getAllVocab,
+  getVocabById,
+} from './curriculum';
 import { getReviewWordIds } from './progress';
 
 export type ExerciseType =
   | 'teach' // flashcard-style introduction, no grading
+  | 'grammar_slide' // teacher explanation card, no grading
+  | 'dialogue_slide' // conversation presented with audio, no grading
+  | 'concept_check' // graded understanding question with explanation
+  | 'build_sentence' // assemble a sentence from word tiles
   | 'mcq_es_en' // see Spanish, pick English
   | 'mcq_en_es' // see English, pick Spanish
   | 'listen_mcq' // hear Spanish, pick what you heard
@@ -27,8 +41,25 @@ export interface Exercise {
   sentence?: { es: string; en: string; blank: string };
   /** For match_pairs */
   pairs?: Array<{ es: string; en: string }>;
+  /** For grammar_slide */
+  slide?: GrammarSlide;
+  /** For dialogue_slide */
+  dialogue?: DialogueTurn[];
+  /** For concept_check */
+  check?: ConceptCheck;
+  /** For build_sentence */
+  build?: SentenceBuild;
+  /** For build_sentence: shuffled word tiles (correct words + distractors) */
+  tiles?: string[];
+  /** Don't record this result against a real vocab word (synthetic anchors) */
+  noWordTracking?: boolean;
   /** Marks re-queued exercises after a miss */
   isRetry?: boolean;
+}
+
+/** Synthetic anchor for exercises not tied to one vocab word */
+function syntheticWord(id: string, es: string, en: string): VocabItem {
+  return { id, es, en, pron: '', exampleEs: '', exampleEn: '' };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -103,7 +134,48 @@ function matchPairs(words: VocabItem[]): Exercise {
   };
 }
 
-/** Build the full exercise queue for a standard lesson. */
+function conceptCheck(check: ConceptCheck, lessonSlug: string, idx: number): Exercise {
+  return {
+    type: 'concept_check',
+    word: syntheticWord(`cc-${lessonSlug}-${idx}`, check.correct, ''),
+    check,
+    options: check.options,
+    noWordTracking: true,
+  };
+}
+
+/** Split a Spanish sentence into word tiles (punctuation stripped from tiles). */
+export function sentenceTiles(es: string): string[] {
+  return es
+    .replace(/[¿?¡!.,;:]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
+}
+
+function buildSentence(build: SentenceBuild, lessonSlug: string, idx: number, pool: VocabItem[]): Exercise {
+  const words = sentenceTiles(build.es);
+  const inSentence = new Set(words.map((w) => w.toLowerCase()));
+  // Two distractor tiles sampled from single-word vocab not in the sentence
+  const distractors = shuffle(
+    pool
+      .map((v) => v.es.replace(/^(el|la|los|las)\s+/i, ''))
+      .filter((w) => !w.includes(' ') && !inSentence.has(w.toLowerCase()))
+  ).slice(0, 2);
+  return {
+    type: 'build_sentence',
+    word: syntheticWord(`bs-${lessonSlug}-${idx}`, build.es, build.en),
+    build,
+    tiles: shuffle([...words, ...distractors]),
+    noWordTracking: true,
+  };
+}
+
+/** Build the full exercise queue for a standard lesson.
+ *
+ * Structure mirrors a real tutoring session:
+ *   explain (grammar) → check understanding → teach vocab in chunks →
+ *   drill → dialogue in context → produce full sentences → challenge.
+ */
 export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAvailable: boolean): Exercise[] {
   if (lesson.isReview) return buildReviewSession(lesson, speechRecognitionAvailable);
 
@@ -111,7 +183,16 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
   const pool = [...vocab, ...getPriorLessons(lesson.slug).flatMap((l) => l.vocab)];
   const queue: Exercise[] = [];
 
-  // Chunk vocab into groups of 4: teach → drill → teach → drill
+  const slides = lesson.grammar ?? [];
+  const checks = (lesson.conceptChecks ?? []).map((c, i) => conceptCheck(c, lesson.slug, i));
+
+  // 1. Teacher explains the first concept, then immediately checks understanding
+  if (slides[0]) {
+    queue.push({ type: 'grammar_slide', word: vocab[0] ?? syntheticWord(`gs-${lesson.slug}`, '', ''), slide: slides[0] });
+    checks.slice(0, 2).forEach((c) => queue.push(c));
+  }
+
+  // 2. Vocabulary in chunks of 4: teach → drill → teach → drill
   const chunkSize = 4;
   const chunks: VocabItem[][] = [];
   for (let i = 0; i < vocab.length; i += chunkSize) {
@@ -119,23 +200,38 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
   }
 
   chunks.forEach((chunk) => {
-    // 1. Teach each word
     chunk.forEach((w) => queue.push({ type: 'teach', word: w }));
-    // 2. Immediate recognition drills (easy first)
     shuffle(chunk).forEach((w) => queue.push(mcqEsEn(w, pool)));
-    // 3. Listening + production drills (sample — the challenge round and
-    //    spaced review cover the rest)
     shuffle(chunk)
       .slice(0, 2)
       .forEach((w, i) => {
         if (i % 2 === 0) queue.push(listenMeaning(w, pool));
         else queue.push(mcqEnEs(w, pool));
       });
-    // 4. Match the chunk together
     if (chunk.length >= 4) queue.push(matchPairs(chunk));
   });
 
-  // Challenge round: harder production exercises on a sample of the vocab
+  // 3. Remaining teaching: second slide + remaining concept checks
+  slides.slice(1).forEach((s) => {
+    queue.push({ type: 'grammar_slide', word: vocab[0] ?? syntheticWord(`gs-${lesson.slug}`, '', ''), slide: s });
+  });
+  checks.slice(2).forEach((c) => queue.push(c));
+
+  // 4. Dialogue in context (listen + read, then it feeds the checks/builds)
+  if (lesson.dialogue && lesson.dialogue.length > 0) {
+    queue.push({
+      type: 'dialogue_slide',
+      word: vocab[0] ?? syntheticWord(`dl-${lesson.slug}`, '', ''),
+      dialogue: lesson.dialogue,
+    });
+  }
+
+  // 5. Production: build full sentences from tiles
+  (lesson.builds ?? []).forEach((b, i) => {
+    queue.push(buildSentence(b, lesson.slug, i, pool));
+  });
+
+  // 6. Challenge round: harder production on a sample of the vocab
   const challenge = shuffle(vocab).slice(0, 6);
   challenge.forEach((w, i) => {
     if (speechRecognitionAvailable && i % 3 === 2) queue.push(speak(w));
@@ -143,7 +239,7 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
     else queue.push(listenMcq(w, pool));
   });
 
-  // Sentence work
+  // 7. Sentence fill-ins
   shuffle(lesson.sentences)
     .slice(0, 4)
     .forEach((s) => {
@@ -213,6 +309,12 @@ export function buildRetry(missed: Exercise, pool: VocabItem[]): Exercise {
   const w = missed.word;
   let retry: Exercise;
   switch (missed.type) {
+    // Understanding/production exercises come back as themselves — the point
+    // is to apply the explanation you just read.
+    case 'concept_check':
+    case 'build_sentence':
+      retry = { ...missed, tiles: missed.tiles ? shuffle(missed.tiles) : undefined };
+      break;
     case 'type_es':
     case 'speak':
       retry = mcqEnEs(w, pool);

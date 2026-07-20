@@ -20,6 +20,8 @@ const themeAccents: Record<string, string> = {
   nouns: 'from-sky-400 to-blue-600',
   adjectives: 'from-cyan-400 to-teal-500',
   review: 'from-amber-400 to-orange-500',
+  grammar: 'from-indigo-400 to-indigo-600',
+  conversation: 'from-pink-400 to-rose-500',
 };
 
 export default function LessonsPage() {
@@ -230,7 +232,7 @@ export default function LessonsPage() {
         ))}
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-10">
-          Phase 2 (Core Vocabulary — 2,000 words) unlocks when you finish Phase 1
+          Weeks 9+ (past tense, future plans, real conversations) coming as you progress
         </p>
       </main>
     </div>
