@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
+import { markOnboardingComplete } from '@/lib/sync';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -28,7 +29,8 @@ export default function OnboardingPage() {
     if (step < 3) {
       setStep(step + 1);
     } else {
-      // Start first lesson
+      // Remember onboarding is done so it never re-asks (synced to the account).
+      markOnboardingComplete();
       router.push('/lessons');
     }
   };

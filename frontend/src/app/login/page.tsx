@@ -37,7 +37,10 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push('/onboarding');
+      // Returning users go straight to their lessons. Onboarding is only for
+      // brand-new accounts (see the register flow) — logging in should never
+      // re-ask the introductory questions.
+      router.push('/lessons');
     } catch (err: any) {
       setFormError(err.response?.data?.error || 'Login failed');
     }

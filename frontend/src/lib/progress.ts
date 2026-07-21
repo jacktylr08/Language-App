@@ -32,7 +32,10 @@ export interface ProgressState {
   words: Record<string, WordState>; // vocab id -> state
 }
 
-const KEY = 'aprende-progress-v1';
+import { PROGRESS_KEY } from './keys';
+import { scheduleSync } from './sync';
+
+const KEY = PROGRESS_KEY;
 
 const DEFAULT_STATE: ProgressState = {
   xp: 0,
@@ -71,6 +74,8 @@ function save(state: ProgressState): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
+    // Mirror the change to the account so it follows the learner across devices.
+    scheduleSync();
   } catch {
     /* storage full or unavailable — progress just won't persist */
   }
