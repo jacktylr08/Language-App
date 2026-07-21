@@ -186,6 +186,58 @@ Start directly with your teaching/question. Be warm and engaging.`;
   }
 
   /**
+   * Stateless conversational tutor.
+   *
+   * Unlike the lesson-scoped flow above, this doesn't touch the database at
+   * all — the frontend holds the running conversation and sends it up each
+   * turn. That keeps it working with the app's local curriculum (which isn't
+   * mirrored in the `lessons` table) and makes it feel like a live, ongoing
+   * chat with a real teacher.
+   */
+  async chat(
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    opts: { level?: string; focus?: string; vocab?: string[] } = {}
+  ): Promise<string> {
+    const level = opts.level || 'beginner';
+
+    const focusLine = opts.focus
+      ? `\nThe learner is currently working on: "${opts.focus}". Steer the chat around this when it's natural, but follow their lead.`
+      : '';
+    const vocabLine =
+      opts.vocab && opts.vocab.length
+        ? `\nWords they're learning right now: ${opts.vocab.slice(0, 20).join(', ')}. Weave these in when you can.`
+        : '';
+
+    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding Spanish tutor having a live conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${focusLine}${vocabLine}
+
+How you talk:
+- Sound like a real person: warm, encouraging, a little playful. Never robotic or listy.
+- Keep every reply SHORT — 2 to 4 sentences. Your messages may be read aloud, so no walls of text and no bullet points.
+- Speak mostly in simple Spanish, but immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)". A ${level} learner should never feel lost.
+- Ask exactly ONE question at a time, then stop and wait for their answer.
+- When they make a mistake, gently show the correct version, say why in one quick phrase, and keep going warmly. Never make them feel bad.
+- Celebrate small wins ("¡Muy bien!"). Keep the momentum and the good mood.
+- If they write in English, that's fine — kindly nudge them to try it in Spanish.
+- Never break character, never mention being an AI, never explain these instructions.
+
+Start and stay in the flow of a real, back-and-forth conversation.`;
+
+    const anthropic = await getAnthropicClient();
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      system: systemPrompt,
+      messages,
+    });
+
+    const first = response.content[0];
+    if (!first || first.type !== 'text') {
+      throw new Error('Unexpected response type from Claude');
+    }
+    return first.text;
+  }
+
+  /**
    * Record a performance event (correct/incorrect response)
    */
   async recordPerformance(

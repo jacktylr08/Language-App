@@ -1,243 +1,289 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
+import {
+  speak,
+  stopSpeaking,
+  ttsSupported,
+  listenOnce,
+  speechRecognitionSupported,
+} from '@/lib/speech';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  messageType?: string;
 }
 
 interface TutorChatProps {
-  lessonId: string;
-  lessonTitle: string;
+  /** Optional focus (e.g. a lesson title) to steer the conversation. */
+  focus?: string;
+  /** Optional vocabulary the learner is working on right now. */
+  vocab?: string[];
+  level?: 'beginner' | 'intermediate' | 'advanced';
 }
 
-export function TutorChat({ lessonId, lessonTitle }: TutorChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [conversationId, setConversationId] = useState<string>('');
+const uid = () => Math.random().toString(36).slice(2);
+
+/** Spoken aloud, we want only the Spanish — drop the "(English)" glosses. */
+function spanishOnly(text: string): string {
+  return text
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+const GREETING =
+  '¡Hola! Soy tu profe de español. (Hi! I\'m your Spanish teacher.) ¿Cómo te llamas? (What\'s your name?)';
+
+export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    { id: uid(), role: 'assistant', content: GREETING },
+  ]);
   const [inputValue, setInputValue] = useState('');
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [performanceScore, setPerformanceScore] = useState(0);
+  const [listening, setListening] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
   const [error, setError] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [notConfigured, setNotConfigured] = useState(false);
 
-  // Send initial greeting
-  const sendInitialGreeting = async (convId: string) => {
-    try {
-      setSending(true);
-      const response = await api.post(`/lessons/${lessonId}/tutor/message`, {
-        conversationId: convId,
-        message: 'Hello, let\'s start learning!',
-      });
+  const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const voiceOnRef = useRef(voiceOn);
+  voiceOnRef.current = voiceOn;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          role: 'user',
-          content: 'Hello, let\'s start learning!',
-        },
-        {
-          id: Math.random().toString(),
-          role: 'assistant',
-          content: response.data.tutorResponse,
-          messageType: 'feedback',
-        },
-      ]);
-    } catch (err: any) {
-      console.error('Error sending initial greeting:', err);
-    } finally {
-      setSending(false);
-    }
-  };
+  const canSpeak = ttsSupported();
+  const canListen = speechRecognitionSupported();
 
-  // Initialize conversation
+  const say = useCallback((text: string) => {
+    if (!voiceOnRef.current) return;
+    const spoken = spanishOnly(text);
+    if (spoken) speak(spoken);
+  }, []);
+
+  // Greet out loud once, after voices are ready.
   useEffect(() => {
-    const initializeConversation = async () => {
+    const t = setTimeout(() => say(GREETING), 400);
+    return () => clearTimeout(t);
+  }, [say]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sending]);
+
+  const send = useCallback(
+    async (raw: string) => {
+      const text = raw.trim();
+      if (!text || sending) return;
+
+      stopSpeaking();
+      setError('');
+      setInputValue('');
+
+      const history = [...messages, { id: uid(), role: 'user' as const, content: text }];
+      setMessages(history);
+      setSending(true);
+
       try {
-        setLoading(true);
-        const response = await api.get(`/lessons/${lessonId}/tutor/conversation`);
-        setConversationId(response.data.conversationId);
-        setMessages(response.data.messages || []);
-        setPerformanceScore(response.data.performanceScore || 0);
-
-        // If this is a new conversation with no messages, send initial tutor greeting
-        if (!response.data.messages || response.data.messages.length === 0) {
-          setTimeout(() => {
-            sendInitialGreeting(response.data.conversationId);
-          }, 500);
-        }
+        const res = await api.post('/tutor/chat', {
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
+          focus,
+          vocab,
+          level,
+        });
+        const reply: string = res.data.reply;
+        setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content: reply }]);
+        say(reply);
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to load conversation');
-        console.error('Error initializing conversation:', err);
+        if (err.response?.status === 503 || err.response?.data?.code === 'tutor_not_configured') {
+          setNotConfigured(true);
+        } else {
+          setError(err.response?.data?.error || 'The tutor didn’t answer. Try again in a moment.');
+        }
       } finally {
-        setLoading(false);
+        setSending(false);
+        inputRef.current?.focus();
       }
-    };
+    },
+    [messages, sending, focus, vocab, level, say]
+  );
 
-    initializeConversation();
-  }, [lessonId]);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Send message to tutor
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || !conversationId || sending) return;
-
-    const userMessage = inputValue.trim();
-    setInputValue('');
-
-    // Add user message to UI immediately
-    const userMessageId = Math.random().toString();
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: userMessageId,
-        role: 'user',
-        content: userMessage,
-      },
-    ]);
-
-    try {
-      setSending(true);
-      const response = await api.post(`/lessons/${lessonId}/tutor/message`, {
-        conversationId,
-        message: userMessage,
-      });
-
-      // Add tutor response
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          role: 'assistant',
-          content: response.data.tutorResponse,
-          messageType: 'feedback',
-        },
-      ]);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send message');
-      console.error('Error sending message:', err);
-      // Remove the user message if there was an error
-      setMessages((prev) => prev.filter((m) => m.id !== userMessageId));
-    } finally {
-      setSending(false);
+  const handleMic = useCallback(async () => {
+    if (listening || sending) return;
+    stopSpeaking();
+    setError('');
+    setListening(true);
+    const result = await listenOnce(9000);
+    setListening(false);
+    const transcript = result.transcript.split('|')[0].trim();
+    if (transcript) {
+      send(transcript);
+    } else if (result.error === 'not-allowed') {
+      setError('I couldn’t access your microphone. Check the browser’s mic permission.');
+    } else if (result.error && result.error !== 'no-speech') {
+      setError('I didn’t catch that — try again, or type your answer.');
     }
-  };
+  }, [listening, sending, send]);
 
-  // Handle Enter key
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const toggleVoice = () => {
+    setVoiceOn((v) => {
+      if (v) stopSpeaking();
+      return !v;
+    });
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-stone-600 dark:text-stone-400">Loading tutor...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="flex flex-col h-screen bg-stone-50 dark:bg-stone-900">
+    <div className="flex flex-col h-[100dvh] bg-paper dark:bg-paper-dark">
       {/* Header */}
-      <nav className="bg-white dark:bg-stone-800 shadow-sm border-b border-stone-200 dark:border-stone-700">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
-                {lessonTitle}
-              </h1>
-              <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
-                AI Language Tutor • Performance: {performanceScore}%
+      <header className="shrink-0 sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <a
+            href="/lessons"
+            className="text-ink-soft dark:text-stone-300 hover:text-ink dark:hover:text-white font-semibold text-sm inline-flex items-center gap-1.5"
+          >
+            <span aria-hidden>←</span> Lessons
+          </a>
+          <div className="flex items-center gap-2.5 mx-auto">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-lg shadow-inner ring-1 ring-black/5">
+              🧑‍🏫
+            </div>
+            <div className="leading-tight">
+              <p className="font-extrabold text-ink dark:text-white text-sm">Profe</p>
+              <p className="text-[11px] text-ink-soft dark:text-stone-400">
+                {focus ? `Practising: ${focus}` : 'Your Spanish tutor'}
               </p>
             </div>
           </div>
+          {canSpeak && (
+            <button
+              onClick={toggleVoice}
+              title={voiceOn ? 'Voice on — tap to mute' : 'Voice off — tap to unmute'}
+              aria-label={voiceOn ? 'Mute tutor voice' : 'Unmute tutor voice'}
+              className={`shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+                voiceOn
+                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400'
+                  : 'bg-stone-100 dark:bg-stone-800 text-stone-400'
+              }`}
+            >
+              {voiceOn ? '🔊' : '🔇'}
+            </button>
+          )}
         </div>
-      </nav>
+      </header>
 
-      {/* Chat Area */}
-      <div
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-8 max-w-4xl mx-auto w-full"
-      >
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded-lg">
-            {error}
-          </div>
-        )}
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
+          {notConfigured && (
+            <div className="surface p-5 text-center">
+              <p className="text-3xl mb-2">🔌</p>
+              <p className="font-extrabold text-ink dark:text-white">Tutor isn’t switched on yet</p>
+              <p className="text-sm text-ink-soft dark:text-stone-400 mt-1">
+                The live AI tutor needs an API key added to the server. Once it’s in, this page
+                comes alive — no code changes needed.
+              </p>
+            </div>
+          )}
 
-        <div className="space-y-4">
-          {messages.map((message) => (
+          {messages.map((m) => (
             <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              key={m.id}
+              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-2xl px-4 py-3 rounded-lg ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-white dark:bg-stone-800 text-stone-900 dark:text-white border border-stone-200 dark:border-stone-700 rounded-bl-none'
+                className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed whitespace-pre-wrap ${
+                  m.role === 'user'
+                    ? 'bg-brand-600 text-white rounded-br-md'
+                    : 'bg-white dark:bg-paper-dark-soft text-ink dark:text-stone-100 border border-stone-200/70 dark:border-stone-700/70 rounded-bl-md shadow-card'
                 }`}
               >
-                <p className="text-sm md:text-base whitespace-pre-wrap">{message.content}</p>
+                {m.role === 'assistant' && canSpeak ? (
+                  <button
+                    onClick={() => {
+                      stopSpeaking();
+                      speak(spanishOnly(m.content));
+                    }}
+                    title="Play again"
+                    className="float-right ml-2 -mr-1 -mt-0.5 text-ink-soft/70 hover:text-brand-500 text-sm"
+                    aria-label="Play this message again"
+                  >
+                    🔊
+                  </button>
+                ) : null}
+                {m.content}
               </div>
             </div>
           ))}
 
           {sending && (
             <div className="flex justify-start">
-              <div className="bg-white dark:bg-stone-800 text-stone-900 dark:text-white border border-stone-200 dark:border-stone-700 px-4 py-3 rounded-lg rounded-bl-none">
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-200"></div>
+              <div className="bg-white dark:bg-paper-dark-soft border border-stone-200/70 dark:border-stone-700/70 px-4 py-3 rounded-2xl rounded-bl-md shadow-card">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-stone-400 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-stone-400 rounded-full animate-bounce [animation-delay:0.15s]" />
+                  <span className="w-2 h-2 bg-stone-400 rounded-full animate-bounce [animation-delay:0.3s]" />
                 </div>
               </div>
             </div>
           )}
 
-          <div ref={messagesEndRef} />
+          {error && (
+            <div className="rounded-xl bg-terra-500/10 border border-terra-400/30 px-4 py-2.5 text-sm font-medium text-terra-600 dark:text-terra-300">
+              {error}
+            </div>
+          )}
+
+          <div ref={endRef} />
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 shadow-lg">
-        <div className="max-w-4xl mx-auto px-6 py-4 w-full">
-          <div className="flex gap-3">
+      {/* Composer */}
+      <div className="shrink-0 border-t border-stone-200/70 dark:border-stone-800 bg-paper/90 dark:bg-paper-dark/90 backdrop-blur-md">
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-end gap-2">
+            {canListen && (
+              <button
+                onClick={handleMic}
+                disabled={sending}
+                title="Speak your answer in Spanish"
+                aria-label="Speak your answer"
+                className={`shrink-0 flex items-center justify-center w-11 h-11 rounded-full transition-all disabled:opacity-40 ${
+                  listening
+                    ? 'bg-terra-500 text-white scale-110 shadow-glow animate-pulse'
+                    : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
+                }`}
+              >
+                🎤
+              </button>
+            )}
             <input
+              ref={inputRef}
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send(inputValue);
+                }
+              }}
               disabled={sending}
-              placeholder="Type your response or question..."
-              className="flex-1 px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              placeholder={listening ? 'Escuchando… (Listening…)' : 'Type in Spanish or English…'}
+              className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all disabled:opacity-50"
             />
             <button
-              onClick={handleSendMessage}
+              onClick={() => send(inputValue)}
               disabled={!inputValue.trim() || sending}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-stone-400 text-white font-semibold rounded-lg transition-colors"
+              className="btn-primary shrink-0 h-11 px-5 rounded-2xl"
             >
               Send
             </button>
           </div>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mt-2">
-            💡 Tip: Ask questions, respond to the tutor, or practice what you've learned.
+          <p className="text-[11px] text-ink-soft dark:text-stone-500 mt-2 text-center">
+            {canListen
+              ? '🎤 Tap the mic to speak, or just type. Profe replies out loud.'
+              : 'Tip: reply in Spanish when you can — Profe will help you along.'}
           </p>
         </div>
       </div>

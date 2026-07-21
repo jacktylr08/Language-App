@@ -10,6 +10,7 @@ import authRoutes from '@/routes/auth';
 import lessonsRoutes from '@/routes/lessons';
 import vocabularyRoutes from '@/routes/vocabulary';
 import reviewsRoutes from '@/routes/reviews';
+import tutorRoutes from '@/routes/tutor';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/lessons', lessonsRoutes);
 app.use('/api/v1/vocabulary', vocabularyRoutes);
 app.use('/api/v1/reviews', reviewsRoutes);
+app.use('/api/v1/tutor', tutorRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

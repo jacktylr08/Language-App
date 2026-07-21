@@ -143,6 +143,24 @@ export default function LessonsPage() {
         </div>
       </div>
 
+      {/* Talk to the AI tutor */}
+      <Link
+        href="/tutor"
+        className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-terra-500 via-terra-400 to-saffron-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+      >
+        <div className="absolute -right-5 -top-7 text-[92px] opacity-15 -rotate-12 select-none" aria-hidden>
+          🧑‍🏫
+        </div>
+        <p className="font-extrabold text-white text-lg">Talk to your tutor</p>
+        <p className="text-white/90 text-sm mt-1 leading-snug">
+          A live, back-and-forth chat with Profe — speak or type, and hear Spanish back.
+        </p>
+        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
+          Start talking
+          <span className="transition-transform group-hover:translate-x-1">→</span>
+        </span>
+      </Link>
+
       {/* Smart practice */}
       {lessonsDone > 0 && (
         <Link
