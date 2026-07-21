@@ -2,9 +2,13 @@ import { Router, Response } from 'express';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
 import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
+import { createRealtimeClientSecret } from '@/services/openai-service';
 import { logger } from '@/utils/logger';
 
 const router = Router();
+
+const strList = (v: any): string[] | undefined =>
+  Array.isArray(v) ? v.filter((x: any) => typeof x === 'string' && x.trim()) : undefined;
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -55,9 +59,6 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
       res.status(400).json({ error: 'The last message must be from the user' });
       return;
     }
-
-    const strList = (v: any): string[] | undefined =>
-      Array.isArray(v) ? v.filter((x: any) => typeof x === 'string' && x.trim()) : undefined;
 
     const reply = await tutorService.chat(clean, {
       level: typeof level === 'string' ? level : undefined,
@@ -123,6 +124,50 @@ router.post('/reflect', verifyToken, async (req: AuthRequest, res: Response): Pr
     }
     logger.error('Tutor reflect error:', err?.response?.status ?? '', message);
     res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * Mint an ephemeral token for a LIVE voice call (OpenAI Realtime API).
+ *
+ * POST /api/v1/tutor/realtime
+ * Body: { level?, focus?, weekReached?, knownVocab?, weaknesses?, strengths?, profileSummary?, learnerName? }
+ *
+ * The learner's level + memory are baked into the session instructions here,
+ * server-side, so the browser only ever receives a short-lived ek_… token —
+ * never the API key. The browser uses the token to open a WebRTC connection
+ * directly to OpenAI. 503 when the tutor isn't configured.
+ */
+router.post('/realtime', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const b = req.body ?? {};
+    const instructions = tutorService.buildLiveInstructions({
+      level: typeof b.level === 'string' ? b.level : undefined,
+      focus: typeof b.focus === 'string' ? b.focus : undefined,
+      weekReached: typeof b.weekReached === 'number' ? b.weekReached : undefined,
+      knownVocab: strList(b.knownVocab),
+      weaknesses: strList(b.weaknesses),
+      strengths: strList(b.strengths),
+      profileSummary: typeof b.profileSummary === 'string' ? b.profileSummary.slice(0, 800) : undefined,
+      learnerName: typeof b.learnerName === 'string' ? b.learnerName.slice(0, 60) : undefined,
+    });
+
+    const session = await createRealtimeClientSecret({ instructions });
+    res.json(session);
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : 'Failed to start the voice session';
+    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
+      res.status(503).json({ error: message, code: 'tutor_not_configured' });
+      return;
+    }
+    // Surface OpenAI's own error body to the logs so a config/shape mismatch is
+    // diagnosable, without leaking it to the client.
+    logger.error(
+      'Realtime session error:',
+      err?.response?.status ?? '',
+      JSON.stringify(err?.response?.data ?? message)
+    );
+    res.status(502).json({ error: 'Could not start the voice session.' });
   }
 });
 

@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_REALTIME_SECRET_URL = 'https://api.openai.com/v1/realtime/client_secrets';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -61,4 +62,81 @@ export async function openaiChat(
     throw new Error('Unexpected response from OpenAI');
   }
   return content.trim();
+}
+
+export interface RealtimeSessionConfig {
+  instructions: string;
+  /** Voice name (e.g. "cedar", "marin", "alloy"). */
+  voice?: string;
+}
+
+export interface RealtimeSessionResult {
+  /** The ephemeral client secret (ek_…) the browser uses to connect over WebRTC. */
+  token: string;
+  model: string;
+  expiresAt: number | null;
+}
+
+/**
+ * Mint a short-lived ephemeral client secret for the browser to open a WebRTC
+ * connection to OpenAI's Realtime API (speech-to-speech). The real API key
+ * never leaves the server — the browser only ever sees the ek_… token, which
+ * is bound to this session config and expires in about a minute.
+ *
+ * Model defaults to gpt-realtime-mini (the cost-sensible realtime model),
+ * overridable via OPENAI_REALTIME_MODEL. Voice via OPENAI_REALTIME_VOICE.
+ */
+export async function createRealtimeClientSecret(
+  config: RealtimeSessionConfig
+): Promise<RealtimeSessionResult> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) {
+    const err = new Error('AI tutor is not configured (OPENAI_API_KEY is not set).');
+    (err as any).code = 'tutor_not_configured';
+    throw err;
+  }
+
+  const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini';
+  const voice = config.voice || process.env.OPENAI_REALTIME_VOICE || 'cedar';
+
+  const response = await axios.post(
+    OPENAI_REALTIME_SECRET_URL,
+    {
+      session: {
+        type: 'realtime',
+        model,
+        instructions: config.instructions,
+        audio: {
+          input: {
+            transcription: { model: 'gpt-4o-mini-transcribe' },
+            // Server-side voice activity detection: lets the learner just talk,
+            // and lets them interrupt the tutor (barge-in) naturally.
+            turn_detection: { type: 'server_vad', silence_duration_ms: 600 },
+          },
+          output: { voice },
+        },
+      },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+
+  // The client-secrets response has evolved; accept both the flat and nested
+  // shapes so a minor API revision doesn't break us.
+  const data = response.data ?? {};
+  const token: string | undefined = data.value ?? data.client_secret?.value;
+  if (!token) {
+    throw new Error('Realtime session did not return a client secret');
+  }
+
+  return {
+    token,
+    model,
+    expiresAt: data.expires_at ?? data.client_secret?.expires_at ?? null,
+  };
 }

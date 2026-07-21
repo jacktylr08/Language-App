@@ -6,6 +6,8 @@ import { LiveMic, speechRecognitionSupported } from '@/lib/speech';
 import { speakText, stopSpeaking, voiceSupported } from '@/lib/tts';
 import { buildTutorContext, type TutorContext } from '@/lib/tutor-context';
 import { loadProfile, reflectAndSave } from '@/lib/tutor-memory';
+import { realtimeSupported } from '@/lib/realtime';
+import { RealtimeCall } from '@/components/RealtimeCall';
 
 interface Message {
   id: string;
@@ -46,6 +48,9 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
   const [error, setError] = useState('');
   const [notConfigured, setNotConfigured] = useState(false);
   const [ctx, setCtx] = useState<TutorContext | null>(null);
+  const [inCall, setInCall] = useState(false);
+
+  const canCall = realtimeSupported();
 
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -260,9 +265,37 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
     });
   };
 
+  /** Start the full-duplex Realtime voice call. Stops any half-duplex mode. */
+  const startCall = useCallback(() => {
+    if (live) endLive();
+    stopSpeaking();
+    setError('');
+    setInCall(true);
+  }, [live, endLive]);
+
+  /** The call ended — fold its transcript into the chat and update memory. */
+  const handleCallClose = useCallback(
+    (transcript: Array<{ role: 'user' | 'assistant'; content: string }>) => {
+      setInCall(false);
+      if (transcript.length) {
+        const asMessages = transcript.map((t) => ({ id: uid(), role: t.role, content: t.content }));
+        setMessages((prev) => {
+          const next = [...prev, ...asMessages];
+          void reflectAndSave(next.map((m) => ({ role: m.role, content: m.content })));
+          return next;
+        });
+      }
+    },
+    []
+  );
+
   const levelLabel = ctx
     ? `Week ${ctx.weekReached} · ${ctx.level}`
     : 'Your Spanish tutor';
+
+  if (inCall) {
+    return <RealtimeCall context={ctx} onClose={handleCallClose} />;
+  }
 
   return (
     <div className="flex flex-col h-[100dvh] bg-paper dark:bg-paper-dark">
@@ -382,8 +415,16 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
             <LiveBar phase={phase} onInterrupt={interrupt} onEnd={endLive} />
           ) : (
             <>
+              {canCall && (
+                <button
+                  onClick={startCall}
+                  className="w-full mb-2 h-12 rounded-2xl bg-gradient-to-r from-brand-500 to-brand-600 text-white font-extrabold shadow-glow hover:brightness-105 transition-all inline-flex items-center justify-center gap-2"
+                >
+                  📞 Start a live voice call
+                </button>
+              )}
               <div className="flex items-end gap-2">
-                {canListen && (
+                {canListen && !canCall && (
                   <button
                     onClick={startLive}
                     title="Start a hands-free voice conversation"
@@ -417,8 +458,10 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
                 </button>
               </div>
               <p className="text-[11px] text-ink-soft dark:text-stone-500 mt-2 text-center">
-                {canListen
-                  ? '🎙️ Tap Talk for a hands-free, flowing conversation — or just type.'
+                {canCall
+                  ? '📞 Talk naturally — Profe listens, replies, and you can interrupt any time. Or type below.'
+                  : canListen
+                  ? '🎙️ Tap Talk for a hands-free conversation — or just type.'
                   : 'Tip: reply in Spanish when you can — Profe will help you along.'}
               </p>
             </>
