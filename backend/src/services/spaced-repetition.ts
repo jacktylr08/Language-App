@@ -120,7 +120,7 @@ export const sr = {
     // Check if ready for active review (20+ encounters)
     if (uvp.encounters < 20 && quality > 0) {
       // Passive encounter, increment count
-      await uvp.$query().update({
+      await uvp.$query().patch({
         encounters: uvp.encounters + 1,
         last_encounter_at: new Date(),
       });
@@ -149,7 +149,7 @@ export const sr = {
     nextReviewAt.setDate(nextReviewAt.getDate() + newInterval);
 
     // Update database
-    const updatedUvp = await uvp.$query().update({
+    const updatedUvp = await uvp.$query().patch({
       interval_days: newInterval,
       ease_factor: newEaseFactor,
       reps: newReps,

@@ -100,7 +100,7 @@ export const lessonProgress = {
     if (progress) {
       // Update existing progress
       if (progress.status === 'not_started') {
-        progress = await progress.$query().update({
+        progress = await progress.$query().patch({
           status: 'in_progress',
           started_at: new Date(),
         });
@@ -143,7 +143,7 @@ export const lessonProgress = {
         completed_at: new Date(),
       });
     } else {
-      progress = await progress.$query().update({
+      progress = await progress.$query().patch({
         status: 'completed',
         completed_at: new Date(),
         completion_percentage: 100,
@@ -178,7 +178,7 @@ export const lessonProgress = {
         });
       } else if (existingProgress.first_encountered_lesson_id === null) {
         // Update if not set
-        await existingProgress.$query().update({
+        await existingProgress.$query().patch({
           first_encountered_lesson_id: lessonId,
         });
       }
@@ -187,7 +187,7 @@ export const lessonProgress = {
     }
 
     // Update progress with extracted vocabulary
-    progress = await progress.$query().update({
+    progress = await progress.$query().patch({
       extracted_vocabulary_count: extractedVocabIds.length,
       extracted_vocabulary_ids: extractedVocabIds,
     });
@@ -211,7 +211,7 @@ export const lessonProgress = {
       });
 
       if (progress) {
-        await progress.$query().update({
+        await progress.$query().patch({
           encounters: progress.encounters + 1,
           last_encounter_at: new Date(),
         });

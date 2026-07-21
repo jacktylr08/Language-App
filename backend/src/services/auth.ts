@@ -94,7 +94,7 @@ export const auth = {
     }
 
     // Update last active
-    await user.$query().update({ last_active_at: new Date().toISOString() });
+    await user.$query().patch({ last_active_at: new Date().toISOString() });
 
     const tokens = this.generateTokens(user.id, user.email);
     logger.info(`User logged in: ${email}`);
@@ -155,7 +155,7 @@ export const auth = {
     }
 
     const passwordHash = await this.hashPassword(newPassword);
-    await user.$query().update({
+    await user.$query().patch({
       password_hash: passwordHash,
       updated_at: new Date().toISOString(),
     });
