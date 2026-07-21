@@ -1,5 +1,5 @@
 import { knexInstance } from '@/config/database';
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { logger } from '@/utils/logger';
 
 interface TutorMessage {
@@ -16,7 +16,24 @@ interface ConversationContext {
   themes: string[];
 }
 
-const client = new Anthropic();
+// The Anthropic client is created lazily, on first use, rather than at module
+// load. This keeps the server booting cleanly when the optional AI-tutor
+// feature is unconfigured: no ANTHROPIC_API_KEY (and even no SDK installed)
+// must never crash the whole backend on startup.
+let client: Anthropic | null = null;
+
+async function getAnthropicClient(): Promise<Anthropic> {
+  if (client) return client;
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error(
+      'AI tutor is not configured (ANTHROPIC_API_KEY is not set). ' +
+        'Set the key in your environment to enable it.'
+    );
+  }
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  client = new Anthropic();
+  return client;
+}
 
 export class TutorService {
   /**
@@ -148,7 +165,8 @@ Start directly with your teaching/question. Be warm and engaging.`;
     });
 
     try {
-      const response = await client.messages.create({
+      const anthropic = await getAnthropicClient();
+      const response = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         system: systemPrompt,
