@@ -1,5 +1,5 @@
 import { knexInstance } from '@/config/database';
-import type Anthropic from '@anthropic-ai/sdk';
+import { openaiChat } from '@/services/openai-service';
 import { logger } from '@/utils/logger';
 
 interface TutorMessage {
@@ -14,25 +14,6 @@ interface ConversationContext {
   lessonTitle: string;
   vocabulary: Array<{ spanish: string; english: string[]; pronunciation: string }>;
   themes: string[];
-}
-
-// The Anthropic client is created lazily, on first use, rather than at module
-// load. This keeps the server booting cleanly when the optional AI-tutor
-// feature is unconfigured: no ANTHROPIC_API_KEY (and even no SDK installed)
-// must never crash the whole backend on startup.
-let client: Anthropic | null = null;
-
-async function getAnthropicClient(): Promise<Anthropic> {
-  if (client) return client;
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      'AI tutor is not configured (ANTHROPIC_API_KEY is not set). ' +
-        'Set the key in your environment to enable it.'
-    );
-  }
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  client = new Anthropic();
-  return client;
 }
 
 export class TutorService {
@@ -152,33 +133,14 @@ Guidelines:
 Response format:
 Start directly with your teaching/question. Be warm and engaging.`;
 
-    // Convert to Anthropic message format
-    const anthropicMessages = messages.map((m) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }));
-
-    // Add current user message
-    anthropicMessages.push({
-      role: 'user',
-      content: userMessage,
-    });
+    // Build the message list: prior history + the new user turn.
+    const chatMessages = [
+      ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      { role: 'user' as const, content: userMessage },
+    ];
 
     try {
-      const anthropic = await getAnthropicClient();
-      const response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: anthropicMessages,
-      });
-
-      const assistantMessage = response.content[0];
-      if (assistantMessage.type !== 'text') {
-        throw new Error('Unexpected response type from Claude');
-      }
-
-      return assistantMessage.text;
+      return await openaiChat(systemPrompt, chatMessages, { maxTokens: 1024 });
     } catch (error) {
       logger.error('Error generating tutor response:', error);
       throw error;
@@ -222,19 +184,7 @@ How you talk:
 
 Start and stay in the flow of a real, back-and-forth conversation.`;
 
-    const anthropic = await getAnthropicClient();
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
-      system: systemPrompt,
-      messages,
-    });
-
-    const first = response.content[0];
-    if (!first || first.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-    return first.text;
+    return openaiChat(systemPrompt, messages, { maxTokens: 600 });
   }
 
   /**

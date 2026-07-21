@@ -19,7 +19,7 @@ interface ChatMessage {
  *
  * The client keeps the running conversation and sends it up each turn, so this
  * works with the app's local curriculum and needs no database rows. If the AI
- * tutor isn't configured (no ANTHROPIC_API_KEY), we answer 503 so the UI can
+ * tutor isn't configured (no OPENAI_API_KEY), we answer 503 so the UI can
  * show a friendly "not switched on yet" notice instead of a hard error.
  */
 router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -56,14 +56,14 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
     });
 
     res.json({ reply });
-  } catch (err) {
+  } catch (err: any) {
     const message = err instanceof Error ? err.message : 'Failed to reach the tutor';
     // A missing key is a configuration state, not a crash — surface it as 503.
-    if (message.includes('not configured') || message.includes('ANTHROPIC_API_KEY')) {
+    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
       res.status(503).json({ error: message, code: 'tutor_not_configured' });
       return;
     }
-    logger.error('Tutor chat error:', message);
+    logger.error('Tutor chat error:', err?.response?.status ?? '', message);
     res.status(500).json({ error: message });
   }
 });
