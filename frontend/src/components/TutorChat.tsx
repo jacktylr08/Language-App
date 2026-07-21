@@ -100,6 +100,7 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
       vocab: c?.vocab,
       weekReached: c?.weekReached,
       knownVocab: c?.knownVocab,
+      plan: c?.plan,
       strengths: profile?.strengths,
       weaknesses: profile?.weaknesses,
       profileSummary: profile?.summary,

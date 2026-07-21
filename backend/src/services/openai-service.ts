@@ -110,8 +110,10 @@ export async function createRealtimeClientSecret(
           input: {
             transcription: { model: 'gpt-4o-mini-transcribe' },
             // Server-side voice activity detection: lets the learner just talk,
-            // and lets them interrupt the tutor (barge-in) naturally.
-            turn_detection: { type: 'server_vad', silence_duration_ms: 600 },
+            // and lets them interrupt the tutor (barge-in) naturally. A longer
+            // silence window means a beginner isn't cut off mid-thought while
+            // they search for a word.
+            turn_detection: { type: 'server_vad', silence_duration_ms: 900 },
           },
           output: { voice },
         },

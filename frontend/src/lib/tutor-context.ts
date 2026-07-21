@@ -3,8 +3,12 @@
  * progress. This is what stops Profe hitting a week-1 learner with week-5
  * grammar: we pass the reached week + the vocabulary they've genuinely met, and
  * the backend prompt treats the week as a hard ceiling.
+ *
+ * It also gives each session a backbone: the learner's *current* lesson and a
+ * practical "can-do" goal, so a voice call has structure instead of drifting
+ * into random phrases.
  */
-import { curriculum } from './curriculum';
+import { curriculum, type CurriculumLesson } from './curriculum';
 import { loadProgress } from './progress';
 
 export interface TutorContext {
@@ -13,16 +17,58 @@ export interface TutorContext {
   weekReached: number;
   /** Spanish the learner already knows — safe for Profe to use freely. */
   knownVocab: string[];
-  /** Optional lesson focus (title) when the session is launched from a lesson. */
+  /** The lesson the session is focused on (title). */
   focus?: string;
   /** Vocabulary of the focused lesson. */
   vocab?: string[];
+  /** A short, natural-language plan giving the session a gentle structure. */
+  plan?: string;
 }
 
 // vocab id -> Spanish, built once.
 const vocabById = new Map<string, string>();
 for (const lesson of curriculum) {
   for (const v of lesson.vocab) vocabById.set(v.id, v.es);
+}
+
+/** A practical "can-do" goal for each lesson theme. */
+function canDoGoal(theme: CurriculumLesson['theme']): string {
+  switch (theme) {
+    case 'phonetics':
+      return 'greet someone and introduce yourself';
+    case 'verbs':
+      return 'talk about what you do day to day';
+    case 'family':
+      return 'talk about your family and the people in your life';
+    case 'nouns':
+      return 'describe your home and order food and drinks';
+    case 'adjectives':
+      return 'describe things around you — sizes, colours, how they are';
+    case 'grammar':
+      return 'build your own sentences from scratch';
+    case 'conversation':
+      return 'hold a real-life conversation, like ordering in a café';
+    case 'review':
+      return 'use everything so far together';
+    default:
+      return 'have a natural little conversation';
+  }
+}
+
+/** Curriculum order: by week, then order within the week. */
+const orderedCurriculum = [...curriculum].sort(
+  (a, b) => a.week - b.week || a.order - b.order
+);
+
+/**
+ * The lesson the learner is "on": the first one they haven't completed, or the
+ * last lesson if they've finished everything.
+ */
+function currentLesson(completed: Set<string>): CurriculumLesson {
+  return (
+    orderedCurriculum.find((l) => !completed.has(l.slug)) ??
+    orderedCurriculum[orderedCurriculum.length - 1]
+  );
 }
 
 export function buildTutorContext(focusSlug?: string): TutorContext {
@@ -58,13 +104,31 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   const level: TutorContext['level'] =
     weekReached >= 13 ? 'advanced' : weekReached >= 5 ? 'intermediate' : 'beginner';
 
-  const focusLesson = focusSlug ? curriculum.find((l) => l.slug === focusSlug) : undefined;
+  // Session focus: an explicit lesson (if launched from one), else the lesson
+  // the learner is currently on — so every call has a subject and a goal.
+  const lesson =
+    (focusSlug ? curriculum.find((l) => l.slug === focusSlug) : undefined) ??
+    currentLesson(completed);
+
+  const targetWords = lesson.vocab
+    .slice(0, 8)
+    .map((v) => `${v.es} (${v.en})`)
+    .join(', ');
+
+  const plan =
+    `Today, loosely centre things on the lesson "${lesson.title}"${
+      lesson.subtitle ? ` — ${lesson.subtitle}` : ''
+    }. ` +
+    (targetWords ? `Weave in some of these when it fits: ${targetWords}. ` : '') +
+    `The real goal is for the learner to get comfortable being able to ${canDoGoal(lesson.theme)}. ` +
+    `Keep it a natural conversation, not a checklist — this is just a gentle backbone.`;
 
   return {
     level,
     weekReached,
     knownVocab: Array.from(known).slice(0, 150),
-    focus: focusLesson?.title,
-    vocab: focusLesson?.vocab.map((v) => v.es),
+    focus: lesson.title,
+    vocab: lesson.vocab.map((v) => v.es),
+    plan,
   };
 }

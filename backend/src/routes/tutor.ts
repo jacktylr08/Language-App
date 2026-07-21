@@ -45,7 +45,7 @@ function sanitizeMessages(messages: any[]): ChatMessage[] {
  */
 router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { messages, focus, vocab, level, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName } =
+    const { messages, focus, vocab, level, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName, plan } =
       req.body ?? {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -70,6 +70,7 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
       strengths: strList(strengths),
       profileSummary: typeof profileSummary === 'string' ? profileSummary.slice(0, 800) : undefined,
       learnerName: typeof learnerName === 'string' ? learnerName.slice(0, 60) : undefined,
+      plan: typeof plan === 'string' ? plan.slice(0, 800) : undefined,
     });
 
     res.json({ reply });
@@ -150,6 +151,7 @@ router.post('/realtime', verifyToken, async (req: AuthRequest, res: Response): P
       strengths: strList(b.strengths),
       profileSummary: typeof b.profileSummary === 'string' ? b.profileSummary.slice(0, 800) : undefined,
       learnerName: typeof b.learnerName === 'string' ? b.learnerName.slice(0, 60) : undefined,
+      plan: typeof b.plan === 'string' ? b.plan.slice(0, 800) : undefined,
     });
 
     const session = await createRealtimeClientSecret({ instructions });

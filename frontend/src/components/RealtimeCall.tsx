@@ -70,6 +70,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           focus: c?.focus,
           weekReached: c?.weekReached,
           knownVocab: c?.knownVocab,
+          plan: c?.plan,
           weaknesses: profile?.weaknesses,
           strengths: profile?.strengths,
           profileSummary: profile?.summary,
