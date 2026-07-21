@@ -363,9 +363,11 @@ export default function LessonsPage() {
             </p>
           </div>
 
-          {/* Desktop sidebar */}
+          {/* Desktop sidebar — pinned below the nav, scrolls on its own */}
           <aside className="hidden lg:block">
-            <div className="sticky top-20">{sidebar}</div>
+            <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pb-6 pr-1">
+              {sidebar}
+            </div>
           </aside>
         </div>
       </div>

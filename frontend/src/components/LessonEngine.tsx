@@ -11,7 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CurriculumLesson, VocabItem, GrammarSlide, DialogueTurn, getAllVocab } from '@/lib/curriculum';
 import { Exercise, buildLessonSession, buildReviewSession, buildRetry } from '@/lib/exercise-engine';
-import { speak, stopSpeaking, listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
+import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
+import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { addXp, completeLessonLocal, recordWordResult, loadProgress, currentStreak } from '@/lib/progress';
 
 type Feedback =

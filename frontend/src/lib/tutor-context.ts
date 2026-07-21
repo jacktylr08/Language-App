@@ -66,14 +66,17 @@ const orderedCurriculum = [...curriculum].sort(
 );
 
 /**
- * The lesson the learner is "on": the first one they haven't completed, or the
- * last lesson if they've finished everything.
+ * The lesson the tutor should anchor on: the learner's MOST RECENT completed
+ * lesson — so it consolidates what they've actually learned rather than teaching
+ * ahead into material they haven't studied yet. If they've completed nothing,
+ * anchor on the very first lesson (what they're just starting).
  */
-function currentLesson(completed: Set<string>): CurriculumLesson {
-  return (
-    orderedCurriculum.find((l) => !completed.has(l.slug)) ??
-    orderedCurriculum[orderedCurriculum.length - 1]
-  );
+function anchorLesson(completed: Set<string>): CurriculumLesson {
+  let last: CurriculumLesson | undefined;
+  for (const l of orderedCurriculum) {
+    if (completed.has(l.slug)) last = l;
+  }
+  return last ?? orderedCurriculum[0];
 }
 
 export function buildTutorContext(focusSlug?: string): TutorContext {
@@ -124,11 +127,12 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
 
   const evaluation = isEvaluationDue(loadProfile());
 
-  // Session focus: an explicit lesson (if launched from one), else the lesson
-  // the learner is currently on — so every call has a subject and a goal.
+  // Session focus: an explicit lesson (if launched from one), else the learner's
+  // most recent completed lesson — so every call consolidates learned material
+  // and never drifts into lessons they haven't done.
   const lesson =
     (focusSlug ? curriculum.find((l) => l.slug === focusSlug) : undefined) ??
-    currentLesson(completed);
+    anchorLesson(completed);
 
   const targetWords = lesson.vocab
     .slice(0, 8)
@@ -136,12 +140,13 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     .join(', ');
 
   const plan =
-    `Today, loosely centre things on the lesson "${lesson.title}"${
-      lesson.subtitle ? ` — ${lesson.subtitle}` : ''
+    `Practise and build confidence with what the learner has ALREADY learned — everything up to week ${weekReached}, and NOTHING beyond it. ` +
+    `Anchor today around their recent lesson "${lesson.title}"${
+      lesson.subtitle ? ` (${lesson.subtitle})` : ''
     }. ` +
-    (targetWords ? `Weave in some of these when it fits: ${targetWords}. ` : '') +
-    `The real goal is for the learner to get comfortable being able to ${canDoGoal(lesson.theme)}. ` +
-    `Keep it a natural conversation, not a checklist — this is just a gentle backbone.`;
+    (targetWords ? `Naturally reuse some of these words they know: ${targetWords}. ` : '') +
+    `The real goal is for them to get comfortable being able to ${canDoGoal(lesson.theme)}. ` +
+    `Keep it a flowing conversation, not a checklist.`;
 
   return {
     level,
