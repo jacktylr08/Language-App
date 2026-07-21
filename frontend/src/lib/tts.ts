@@ -23,15 +23,35 @@ export function stopSpeaking(): void {
   browserStop();
 }
 
-/** Speak text with the neural voice, falling back to the browser voice. */
-export async function speakText(text: string): Promise<void> {
+export interface SpeakOptions {
+  /** Called once when playback finishes naturally (not when interrupted). */
+  onEnd?: () => void;
+}
+
+/**
+ * Speak text with the neural voice, falling back to the browser voice.
+ * `onEnd` fires once when speech finishes on its own — the live conversation
+ * loop uses it to know when to reopen the mic.
+ */
+export async function speakText(text: string, opts: SpeakOptions = {}): Promise<void> {
   const clean = text.trim();
-  if (!clean) return;
+  if (!clean) {
+    opts.onEnd?.();
+    return;
+  }
 
   stopSpeaking();
 
+  let ended = false;
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    opts.onEnd?.();
+  };
+
   if (neuralAvailable === false) {
-    if (ttsSupported()) browserSpeak(clean);
+    if (ttsSupported()) browserSpeak(clean).then(finish);
+    else finish();
     return;
   }
 
@@ -51,8 +71,14 @@ export async function speakText(text: string): Promise<void> {
       URL.revokeObjectURL(url);
       if (currentAudio === audio) currentAudio = null;
     };
-    audio.onended = cleanup;
-    audio.onerror = cleanup;
+    audio.onended = () => {
+      cleanup();
+      finish();
+    };
+    audio.onerror = () => {
+      cleanup();
+      finish();
+    };
     await audio.play().catch(() => {
       // Autoplay may be blocked until the first user gesture — harmless.
     });
@@ -61,7 +87,8 @@ export async function speakText(text: string): Promise<void> {
       neuralAvailable = false;
     }
     // Whatever went wrong, still speak with the browser voice.
-    if (ttsSupported()) browserSpeak(clean);
+    if (ttsSupported()) browserSpeak(clean).then(finish);
+    else finish();
   }
 }
 

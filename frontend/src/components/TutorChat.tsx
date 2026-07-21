@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { listenOnce, speechRecognitionSupported } from '@/lib/speech';
+import { LiveMic, speechRecognitionSupported } from '@/lib/speech';
 import { speakText, stopSpeaking, voiceSupported } from '@/lib/tts';
+import { buildTutorContext, type TutorContext } from '@/lib/tutor-context';
+import { loadProfile, reflectAndSave } from '@/lib/tutor-memory';
 
 interface Message {
   id: string;
@@ -12,12 +14,11 @@ interface Message {
 }
 
 interface TutorChatProps {
-  /** Optional focus (e.g. a lesson title) to steer the conversation. */
-  focus?: string;
-  /** Optional vocabulary the learner is working on right now. */
-  vocab?: string[];
-  level?: 'beginner' | 'intermediate' | 'advanced';
+  /** Optional lesson slug to focus the session on. */
+  focusSlug?: string;
 }
+
+type Phase = 'listening' | 'thinking' | 'speaking';
 
 const uid = () => Math.random().toString(36).slice(2);
 
@@ -32,94 +33,225 @@ function spanishOnly(text: string): string {
 const GREETING =
   '¡Hola! Soy tu profe de español. (Hi! I\'m your Spanish teacher.) ¿Cómo te llamas? (What\'s your name?)';
 
-export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) {
+export function TutorChat({ focusSlug }: TutorChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     { id: uid(), role: 'assistant', content: GREETING },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
-  const [listening, setListening] = useState(false);
+  const [live, setLive] = useState(false);
+  const [phase, setPhase] = useState<Phase>('listening');
+  const [interim, setInterim] = useState('');
   const [voiceOn, setVoiceOn] = useState(true);
   const [error, setError] = useState('');
   const [notConfigured, setNotConfigured] = useState(false);
+  const [ctx, setCtx] = useState<TutorContext | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Refs mirror state for use inside async callbacks and the mic controller.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const ctxRef = useRef<TutorContext | null>(null);
+  const liveRef = useRef(false);
   const voiceOnRef = useRef(voiceOn);
   voiceOnRef.current = voiceOn;
+  const micRef = useRef<LiveMic | null>(null);
+  // Increments each turn; a stale speak/onEnd callback checks this to avoid
+  // reopening the mic after the turn was superseded or interrupted.
+  const genRef = useRef(0);
 
-  const canSpeak = voiceSupported();
   const canListen = speechRecognitionSupported();
+  const canSpeak = voiceSupported();
 
-  const say = useCallback((text: string) => {
-    if (!voiceOnRef.current) return;
-    const spoken = spanishOnly(text);
-    if (spoken) speakText(spoken);
-  }, []);
-
-  // Greet out loud once, after voices are ready.
+  // Build the level/known-vocab context from the learner's progress on mount.
   useEffect(() => {
-    const t = setTimeout(() => say(GREETING), 400);
-    return () => clearTimeout(t);
-  }, [say]);
+    const c = buildTutorContext(focusSlug);
+    setCtx(c);
+    ctxRef.current = c;
+  }, [focusSlug]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, sending, interim]);
 
-  const send = useCallback(
+  const pushAssistant = useCallback((content: string) => {
+    setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content }]);
+  }, []);
+
+  /** Ask the tutor, passing level scope + remembered strengths/weaknesses. */
+  const askTutor = useCallback(async (userText: string): Promise<string> => {
+    const history = [
+      ...messagesRef.current.map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user' as const, content: userText },
+    ];
+    const c = ctxRef.current;
+    const profile = loadProfile();
+    const res = await api.post('/tutor/chat', {
+      messages: history,
+      level: c?.level,
+      focus: c?.focus,
+      vocab: c?.vocab,
+      weekReached: c?.weekReached,
+      knownVocab: c?.knownVocab,
+      strengths: profile?.strengths,
+      weaknesses: profile?.weaknesses,
+      profileSummary: profile?.summary,
+    });
+    return res.data.reply as string;
+  }, []);
+
+  const speakReply = useCallback(
+    (text: string, gen: number) => {
+      if (!voiceOnRef.current) {
+        // Voice muted: in live mode, jump straight back to listening.
+        if (gen === genRef.current && liveRef.current) {
+          setPhase('listening');
+          micRef.current?.resume();
+        }
+        return;
+      }
+      setPhase('speaking');
+      speakText(spanishOnly(text), {
+        onEnd: () => {
+          if (gen === genRef.current && liveRef.current) {
+            setPhase('listening');
+            micRef.current?.resume();
+          }
+        },
+      });
+    },
+    []
+  );
+
+  /** One conversational turn: learner said `text`, Profe replies (and speaks). */
+  const takeTurn = useCallback(
     async (raw: string) => {
       const text = raw.trim();
-      if (!text || sending) return;
+      if (!text) return;
 
+      const gen = ++genRef.current;
+      micRef.current?.pause();
       stopSpeaking();
+      setInterim('');
       setError('');
       setInputValue('');
-
-      const history = [...messages, { id: uid(), role: 'user' as const, content: text }];
-      setMessages(history);
+      setMessages((prev) => [...prev, { id: uid(), role: 'user', content: text }]);
       setSending(true);
+      if (liveRef.current) setPhase('thinking');
 
       try {
-        const res = await api.post('/tutor/chat', {
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
-          focus,
-          vocab,
-          level,
-        });
-        const reply: string = res.data.reply;
-        setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content: reply }]);
-        say(reply);
+        const reply = await askTutor(text);
+        setSending(false);
+        if (gen !== genRef.current) return; // superseded (interrupted / ended)
+        pushAssistant(reply);
+        if (liveRef.current) {
+          speakReply(reply, gen);
+        } else if (voiceOnRef.current) {
+          speakText(spanishOnly(reply));
+        }
       } catch (err: any) {
+        setSending(false);
         if (err.response?.status === 503 || err.response?.data?.code === 'tutor_not_configured') {
           setNotConfigured(true);
         } else {
           setError(err.response?.data?.error || 'The tutor didn’t answer. Try again in a moment.');
         }
+        // In live mode, keep the conversation going despite the hiccup.
+        if (gen === genRef.current && liveRef.current) {
+          setPhase('listening');
+          micRef.current?.resume();
+        }
       } finally {
-        setSending(false);
-        inputRef.current?.focus();
+        if (!liveRef.current) inputRef.current?.focus();
       }
     },
-    [messages, sending, focus, vocab, level, say]
+    [askTutor, pushAssistant, speakReply]
   );
 
-  const handleMic = useCallback(async () => {
-    if (listening || sending) return;
-    stopSpeaking();
+  const takeTurnRef = useRef(takeTurn);
+  takeTurnRef.current = takeTurn;
+
+  // ---- Live session controls ----
+
+  const startLive = useCallback(() => {
+    if (!canListen) return;
     setError('');
-    setListening(true);
-    const result = await listenOnce(9000);
-    setListening(false);
-    const transcript = result.transcript.split('|')[0].trim();
-    if (transcript) {
-      send(transcript);
-    } else if (result.error === 'not-allowed') {
-      setError('I couldn’t access your microphone. Check the browser’s mic permission.');
-    } else if (result.error && result.error !== 'no-speech') {
-      setError('I didn’t catch that — try again, or type your answer.');
+    liveRef.current = true;
+    setLive(true);
+
+    const mic = new LiveMic(
+      {
+        onFinal: (t) => takeTurnRef.current(t),
+        onInterim: (t) => setInterim(t),
+        onError: (e) => {
+          if (e === 'not-allowed' || e === 'service-not-allowed') {
+            setError('I couldn’t access your microphone. Check the browser’s mic permission.');
+            liveRef.current = false;
+            setLive(false);
+          }
+        },
+      },
+      1300
+    );
+    micRef.current = mic;
+
+    const hasUserTurn = messagesRef.current.some((m) => m.role === 'user');
+    if (!hasUserTurn && voiceOnRef.current) {
+      // Greet out loud, then start listening.
+      const gen = ++genRef.current;
+      setPhase('speaking');
+      speakText(spanishOnly(GREETING), {
+        onEnd: () => {
+          if (gen === genRef.current && liveRef.current) {
+            setPhase('listening');
+            mic.start();
+          }
+        },
+      });
+    } else {
+      setPhase('listening');
+      mic.start();
     }
-  }, [listening, sending, send]);
+  }, [canListen]);
+
+  const endLive = useCallback(() => {
+    genRef.current++;
+    liveRef.current = false;
+    micRef.current?.stop();
+    micRef.current = null;
+    stopSpeaking();
+    setLive(false);
+    setInterim('');
+    // Distil what happened into the learner's memory for next time.
+    void reflectAndSave(messagesRef.current.map((m) => ({ role: m.role, content: m.content })));
+  }, []);
+
+  /** Stop the tutor mid-sentence and hand the turn back to the learner. */
+  const interrupt = useCallback(() => {
+    genRef.current++;
+    stopSpeaking();
+    if (liveRef.current) {
+      setPhase('listening');
+      micRef.current?.resume();
+    }
+  }, []);
+
+  // Clean up the mic on unmount, and reflect if we were mid-session.
+  useEffect(() => {
+    return () => {
+      if (liveRef.current) {
+        liveRef.current = false;
+        micRef.current?.stop();
+        micRef.current = null;
+        stopSpeaking();
+        void reflectAndSave(
+          messagesRef.current.map((m) => ({ role: m.role, content: m.content }))
+        );
+      }
+    };
+  }, []);
 
   const toggleVoice = () => {
     setVoiceOn((v) => {
@@ -127,6 +259,10 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
       return !v;
     });
   };
+
+  const levelLabel = ctx
+    ? `Week ${ctx.weekReached} · ${ctx.level}`
+    : 'Your Spanish tutor';
 
   return (
     <div className="flex flex-col h-[100dvh] bg-paper dark:bg-paper-dark">
@@ -146,7 +282,7 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
             <div className="leading-tight">
               <p className="font-extrabold text-ink dark:text-white text-sm">Profe</p>
               <p className="text-[11px] text-ink-soft dark:text-stone-400">
-                {focus ? `Practising: ${focus}` : 'Your Spanish tutor'}
+                {ctx?.focus ? `${ctx.focus}` : levelLabel}
               </p>
             </div>
           </div>
@@ -182,10 +318,7 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
           )}
 
           {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+            <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed whitespace-pre-wrap ${
                   m.role === 'user'
@@ -211,6 +344,15 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
             </div>
           ))}
 
+          {/* Live interim transcript */}
+          {live && interim && (
+            <div className="flex justify-end">
+              <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md text-[15px] leading-relaxed bg-brand-600/40 text-white italic">
+                {interim}…
+              </div>
+            </div>
+          )}
+
           {sending && (
             <div className="flex justify-start">
               <div className="bg-white dark:bg-paper-dark-soft border border-stone-200/70 dark:border-stone-700/70 px-4 py-3 rounded-2xl rounded-bl-md shadow-card">
@@ -233,55 +375,122 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
         </div>
       </div>
 
-      {/* Composer */}
+      {/* Composer / live controls */}
       <div className="shrink-0 border-t border-stone-200/70 dark:border-stone-800 bg-paper/90 dark:bg-paper-dark/90 backdrop-blur-md">
         <div className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-end gap-2">
-            {canListen && (
-              <button
-                onClick={handleMic}
-                disabled={sending}
-                title="Speak your answer in Spanish"
-                aria-label="Speak your answer"
-                className={`shrink-0 flex items-center justify-center w-11 h-11 rounded-full transition-all disabled:opacity-40 ${
-                  listening
-                    ? 'bg-terra-500 text-white scale-110 shadow-glow animate-pulse'
-                    : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
-                }`}
-              >
-                🎤
-              </button>
-            )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  send(inputValue);
-                }
-              }}
-              disabled={sending}
-              placeholder={listening ? 'Escuchando… (Listening…)' : 'Type in Spanish or English…'}
-              className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all disabled:opacity-50"
-            />
-            <button
-              onClick={() => send(inputValue)}
-              disabled={!inputValue.trim() || sending}
-              className="btn-primary shrink-0 h-11 px-5 rounded-2xl"
-            >
-              Send
-            </button>
-          </div>
-          <p className="text-[11px] text-ink-soft dark:text-stone-500 mt-2 text-center">
-            {canListen
-              ? '🎤 Tap the mic to speak, or just type. Profe replies out loud.'
-              : 'Tip: reply in Spanish when you can — Profe will help you along.'}
-          </p>
+          {live ? (
+            <LiveBar phase={phase} onInterrupt={interrupt} onEnd={endLive} />
+          ) : (
+            <>
+              <div className="flex items-end gap-2">
+                {canListen && (
+                  <button
+                    onClick={startLive}
+                    title="Start a hands-free voice conversation"
+                    aria-label="Start talking"
+                    className="shrink-0 flex items-center justify-center gap-2 h-11 px-4 rounded-full bg-gradient-to-br from-terra-500 to-saffron-500 text-white font-bold shadow-glow hover:brightness-105 transition-all"
+                  >
+                    🎙️ <span className="hidden sm:inline">Talk</span>
+                  </button>
+                )}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      takeTurn(inputValue);
+                    }
+                  }}
+                  disabled={sending}
+                  placeholder="Type in Spanish or English…"
+                  className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all disabled:opacity-50"
+                />
+                <button
+                  onClick={() => takeTurn(inputValue)}
+                  disabled={!inputValue.trim() || sending}
+                  className="btn-primary shrink-0 h-11 px-5 rounded-2xl"
+                >
+                  Send
+                </button>
+              </div>
+              <p className="text-[11px] text-ink-soft dark:text-stone-500 mt-2 text-center">
+                {canListen
+                  ? '🎙️ Tap Talk for a hands-free, flowing conversation — or just type.'
+                  : 'Tip: reply in Spanish when you can — Profe will help you along.'}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** The bottom bar shown during a live voice conversation. */
+function LiveBar({
+  phase,
+  onInterrupt,
+  onEnd,
+}: {
+  phase: Phase;
+  onInterrupt: () => void;
+  onEnd: () => void;
+}) {
+  const label =
+    phase === 'listening' ? 'Listening…' : phase === 'thinking' ? 'Thinking…' : 'Profe is speaking';
+
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={onEnd}
+        className="shrink-0 h-11 px-4 rounded-full border-2 border-stone-200 dark:border-stone-700 text-ink-soft dark:text-stone-300 font-bold hover:border-terra-400 hover:text-terra-500 transition-colors"
+      >
+        End
+      </button>
+
+      <div className="flex-1 flex items-center justify-center gap-3">
+        <Orb phase={phase} />
+        <span className="text-sm font-semibold text-ink-soft dark:text-stone-300">{label}</span>
+      </div>
+
+      <button
+        onClick={onInterrupt}
+        disabled={phase !== 'speaking'}
+        title="Interrupt and take your turn"
+        className="shrink-0 h-11 px-4 rounded-full bg-brand-600 text-white font-bold disabled:opacity-30 hover:brightness-105 transition-all"
+      >
+        My turn
+      </button>
+    </div>
+  );
+}
+
+/** A small animated status orb reflecting the live phase. */
+function Orb({ phase }: { phase: Phase }) {
+  if (phase === 'thinking') {
+    return (
+      <span className="flex gap-1" aria-hidden>
+        <span className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" />
+        <span className="w-2 h-2 bg-brand-500 rounded-full animate-bounce [animation-delay:0.15s]" />
+        <span className="w-2 h-2 bg-brand-500 rounded-full animate-bounce [animation-delay:0.3s]" />
+      </span>
+    );
+  }
+  const color =
+    phase === 'listening'
+      ? 'from-terra-400 to-saffron-500'
+      : 'from-brand-400 to-brand-600';
+  return (
+    <span
+      aria-hidden
+      className={`relative flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br ${color}`}
+    >
+      <span
+        className={`absolute inset-0 rounded-full bg-gradient-to-br ${color} opacity-60 animate-ping`}
+      />
+    </span>
   );
 }

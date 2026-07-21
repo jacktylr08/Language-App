@@ -22,7 +22,7 @@ export function openaiConfigured(): boolean {
 export async function openaiChat(
   system: string,
   messages: ChatTurn[],
-  opts: { maxTokens?: number } = {}
+  opts: { maxTokens?: number; temperature?: number; json?: boolean } = {}
 ): Promise<string> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
@@ -41,6 +41,10 @@ export async function openaiChat(
     {
       model,
       max_tokens: opts.maxTokens ?? 600,
+      ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
+      // Ask the model for strict JSON when we need a machine-readable result
+      // (used by the learner-profile reflection step).
+      ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
       messages: [{ role: 'system', content: system }, ...messages],
     },
     {

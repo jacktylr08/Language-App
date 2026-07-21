@@ -174,6 +174,149 @@ export function listenOnce(timeoutMs = 8000): Promise<RecognitionResult> {
   });
 }
 
+// ---------- Live, hands-free listening ----------
+
+export interface LiveMicHandlers {
+  /** Live partial transcript as the learner speaks (for on-screen feedback). */
+  onInterim?: (text: string) => void;
+  /** Fired once the learner pauses — a complete utterance to send to the tutor. */
+  onFinal: (text: string) => void;
+  onError?: (error: string) => void;
+}
+
+/**
+ * Continuous speech recognition with silence-based endpointing, built for a
+ * flowing hands-free conversation. It keeps listening, streams interim text,
+ * and when the learner pauses for a beat it emits the finished utterance — no
+ * button presses. pause()/resume() let the caller stop listening while the
+ * tutor is speaking, so the mic never hears the tutor's own voice.
+ */
+export class LiveMic {
+  private rec: any = null;
+  private active = false;
+  private paused = false;
+  private finalBuffer = '';
+  private silenceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    private handlers: LiveMicHandlers,
+    private silenceMs = 1300
+  ) {}
+
+  static supported(): boolean {
+    return speechRecognitionSupported();
+  }
+
+  start(): void {
+    this.active = true;
+    this.paused = false;
+    this.finalBuffer = '';
+    this.launch();
+  }
+
+  stop(): void {
+    this.active = false;
+    this.clearSilence();
+    this.teardown();
+  }
+
+  /** Stop listening (e.g. while the tutor speaks) without ending the session. */
+  pause(): void {
+    this.paused = true;
+    this.clearSilence();
+    this.finalBuffer = '';
+    this.teardown();
+  }
+
+  resume(): void {
+    if (!this.active) return;
+    this.paused = false;
+    this.finalBuffer = '';
+    this.launch();
+  }
+
+  private teardown(): void {
+    if (this.rec) {
+      try {
+        this.rec.onend = null;
+        this.rec.onresult = null;
+        this.rec.onerror = null;
+        this.rec.stop();
+      } catch {
+        /* already stopped */
+      }
+      this.rec = null;
+    }
+  }
+
+  private launch(): void {
+    const Ctor = getRecognitionCtor();
+    if (!Ctor) {
+      this.handlers.onError?.('unsupported');
+      return;
+    }
+    const rec = new Ctor();
+    rec.lang = 'es-ES';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (event: any) => {
+      if (this.paused) return;
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const r = event.results[i];
+        if (r.isFinal) this.finalBuffer += r[0].transcript + ' ';
+        else interim += r[0].transcript;
+      }
+      this.handlers.onInterim?.((this.finalBuffer + interim).trim());
+      this.armSilence();
+    };
+
+    rec.onerror = (event: any) => {
+      const err = event?.error || 'error';
+      // 'no-speech' and 'aborted' are normal during quiet stretches / restarts.
+      if (err !== 'no-speech' && err !== 'aborted') this.handlers.onError?.(err);
+    };
+
+    rec.onend = () => {
+      // Chrome ends recognition every so often; restart to stay continuous.
+      if (this.active && !this.paused) {
+        try {
+          rec.start();
+        } catch {
+          /* will settle on the next tick */
+        }
+      }
+    };
+
+    this.rec = rec;
+    try {
+      rec.start();
+    } catch {
+      /* start can throw if called too quickly after stop — onend will retry */
+    }
+  }
+
+  private armSilence(): void {
+    this.clearSilence();
+    this.silenceTimer = setTimeout(() => this.flush(), this.silenceMs);
+  }
+
+  private clearSilence(): void {
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+  }
+
+  private flush(): void {
+    const text = this.finalBuffer.trim();
+    this.finalBuffer = '';
+    if (text) this.handlers.onFinal(text);
+  }
+}
+
 // ---------- Answer comparison ----------
 
 /** Lowercase, trim, strip punctuation and collapse spaces. Keeps accents. */

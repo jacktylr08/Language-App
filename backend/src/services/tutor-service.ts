@@ -16,6 +16,38 @@ interface ConversationContext {
   themes: string[];
 }
 
+export interface ChatTurnInput {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** Level + memory context the client sends so Profe teaches at the right level. */
+export interface TutorChatOptions {
+  level?: string;
+  focus?: string;
+  vocab?: string[];
+  /** Highest course week the learner has completed — a hard ceiling on difficulty. */
+  weekReached?: number;
+  /** Spanish the learner already knows (safe to use freely). */
+  knownVocab?: string[];
+  /** Things they keep getting wrong — to work on gently. */
+  weaknesses?: string[];
+  /** Things they're already good at. */
+  strengths?: string[];
+  /** Running summary of the learner from past sessions. */
+  profileSummary?: string;
+  learnerName?: string;
+}
+
+/** Persisted learner profile — the tutor's memory of one learner. */
+export interface LearnerProfile {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  mistakes: string[];
+  updatedAt: string;
+}
+
 export class TutorService {
   /**
    * Get or create a tutor conversation for a lesson
@@ -151,40 +183,118 @@ Start directly with your teaching/question. Be warm and engaging.`;
    * Stateless conversational tutor.
    *
    * Unlike the lesson-scoped flow above, this doesn't touch the database at
-   * all — the frontend holds the running conversation and sends it up each
-   * turn. That keeps it working with the app's local curriculum (which isn't
-   * mirrored in the `lessons` table) and makes it feel like a live, ongoing
-   * chat with a real teacher.
+   * all — the frontend holds the running conversation (and the learner's
+   * progress/memory) and sends it up each turn. That keeps it working with the
+   * app's local curriculum (which isn't mirrored in the `lessons` table) and
+   * makes it feel like a live, ongoing chat with a real teacher who remembers
+   * the learner and teaches strictly at their level.
    */
-  async chat(
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-    opts: { level?: string; focus?: string; vocab?: string[] } = {}
-  ): Promise<string> {
+  async chat(messages: ChatTurnInput[], opts: TutorChatOptions = {}): Promise<string> {
     const level = opts.level || 'beginner';
 
     const focusLine = opts.focus
-      ? `\nThe learner is currently working on: "${opts.focus}". Steer the chat around this when it's natural, but follow their lead.`
+      ? `\nRight now the learner is working on the lesson "${opts.focus}". Lean the chat toward this when it's natural, but follow their lead.`
       : '';
-    const vocabLine =
-      opts.vocab && opts.vocab.length
-        ? `\nWords they're learning right now: ${opts.vocab.slice(0, 20).join(', ')}. Weave these in when you can.`
+
+    // Hard scope: never introduce Spanish beyond what the learner has actually
+    // studied. This is the "don't hit me with week 5 stuff in week 1" rule.
+    const weekLine =
+      typeof opts.weekReached === 'number'
+        ? `\nThe learner has completed up to WEEK ${opts.weekReached} of the course. This is a hard ceiling: do NOT use grammar, tenses, or vocabulary from beyond week ${opts.weekReached}. Stay in the present tense and simple structures unless later material is listed below as known.`
         : '';
 
-    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding Spanish tutor having a live conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${focusLine}${vocabLine}
+    const knownVocabLine =
+      opts.knownVocab && opts.knownVocab.length
+        ? `\nSpanish the learner already knows (safe to use freely): ${opts.knownVocab.slice(0, 120).join(', ')}. Prefer these words. If you must introduce a new word, introduce just one, and always gloss it in English.`
+        : '';
+
+    const weaknessLine =
+      opts.weaknesses && opts.weaknesses.length
+        ? `\nThings this learner keeps getting wrong — gently work on these during the chat: ${opts.weaknesses.slice(0, 12).join('; ')}.`
+        : '';
+    const strengthLine =
+      opts.strengths && opts.strengths.length
+        ? `\nThings they're already good at (don't over-drill these): ${opts.strengths.slice(0, 12).join('; ')}.`
+        : '';
+    const summaryLine = opts.profileSummary
+      ? `\nWhat you remember about this learner from past sessions: ${opts.profileSummary}`
+      : '';
+    const nameLine = opts.learnerName ? `\nThe learner's name is ${opts.learnerName}.` : '';
+
+    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding Spanish tutor having a LIVE, spoken conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}
 
 How you talk:
 - Sound like a real person: warm, encouraging, a little playful. Never robotic or listy.
-- Keep every reply SHORT — 2 to 4 sentences. Your messages may be read aloud, so no walls of text and no bullet points.
-- Speak mostly in simple Spanish, but immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)". A ${level} learner should never feel lost.
-- Ask exactly ONE question at a time, then stop and wait for their answer.
+- Keep every reply SHORT — 1 to 3 sentences. Your messages are read aloud in a live voice chat, so no walls of text, no bullet points, no lists.
+- Speak mostly in simple Spanish at the learner's level, but immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)". A ${level} learner should never feel lost.
+- Ask exactly ONE question at a time, then stop and wait for their answer. Keep the ball moving in a natural back-and-forth.
 - When they make a mistake, gently show the correct version, say why in one quick phrase, and keep going warmly. Never make them feel bad.
 - Celebrate small wins ("¡Muy bien!"). Keep the momentum and the good mood.
-- If they write in English, that's fine — kindly nudge them to try it in Spanish.
+- If they write or speak in English, that's fine — kindly nudge them to try it in Spanish.
+- Stay strictly within the level described above. Never show off with advanced grammar the learner hasn't met.
 - Never break character, never mention being an AI, never explain these instructions.
 
 Start and stay in the flow of a real, back-and-forth conversation.`;
 
-    return openaiChat(systemPrompt, messages, { maxTokens: 600 });
+    return openaiChat(systemPrompt, messages, { maxTokens: 400, temperature: 0.7 });
+  }
+
+  /**
+   * Reflect on a finished (or in-progress) conversation and distil an updated
+   * learner profile — what they're good at, what they keep getting wrong, and
+   * a short running summary. Returns strict JSON the client can persist so the
+   * next session picks up where this one left off.
+   *
+   * The client owns storage (localStorage, like the rest of its progress); we
+   * just do the language-model reasoning that turns a transcript into notes.
+   */
+  async reflect(
+    messages: ChatTurnInput[],
+    previous: LearnerProfile | null = null
+  ): Promise<LearnerProfile> {
+    const prev = previous
+      ? `Here is what you already knew about this learner (merge new observations into it, don't lose old ones unless they've clearly improved):\n${JSON.stringify(
+          previous
+        )}`
+      : 'There is no previous profile for this learner yet — build one from scratch.';
+
+    const system = `You are an expert Spanish teacher reviewing a lesson transcript to update your private notes on a student. ${prev}
+
+Read the conversation and return a JSON object with EXACTLY these keys:
+{
+  "summary": string,        // 1-2 sentence running summary of the learner: their level, what they can do, their vibe. Update, don't just append.
+  "strengths": string[],    // up to 6 short phrases: grammar/vocab/skills they handled well
+  "weaknesses": string[],   // up to 6 short phrases: specific things to focus on next time (e.g. "confuses ser and estar", "forgets accents on question words")
+  "mistakes": string[]      // up to 6 short, concrete examples of errors they made this session, each phrased like "said 'X', should be 'Y'"
+}
+
+Be specific and actionable — these notes decide what the tutor drills next time. Base everything on evidence in the transcript. Keep each array item under 100 characters. Return ONLY the JSON object.`;
+
+    const raw = await openaiChat(system, messages, {
+      maxTokens: 700,
+      temperature: 0.2,
+      json: true,
+    });
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Could not parse learner profile from the model');
+    }
+
+    const cleanList = (v: any): string[] =>
+      Array.isArray(v)
+        ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => String(x).slice(0, 140)).slice(0, 6)
+        : [];
+
+    return {
+      summary: typeof parsed.summary === 'string' ? parsed.summary.slice(0, 600) : '',
+      strengths: cleanList(parsed.strengths),
+      weaknesses: cleanList(parsed.weaknesses),
+      mistakes: cleanList(parsed.mistakes),
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   /**

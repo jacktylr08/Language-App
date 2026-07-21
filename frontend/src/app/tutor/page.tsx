@@ -4,7 +4,6 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { TutorChat } from '@/components/TutorChat';
-import { curriculum } from '@/lib/curriculum';
 
 function TutorPageInner() {
   const { isLoading } = useRequireAuth();
@@ -18,17 +17,11 @@ function TutorPageInner() {
     );
   }
 
-  // Optionally focus the session on a specific lesson's material.
-  const slug = params.get('lesson');
-  const lesson = slug ? curriculum.find((l) => l.slug === slug) : undefined;
+  // Optionally focus the session on a specific lesson; the tutor derives the
+  // learner's level and known vocabulary from their saved progress.
+  const slug = params.get('lesson') || undefined;
 
-  return (
-    <TutorChat
-      focus={lesson?.title}
-      vocab={lesson?.vocab.map((v) => v.es)}
-      level="beginner"
-    />
-  );
+  return <TutorChat focusSlug={slug} />;
 }
 
 export default function TutorPage() {
