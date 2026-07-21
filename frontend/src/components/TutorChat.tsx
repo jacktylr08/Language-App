@@ -2,13 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
-import {
-  speak,
-  stopSpeaking,
-  ttsSupported,
-  listenOnce,
-  speechRecognitionSupported,
-} from '@/lib/speech';
+import { listenOnce, speechRecognitionSupported } from '@/lib/speech';
+import { speakText, stopSpeaking, voiceSupported } from '@/lib/tts';
 
 interface Message {
   id: string;
@@ -53,13 +48,13 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
   const voiceOnRef = useRef(voiceOn);
   voiceOnRef.current = voiceOn;
 
-  const canSpeak = ttsSupported();
+  const canSpeak = voiceSupported();
   const canListen = speechRecognitionSupported();
 
   const say = useCallback((text: string) => {
     if (!voiceOnRef.current) return;
     const spoken = spanishOnly(text);
-    if (spoken) speak(spoken);
+    if (spoken) speakText(spoken);
   }, []);
 
   // Greet out loud once, after voices are ready.
@@ -202,7 +197,7 @@ export function TutorChat({ focus, vocab, level = 'beginner' }: TutorChatProps) 
                   <button
                     onClick={() => {
                       stopSpeaking();
-                      speak(spanishOnly(m.content));
+                      speakText(spanishOnly(m.content));
                     }}
                     title="Play again"
                     className="float-right ml-2 -mr-1 -mt-0.5 text-ink-soft/70 hover:text-brand-500 text-sm"

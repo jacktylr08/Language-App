@@ -4,26 +4,78 @@
  * Both are free, on-device browser APIs — no keys, no cost.
  */
 
-let cachedVoice: SpeechSynthesisVoice | null = null;
+const VOICE_PREF_KEY = 'tutor-voice-uri';
 
-function pickSpanishVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-  if (cachedVoice) return cachedVoice;
-  const voices = window.speechSynthesis.getVoices();
-  cachedVoice =
-    voices.find((v) => v.lang === 'es-ES' && /female|Mónica|Monica|Paulina|Helena/i.test(v.name)) ||
-    voices.find((v) => v.lang === 'es-ES') ||
-    voices.find((v) => v.lang.startsWith('es')) ||
-    null;
-  return cachedVoice;
+function readVoicePref(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage.getItem(VOICE_PREF_KEY);
+  } catch {
+    return null;
+  }
 }
 
-// Warm the voice list (Chrome loads it async)
+let chosenVoiceURI: string | null = readVoicePref();
+
+function allSpanishVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return [];
+  return window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('es'));
+}
+
+/**
+ * Score a voice by likely quality. Browsers ship a mix of ancient robotic
+ * voices and modern neural ones ("Natural"/"Neural"/"Enhanced", or Google's
+ * online voices). We rank the good ones to the top so the default doesn't
+ * grab a tinny one.
+ */
+function scoreVoice(v: SpeechSynthesisVoice): number {
+  const n = v.name.toLowerCase();
+  const lang = v.lang.toLowerCase();
+  let s = 0;
+  if (/natural|neural|enhanced|premium/.test(n)) s += 100;
+  if (!v.localService) s += 40; // cloud/online voices are usually far better
+  if (/google/.test(n)) s += 35;
+  if (/online/.test(n)) s += 20;
+  if (/mónica|monica|paulina|helena|sabina|lupe|conchita/.test(n)) s += 10;
+  if (lang === 'es-es') s += 8;
+  else if (lang === 'es-mx' || lang === 'es-us') s += 6;
+  else s += 2;
+  return s;
+}
+
+/** All Spanish voices on this device, best first. */
+export function listSpanishVoices(): SpeechSynthesisVoice[] {
+  return allSpanishVoices().sort((a, b) => scoreVoice(b) - scoreVoice(a));
+}
+
+function pickSpanishVoice(): SpeechSynthesisVoice | null {
+  const voices = listSpanishVoices();
+  if (chosenVoiceURI) {
+    const chosen = voices.find((v) => v.voiceURI === chosenVoiceURI);
+    if (chosen) return chosen;
+  }
+  return voices[0] || null;
+}
+
+/** Remember the user's chosen voice across sessions. */
+export function setPreferredVoice(voiceURI: string): void {
+  chosenVoiceURI = voiceURI;
+  try {
+    localStorage.setItem(VOICE_PREF_KEY, voiceURI);
+  } catch {
+    /* private mode / storage disabled — keep it in memory only */
+  }
+}
+
+export function getPreferredVoiceURI(): string | null {
+  return chosenVoiceURI ?? pickSpanishVoice()?.voiceURI ?? null;
+}
+
+// Warm the voice list (Chrome/Edge load it asynchronously).
 if (typeof window !== 'undefined' && window.speechSynthesis) {
   window.speechSynthesis.getVoices();
   window.speechSynthesis.onvoiceschanged = () => {
-    cachedVoice = null;
-    pickSpanishVoice();
+    // list is now populated; nothing to cache, pickSpanishVoice reads live
   };
 }
 
@@ -32,14 +84,17 @@ export function ttsSupported(): boolean {
 }
 
 /** Speak Spanish text aloud. Returns a promise that resolves when done. */
-export function speak(text: string, rate = 0.9): Promise<void> {
+export function speak(text: string, rate = 0.95): Promise<void> {
   return new Promise((resolve) => {
     if (!ttsSupported()) return resolve();
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'es-ES';
-    u.rate = rate;
     const voice = pickSpanishVoice();
+    // Match the utterance language to the chosen voice — a mismatch makes some
+    // engines silently fall back to a default (usually worse) voice.
+    u.lang = voice?.lang || 'es-ES';
+    u.rate = rate;
+    u.pitch = 1.0;
     if (voice) u.voice = voice;
     u.onend = () => resolve();
     u.onerror = () => resolve();
