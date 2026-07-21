@@ -22,9 +22,9 @@ function TutorPageInner() {
   // The call ended — distil it into the tutor's memory, then head back.
   const handleClose = useCallback(
     (transcript: Array<{ role: 'user' | 'assistant'; content: string }>) => {
-      const wasEval = ctx?.evaluation;
+      const wasEval = !!ctx?.evaluation;
       void (async () => {
-        await reflectAndSave(transcript);
+        await reflectAndSave(transcript, wasEval);
         if (wasEval) markEvaluationDone();
       })();
       router.push('/lessons');

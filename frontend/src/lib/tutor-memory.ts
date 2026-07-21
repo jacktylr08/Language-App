@@ -19,6 +19,18 @@ export interface WeaknessReview {
   streak: number;
 }
 
+/** One completed session, for the "what we've covered" history log. */
+export interface SessionEntry {
+  /** ISO timestamp of when the session was reflected on. */
+  date: string;
+  /** One-line diary note for this specific session. */
+  note: string;
+  /** Concrete mistakes made in this session. */
+  mistakes: string[];
+  /** True if this session was a periodic evaluation check-in. */
+  wasEvaluation?: boolean;
+}
+
 export interface LearnerProfile {
   summary: string;
   strengths: string[];
@@ -31,6 +43,10 @@ export interface LearnerProfile {
   sessions?: number;
   /** The session number at which the last evaluation happened. */
   lastEvalSession?: number;
+  /** Recent sessions, most recent first — capped so storage stays bounded. */
+  history?: SessionEntry[];
+  /** One-line diary note for the session just reflected on (from the API). */
+  sessionNote?: string;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -38,6 +54,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const INTERVALS = [0, 1, 3, 7, 16, 35];
 // Sessions between short evaluation conversations.
 const EVAL_EVERY = 5;
+// Keep the history log bounded — plenty for "what we've covered lately".
+const MAX_HISTORY = 20;
 
 export function loadProfile(): LearnerProfile | null {
   if (typeof window === 'undefined') return null;
@@ -55,6 +73,7 @@ export function loadProfile(): LearnerProfile | null {
       reviews: p.reviews && typeof p.reviews === 'object' ? p.reviews : {},
       sessions: typeof p.sessions === 'number' ? p.sessions : 0,
       lastEvalSession: typeof p.lastEvalSession === 'number' ? p.lastEvalSession : 0,
+      history: Array.isArray(p.history) ? p.history : [],
     };
   } catch {
     return null;
@@ -132,7 +151,8 @@ export function markEvaluationDone(): void {
  * the network hiccups, we keep the old profile.
  */
 export async function reflectAndSave(
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  wasEvaluation = false
 ): Promise<LearnerProfile | null> {
   const prev = loadProfile();
 
@@ -150,6 +170,15 @@ export async function reflectAndSave(
       fresh.reviews = reconcileReviews(fresh.weaknesses, prev?.reviews ?? {}, now);
       fresh.sessions = (prev?.sessions ?? 0) + 1;
       fresh.lastEvalSession = prev?.lastEvalSession ?? 0;
+
+      const entry: SessionEntry = {
+        date: new Date(now).toISOString(),
+        note: fresh.sessionNote || 'Had a conversation with Profe.',
+        mistakes: fresh.mistakes,
+        wasEvaluation: wasEvaluation || undefined,
+      };
+      fresh.history = [entry, ...(prev?.history ?? [])].slice(0, MAX_HISTORY);
+
       saveProfile(fresh);
       return fresh;
     }

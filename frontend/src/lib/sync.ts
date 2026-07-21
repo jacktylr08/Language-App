@@ -135,8 +135,23 @@ function mergeProfile(
 ): LearnerProfile | null {
   if (!a) return b ?? null;
   if (!b) return a ?? null;
-  // The reflect step already merges content into the profile; the fresher one wins.
-  return (a.updatedAt || '') >= (b.updatedAt || '') ? a : b;
+  // The reflect step already merges content into the profile; the fresher one
+  // wins for the scalar fields (summary/strengths/weaknesses/reviews/etc).
+  const winner = (a.updatedAt || '') >= (b.updatedAt || '') ? a : b;
+
+  // History is additive across devices though — union by date so a session
+  // logged on one device is never lost when the other device's profile wins.
+  const seen = new Set<string>();
+  const history = [...(a.history ?? []), ...(b.history ?? [])]
+    .filter((h) => {
+      if (seen.has(h.date)) return false;
+      seen.add(h.date);
+      return true;
+    })
+    .sort((x, y) => (x.date < y.date ? 1 : -1))
+    .slice(0, 20);
+
+  return { ...winner, history };
 }
 
 function mergeBlob(a: SyncBlob, b: SyncBlob): SyncBlob {

@@ -65,6 +65,8 @@ export interface LearnerProfile {
   weaknesses: string[];
   mistakes: string[];
   updatedAt: string;
+  /** One-line diary entry for this specific session (not the running summary). */
+  sessionNote?: string;
 }
 
 export class TutorService {
@@ -354,7 +356,8 @@ Read the conversation and return a JSON object with EXACTLY these keys:
   "summary": string,        // 1-2 sentence running summary of the learner: their level, what they can do, their vibe. Update, don't just append.
   "strengths": string[],    // up to 6 short phrases: grammar/vocab/skills they handled well
   "weaknesses": string[],   // up to 6 short phrases: specific things to focus on next time (e.g. "confuses ser and estar", "forgets accents on question words")
-  "mistakes": string[]      // up to 6 short, concrete examples of errors they made this session, each phrased like "said 'X', should be 'Y'"
+  "mistakes": string[],     // up to 6 short, concrete examples of errors they made this session, each phrased like "said 'X', should be 'Y'"
+  "sessionNote": string     // ONE short sentence (under 90 chars) describing what THIS specific conversation was about, e.g. "Talked about weekend plans; mixed up por/para twice." This is a diary entry for this one session, not the overall summary.
 }
 
 Be specific and actionable — these notes decide what the tutor drills next time. Base everything on evidence in the transcript. Keep each array item under 100 characters. Return ONLY the JSON object.`;
@@ -382,6 +385,7 @@ Be specific and actionable — these notes decide what the tutor drills next tim
       strengths: cleanList(parsed.strengths),
       weaknesses: cleanList(parsed.weaknesses),
       mistakes: cleanList(parsed.mistakes),
+      sessionNote: typeof parsed.sessionNote === 'string' ? parsed.sessionNote.slice(0, 200) : '',
       updatedAt: new Date().toISOString(),
     };
   }

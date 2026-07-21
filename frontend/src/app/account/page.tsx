@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { getAuth, clearAuth } from '@/lib/auth';
+import { TutorProfilePanel } from '@/components/TutorProfilePanel';
 import {
   loadProgress,
   currentStreak,
@@ -188,6 +189,9 @@ export default function AccountPage() {
             </div>
           </div>
         </section>
+
+        {/* What Profe knows about this learner — the personalisation, made visible */}
+        <TutorProfilePanel />
 
         {/* Change password */}
         <section className="surface p-6 mb-6">
