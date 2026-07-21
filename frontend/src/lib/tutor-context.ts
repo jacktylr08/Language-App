@@ -10,6 +10,7 @@
  */
 import { curriculum, type CurriculumLesson } from './curriculum';
 import { loadProgress } from './progress';
+import { loadProfile, isEvaluationDue } from './tutor-memory';
 
 export interface TutorContext {
   level: 'beginner' | 'intermediate' | 'advanced';
@@ -23,6 +24,10 @@ export interface TutorContext {
   vocab?: string[];
   /** A short, natural-language plan giving the session a gentle structure. */
   plan?: string;
+  /** How the learner is coping — the tutor speeds up or slows down to match. */
+  pace: 'slow' | 'steady' | 'brisk';
+  /** True when it's time for a short evaluation conversation. */
+  evaluation: boolean;
 }
 
 // vocab id -> Spanish, built once.
@@ -32,7 +37,7 @@ for (const lesson of curriculum) {
 }
 
 /** A practical "can-do" goal for each lesson theme. */
-function canDoGoal(theme: CurriculumLesson['theme']): string {
+export function canDoGoal(theme: CurriculumLesson['theme']): string {
   switch (theme) {
     case 'phonetics':
       return 'greet someone and introduce yourself';
@@ -104,6 +109,21 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   const level: TutorContext['level'] =
     weekReached >= 13 ? 'advanced' : weekReached >= 5 ? 'intermediate' : 'beginner';
 
+  // Adaptive pace: read recent accuracy across all graded words. Enough of a
+  // sample keeps this from swinging on the first answer.
+  let correct = 0;
+  let wrong = 0;
+  for (const w of Object.values(progress.words)) {
+    correct += w.correct;
+    wrong += w.wrong;
+  }
+  const graded = correct + wrong;
+  const acc = graded > 0 ? correct / graded : null;
+  const pace: TutorContext['pace'] =
+    acc === null || graded < 10 ? 'steady' : acc >= 0.85 ? 'brisk' : acc <= 0.6 ? 'slow' : 'steady';
+
+  const evaluation = isEvaluationDue(loadProfile());
+
   // Session focus: an explicit lesson (if launched from one), else the lesson
   // the learner is currently on — so every call has a subject and a goal.
   const lesson =
@@ -130,5 +150,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     focus: lesson.title,
     vocab: lesson.vocab.map((v) => v.es),
     plan,
+    pace,
+    evaluation,
   };
 }

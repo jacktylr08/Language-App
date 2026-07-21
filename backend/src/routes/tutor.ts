@@ -45,8 +45,9 @@ function sanitizeMessages(messages: any[]): ChatMessage[] {
  */
 router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { messages, focus, vocab, level, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName, plan } =
+    const { messages, focus, vocab, level, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName, plan, pace, evaluation } =
       req.body ?? {};
+    const paceVal = pace === 'slow' || pace === 'brisk' ? pace : undefined;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ error: 'messages must be a non-empty array' });
@@ -71,6 +72,8 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
       profileSummary: typeof profileSummary === 'string' ? profileSummary.slice(0, 800) : undefined,
       learnerName: typeof learnerName === 'string' ? learnerName.slice(0, 60) : undefined,
       plan: typeof plan === 'string' ? plan.slice(0, 800) : undefined,
+      pace: paceVal,
+      evaluation: evaluation === true,
     });
 
     res.json({ reply });
@@ -152,6 +155,8 @@ router.post('/realtime', verifyToken, async (req: AuthRequest, res: Response): P
       profileSummary: typeof b.profileSummary === 'string' ? b.profileSummary.slice(0, 800) : undefined,
       learnerName: typeof b.learnerName === 'string' ? b.learnerName.slice(0, 60) : undefined,
       plan: typeof b.plan === 'string' ? b.plan.slice(0, 800) : undefined,
+      pace: b.pace === 'slow' || b.pace === 'brisk' ? b.pace : undefined,
+      evaluation: b.evaluation === true,
     });
 
     const session = await createRealtimeClientSecret({ instructions });

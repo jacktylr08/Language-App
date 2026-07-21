@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { LiveMic, speechRecognitionSupported } from '@/lib/speech';
 import { speakText, stopSpeaking, voiceSupported } from '@/lib/tts';
 import { buildTutorContext, type TutorContext } from '@/lib/tutor-context';
-import { loadProfile, reflectAndSave } from '@/lib/tutor-memory';
+import { loadProfile, reflectAndSave, dueWeaknessesFirst, markEvaluationDone } from '@/lib/tutor-memory';
 import { realtimeSupported } from '@/lib/realtime';
 import { RealtimeCall } from '@/components/RealtimeCall';
 
@@ -101,8 +101,10 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
       weekReached: c?.weekReached,
       knownVocab: c?.knownVocab,
       plan: c?.plan,
+      pace: c?.pace,
+      evaluation: c?.evaluation,
       strengths: profile?.strengths,
-      weaknesses: profile?.weaknesses,
+      weaknesses: dueWeaknessesFirst(profile),
       profileSummary: profile?.summary,
     });
     return res.data.reply as string;
@@ -222,6 +224,24 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
     }
   }, [canListen]);
 
+  /**
+   * Wrap up a session: distil it into memory, mark an evaluation done if this
+   * was one, and refresh the context (pace/level/evaluation) for next time.
+   */
+  const finishSession = useCallback(
+    async (msgs: Array<{ role: 'user' | 'assistant'; content: string }>) => {
+      const wasEval = ctxRef.current?.evaluation;
+      await reflectAndSave(msgs);
+      if (wasEval) markEvaluationDone();
+      const c = buildTutorContext(focusSlug);
+      setCtx(c);
+      ctxRef.current = c;
+    },
+    [focusSlug]
+  );
+  const finishSessionRef = useRef(finishSession);
+  finishSessionRef.current = finishSession;
+
   const endLive = useCallback(() => {
     genRef.current++;
     liveRef.current = false;
@@ -231,8 +251,8 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
     setLive(false);
     setInterim('');
     // Distil what happened into the learner's memory for next time.
-    void reflectAndSave(messagesRef.current.map((m) => ({ role: m.role, content: m.content })));
-  }, []);
+    void finishSession(messagesRef.current.map((m) => ({ role: m.role, content: m.content })));
+  }, [finishSession]);
 
   /** Stop the tutor mid-sentence and hand the turn back to the learner. */
   const interrupt = useCallback(() => {
@@ -252,7 +272,7 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
         micRef.current?.stop();
         micRef.current = null;
         stopSpeaking();
-        void reflectAndSave(
+        void finishSessionRef.current(
           messagesRef.current.map((m) => ({ role: m.role, content: m.content }))
         );
       }
@@ -280,14 +300,15 @@ export function TutorChat({ focusSlug }: TutorChatProps) {
       setInCall(false);
       if (transcript.length) {
         const asMessages = transcript.map((t) => ({ id: uid(), role: t.role, content: t.content }));
-        setMessages((prev) => {
-          const next = [...prev, ...asMessages];
-          void reflectAndSave(next.map((m) => ({ role: m.role, content: m.content })));
-          return next;
-        });
+        setMessages((prev) => [...prev, ...asMessages]);
+        const full = [
+          ...messagesRef.current.map((m) => ({ role: m.role, content: m.content })),
+          ...transcript,
+        ];
+        void finishSession(full);
       }
     },
-    []
+    [finishSession]
   );
 
   const levelLabel = ctx

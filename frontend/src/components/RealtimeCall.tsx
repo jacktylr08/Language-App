@@ -8,7 +8,7 @@ import {
   type RealtimeState,
 } from '@/lib/realtime';
 import type { TutorContext } from '@/lib/tutor-context';
-import { loadProfile } from '@/lib/tutor-memory';
+import { loadProfile, dueWeaknessesFirst } from '@/lib/tutor-memory';
 
 interface RealtimeCallProps {
   context: TutorContext | null;
@@ -71,7 +71,9 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           weekReached: c?.weekReached,
           knownVocab: c?.knownVocab,
           plan: c?.plan,
-          weaknesses: profile?.weaknesses,
+          pace: c?.pace,
+          evaluation: c?.evaluation,
+          weaknesses: dueWeaknessesFirst(profile),
           strengths: profile?.strengths,
           profileSummary: profile?.summary,
         });
@@ -116,7 +118,13 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
       {/* Top bar */}
       <div className="shrink-0 px-4 py-4 flex items-center justify-between">
         <span className="text-sm font-semibold text-ink-soft dark:text-stone-400">
-          {context?.focus ? context.focus : context ? `Week ${context.weekReached} · ${context.level}` : 'Voice call'}
+          {context?.evaluation
+            ? '📋 Check-in'
+            : context?.focus
+            ? context.focus
+            : context
+            ? `Week ${context.weekReached} · ${context.level}`
+            : 'Voice call'}
         </span>
         <span className="text-xs font-medium text-ink-soft/70 dark:text-stone-500">Profe · live</span>
       </div>

@@ -39,6 +39,23 @@ export interface TutorChatOptions {
   learnerName?: string;
   /** A short natural-language plan giving the session a gentle structure. */
   plan?: string;
+  /** How the learner is coping — the tutor adapts its pace to match. */
+  pace?: 'slow' | 'steady' | 'brisk';
+  /** When true, run a short, friendly evaluation conversation. */
+  evaluation?: boolean;
+}
+
+/** Shared prompt fragments so the text chat and the live call stay consistent. */
+function paceFragment(pace?: string): string {
+  if (pace === 'brisk')
+    return " The learner is breezing through lately — feel free to stretch them a little, keep a slightly quicker pace, and gently introduce the odd new word.";
+  if (pace === 'slow')
+    return " The learner is finding things tricky lately — slow right down, keep everything very simple, repeat what they already know, and pile on the encouragement.";
+  return '';
+}
+function evaluationFragment(on?: boolean): string {
+  if (!on) return '';
+  return " \n\nTODAY IS A GENTLE CHECK-IN. Frame it warmly as a little catch-up, NOT a test. Over the chat, weave in about five quick things covering recent material and their known weak spots — a mix of asking them to say something, answer a question, or use a word. Keep it light and encouraging. Near the end, give a short, kind summary of what's solid and one or two things worth another look.";
 }
 
 /** Persisted learner profile — the tutor's memory of one learner. */
@@ -223,8 +240,10 @@ Start directly with your teaching/question. Be warm and engaging.`;
       : '';
     const nameLine = opts.learnerName ? `\nThe learner's name is ${opts.learnerName}.` : '';
     const planLine = opts.plan ? `\nGentle backbone for this session: ${opts.plan}` : '';
+    const paceLine = paceFragment(opts.pace);
+    const evalLine = evaluationFragment(opts.evaluation);
 
-    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding Spanish tutor having a LIVE, flowing conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}
+    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding Spanish tutor having a LIVE, flowing conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}
 
 How you talk:
 - Sound like a real person: warm, encouraging, a little playful. Never robotic or listy.
@@ -275,6 +294,8 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
       : '';
     const nameLine = opts.learnerName ? ` Their name is ${opts.learnerName}.` : '';
     const planLine = opts.plan ? `\n\nToday's gentle backbone: ${opts.plan}` : '';
+    const paceLine = paceFragment(opts.pace);
+    const evalLine = evaluationFragment(opts.evaluation);
 
     // If we remember a specific weak spot, open by calling back to it — the
     // "last time you struggled with X, let's revisit" continuity.
@@ -283,7 +304,7 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
         ? `\n\nOpen warmly and naturally bring up something from last time: reference "${opts.weaknesses[0]}" in a friendly way (e.g. "Last time this tripped you up a bit — let's have another go"). Then ease into today's topic with one easy question.`
         : `\n\nOpen warmly: greet them, ask their name if you don't know it, then ease into today's topic with one easy question.`;
 
-    return `You are "Profe", a warm, funny, genuinely human Spanish tutor on a LIVE VOICE CALL with a ${level} learner.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}
+    return `You are "Profe", a warm, funny, genuinely human Spanish tutor on a LIVE VOICE CALL with a ${level} learner.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}
 
 This is a REAL, FLOWING CONVERSATION with a friend — not a drill, not a script. Above all, keep it natural and easy.
 

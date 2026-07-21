@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRequireAuth } from '@/lib/hooks';
+import { AbilitiesPanel } from '@/components/AbilitiesPanel';
 import { curriculum, phaseForWeek } from '@/lib/curriculum';
 import {
   loadProgress,
@@ -99,6 +100,9 @@ export default function LessonsPage() {
           </div>
         </div>
       </div>
+
+      {/* Practical "can-do" abilities — progress by what you can actually do */}
+      <AbilitiesPanel />
 
       {/* Stats */}
       <div className="surface p-5">
