@@ -275,3 +275,12 @@ body {
   background-size: 200% 100%;
   animation: shimmer 2.4s linear infinite;
 }
+
+/* Scrollable region with no visible scrollbar (used by the lessons sidebar). */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}

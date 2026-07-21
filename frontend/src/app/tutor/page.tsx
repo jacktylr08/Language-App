@@ -1,15 +1,38 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
-import { TutorChat } from '@/components/TutorChat';
+import { RealtimeCall } from '@/components/RealtimeCall';
+import { buildTutorContext } from '@/lib/tutor-context';
+import { reflectAndSave, markEvaluationDone } from '@/lib/tutor-memory';
 
 function TutorPageInner() {
   const { isLoading } = useRequireAuth();
+  const router = useRouter();
   const params = useSearchParams();
+  const slug = params.get('lesson') || undefined;
 
-  if (isLoading) {
+  // Built client-side from the learner's progress + memory once authed.
+  const ctx = useMemo(
+    () => (typeof window === 'undefined' || isLoading ? null : buildTutorContext(slug)),
+    [isLoading, slug]
+  );
+
+  // The call ended — distil it into the tutor's memory, then head back.
+  const handleClose = useCallback(
+    (transcript: Array<{ role: 'user' | 'assistant'; content: string }>) => {
+      const wasEval = ctx?.evaluation;
+      void (async () => {
+        await reflectAndSave(transcript);
+        if (wasEval) markEvaluationDone();
+      })();
+      router.push('/lessons');
+    },
+    [router, ctx]
+  );
+
+  if (isLoading || !ctx) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
@@ -17,11 +40,7 @@ function TutorPageInner() {
     );
   }
 
-  // Optionally focus the session on a specific lesson; the tutor derives the
-  // learner's level and known vocabulary from their saved progress.
-  const slug = params.get('lesson') || undefined;
-
-  return <TutorChat focusSlug={slug} />;
+  return <RealtimeCall context={ctx} onClose={handleClose} />;
 }
 
 export default function TutorPage() {

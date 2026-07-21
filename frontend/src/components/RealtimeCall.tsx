@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import {
   RealtimeSession,
@@ -8,7 +8,6 @@ import {
   type RealtimeState,
 } from '@/lib/realtime';
 import type { TutorContext } from '@/lib/tutor-context';
-import { loadProfile, dueWeaknessesFirst } from '@/lib/tutor-memory';
 
 interface RealtimeCallProps {
   context: TutorContext | null;
@@ -32,11 +31,12 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [error, setError] = useState('');
   const [notConfigured, setNotConfigured] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [started, setStarted] = useState(false);
 
   const sessionRef = useRef<RealtimeSession | null>(null);
   const endedRef = useRef(false);
 
-  // End the call and hand the transcript back for memory + display.
+  // End the call and hand the transcript back for memory.
   const end = useRef((forceEmpty = false) => {
     if (endedRef.current) return;
     endedRef.current = true;
@@ -46,7 +46,11 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     onClose(transcript);
   });
 
-  useEffect(() => {
+  // Connect the call. Triggered by the learner's tap — that gesture is what
+  // lets the browser grant the mic and play the tutor's audio.
+  const connect = useCallback(() => {
+    setStarted(true);
+    setError('');
     if (!realtimeSupported()) {
       setError('unsupported');
       return;
@@ -63,7 +67,6 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
 
     const fetchToken = async () => {
       const c = context;
-      const profile = loadProfile();
       try {
         const res = await api.post('/tutor/realtime', {
           level: c?.level,
@@ -73,15 +76,13 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           plan: c?.plan,
           pace: c?.pace,
           evaluation: c?.evaluation,
-          weaknesses: dueWeaknessesFirst(profile),
-          strengths: profile?.strengths,
-          profileSummary: profile?.summary,
+          weaknesses: c?.weaknesses,
+          strengths: c?.strengths,
+          profileSummary: c?.profileSummary,
         });
         return { token: res.data.token as string, model: res.data.model as string };
       } catch (err: any) {
-        if (err.response?.status === 503) {
-          setNotConfigured(true);
-        }
+        if (err.response?.status === 503) setNotConfigured(true);
         throw err;
       }
     };
@@ -90,13 +91,15 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
       if (err?.response?.status === 503) setNotConfigured(true);
       else if (!endedRef.current) setError(err?.message || 'Could not start the call.');
     });
+  }, [context]);
 
-    // Clean up if the component unmounts without an explicit End.
+  // Clean up on unmount if the call never got an explicit End.
+  useEffect(() => {
     return () => {
       if (!endedRef.current) {
         endedRef.current = true;
-        const transcript = session.getTranscript();
-        session.close();
+        const transcript = sessionRef.current?.getTranscript() ?? [];
+        sessionRef.current?.close();
         onClose(transcript);
       }
     };
@@ -112,6 +115,44 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
 
   const active = state === 'user_speaking' || state === 'listening';
   const speaking = state === 'assistant_speaking';
+
+  // Ready screen: one tap starts the conversation (and grants mic + audio).
+  if (!started) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-paper to-brand-50/40 dark:from-paper-dark dark:to-stone-950">
+        <div className="shrink-0 px-4 py-4">
+          <a
+            href="/lessons"
+            className="text-ink-soft dark:text-stone-300 hover:text-ink dark:hover:text-white font-semibold text-sm inline-flex items-center gap-1.5"
+          >
+            <span aria-hidden>←</span> Lessons
+          </a>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow flex items-center justify-center text-5xl mb-8">
+            🧑‍🏫
+          </div>
+          <h1 className="font-display text-3xl font-black text-ink dark:text-white">
+            {context?.evaluation ? 'Time for a little check-in' : 'Talk with Profe'}
+          </h1>
+          <p className="text-ink-soft dark:text-stone-400 mt-2 max-w-sm">
+            {context
+              ? `A live Spanish chat, just at your level — week ${context.weekReached}. Speak naturally; Profe listens and talks back.`
+              : 'A live Spanish chat. Speak naturally; Profe listens and talks back.'}
+          </p>
+          <button
+            onClick={connect}
+            className="mt-9 h-16 px-10 rounded-full bg-gradient-to-r from-brand-500 to-brand-600 text-white font-extrabold text-lg shadow-glow hover:brightness-105 transition-all inline-flex items-center gap-3"
+          >
+            🎙️ Start talking
+          </button>
+          <p className="text-xs text-ink-soft/70 dark:text-stone-500 mt-4">
+            You’ll be asked to allow your microphone.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-paper to-brand-50/40 dark:from-paper-dark dark:to-stone-950">

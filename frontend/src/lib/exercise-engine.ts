@@ -15,7 +15,7 @@ import {
   getAllVocab,
   getVocabById,
 } from './curriculum';
-import { getReviewWordIds } from './progress';
+import { getReviewWordIds, getMistakeWordIds } from './progress';
 
 export type ExerciseType =
   | 'teach' // flashcard-style introduction, no grading
@@ -321,6 +321,44 @@ export function buildReviewSession(
     queue.push(matchPairs(shuffle(words)));
   }
 
+  return queue;
+}
+
+/**
+ * A session built purely from the words the learner has actually got wrong
+ * (in lessons or practice) and not yet nailed. Same mix of exercise angles as
+ * review, but the queue is their mistakes.
+ */
+export function buildMistakesSession(
+  speechRecognitionAvailable: boolean,
+  size = 16
+): Exercise[] {
+  const ids = getMistakeWordIds(size);
+  const words = ids.map((id) => getVocabById(id)).filter((w): w is VocabItem => !!w);
+  if (words.length === 0) return [];
+
+  const pool = getAllVocab();
+  const queue: Exercise[] = [];
+  shuffle(words).forEach((w, i) => {
+    switch (i % 5) {
+      case 0:
+        queue.push(mcqEsEn(w, pool));
+        break;
+      case 1:
+        queue.push(listenMeaning(w, pool));
+        break;
+      case 2:
+        queue.push(typeEs(w));
+        break;
+      case 3:
+        queue.push(mcqEnEs(w, pool));
+        break;
+      default:
+        if (speechRecognitionAvailable) queue.push(speak(w));
+        else queue.push(listenMcq(w, pool));
+    }
+  });
+  if (words.length >= 5) queue.push(matchPairs(words));
   return queue;
 }
 

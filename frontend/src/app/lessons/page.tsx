@@ -8,9 +8,8 @@ import { curriculum, phaseForWeek } from '@/lib/curriculum';
 import {
   loadProgress,
   currentStreak,
-  todaysXp,
   knownWordCount,
-  masteredWordCount,
+  mistakeWordCount,
   lessonStars,
   ProgressState,
 } from '@/lib/progress';
@@ -43,10 +42,8 @@ export default function LessonsPage() {
   }
 
   const streak = currentStreak(progress);
-  const xpToday = todaysXp(progress);
-  const goalPct = Math.min(100, Math.round((xpToday / progress.dailyGoal) * 100));
   const wordsKnown = knownWordCount(progress);
-  const wordsMastered = masteredWordCount(progress);
+  const mistakes = mistakeWordCount();
   const lessonsDone = curriculum.filter((l) => progress.lessons[l.slug]?.completed).length;
   const coursePct = Math.round((lessonsDone / curriculum.length) * 100);
 
@@ -58,96 +55,53 @@ export default function LessonsPage() {
   const currentIndex = curriculum.findIndex(
     (l, i) => isUnlocked(i) && !progress.lessons[l.slug]?.completed
   );
+  const nextLesson = currentIndex >= 0 ? curriculum[currentIndex] : null;
 
   const weeks = Array.from(new Set(curriculum.map((l) => l.week))).sort((a, b) => a - b);
 
   const sidebar = (
     <div className="space-y-4">
-      {/* Daily goal */}
-      <div className="surface p-5">
-        <div className="flex items-center gap-4">
-          <div className="relative w-16 h-16 shrink-0">
-            <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-              <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4.5" className="stroke-stone-200 dark:stroke-stone-700" />
-              <circle
-                cx="18"
-                cy="18"
-                r="15.5"
-                fill="none"
-                strokeWidth="4.5"
-                strokeLinecap="round"
-                className="stroke-saffron-500 transition-all duration-700"
-                strokeDasharray={`${(goalPct / 100) * 97.4} 97.4`}
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xl">
-              {goalPct >= 100 ? '🎉' : '🎯'}
-            </span>
+      {/* Continue — the main call-to-action, right at the top */}
+      {nextLesson ? (
+        <Link
+          href={`/lessons/${nextLesson.slug}`}
+          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+        >
+          <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
+            {nextLesson.emoji}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-extrabold text-ink dark:text-white leading-tight">
-              {goalPct >= 100 ? 'Goal smashed!' : 'Daily goal'}
-            </p>
-            <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5">
-              {xpToday} / {progress.dailyGoal} XP today
-            </p>
-            <div className="mt-2 h-1.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-saffron-500 transition-all duration-700"
-                style={{ width: `${goalPct}%` }}
-              />
-            </div>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+            {lessonsDone > 0 ? 'Pick up where you left off' : 'Start here'}
+          </p>
+          <p className="font-extrabold text-white text-lg mt-1 leading-tight">{nextLesson.title}</p>
+          <p className="text-white/85 text-sm mt-0.5">
+            Week {nextLesson.week} · {lessonsDone}/{curriculum.length} lessons done
+          </p>
+          <div className="mt-3 h-1.5 rounded-full bg-white/25 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-white/90 transition-all duration-700"
+              style={{ width: `${Math.max(coursePct, 3)}%` }}
+            />
           </div>
+          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white">
+            Continue
+            <span className="transition-transform group-hover:translate-x-1">→</span>
+          </span>
+        </Link>
+      ) : (
+        <div className="surface p-5 text-center">
+          <p className="text-3xl mb-1">🏆</p>
+          <p className="font-extrabold text-ink dark:text-white">Course complete!</p>
+          <p className="text-sm text-ink-soft dark:text-stone-400 mt-1">
+            You’ve finished every lesson. Keep it sharp with a chat or a mistakes review.
+          </p>
         </div>
-      </div>
+      )}
 
       {/* Practical "can-do" abilities — progress by what you can actually do */}
       <AbilitiesPanel />
 
-      {/* Stats */}
-      <div className="surface p-5">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-2xl font-extrabold text-terra-500">{streak}</p>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-0.5">
-              🔥 streak
-            </p>
-          </div>
-          <div className="border-x border-stone-100 dark:border-stone-800">
-            <p className="text-2xl font-extrabold text-brand-600 dark:text-brand-400">{wordsKnown}</p>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-0.5">
-              words
-            </p>
-          </div>
-          <div>
-            <p className="text-2xl font-extrabold text-saffron-500">{progress.xp}</p>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-0.5">
-              ⚡ total xp
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-800">
-          <div className="flex justify-between text-xs font-semibold text-ink-soft dark:text-stone-400 mb-1.5">
-            <span>Course progress</span>
-            <span>
-              {lessonsDone}/{curriculum.length} lessons
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all duration-700"
-              style={{ width: `${Math.max(coursePct, 2)}%` }}
-            />
-          </div>
-          {wordsMastered > 0 && (
-            <p className="text-xs text-ink-soft dark:text-stone-400 mt-2">
-              ✨ {wordsMastered} words fully mastered
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Talk to the AI tutor */}
+      {/* Talk to the AI tutor — a live voice call */}
       <Link
         href="/tutor"
         className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-terra-500 via-terra-400 to-saffron-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
@@ -157,33 +111,38 @@ export default function LessonsPage() {
         </div>
         <p className="font-extrabold text-white text-lg">Talk to your tutor</p>
         <p className="text-white/90 text-sm mt-1 leading-snug">
-          A live, back-and-forth chat with Profe — speak or type, and hear Spanish back.
+          A live voice conversation with Profe — speak naturally, get corrected, at your level.
         </p>
         <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
-          Start talking
+          Start a call
           <span className="transition-transform group-hover:translate-x-1">→</span>
         </span>
       </Link>
 
-      {/* Smart practice */}
-      {lessonsDone > 0 && (
+      {/* Review your mistakes — built from what you've got wrong */}
+      {mistakes > 0 && (
         <Link
-          href="/practice"
-          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+          href="/practice?mode=mistakes"
+          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 via-rose-400 to-terra-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
         >
           <div className="absolute -right-6 -top-8 text-[96px] opacity-15 rotate-12 select-none" aria-hidden>
-            🧠
+            🩹
           </div>
-          <p className="font-extrabold text-white text-lg">Smart Practice</p>
-          <p className="text-brand-100 text-sm mt-1 leading-snug">
-            A session built from the words your memory is about to drop.
+          <p className="font-extrabold text-white text-lg">Fix your mistakes</p>
+          <p className="text-white/90 text-sm mt-1 leading-snug">
+            {mistakes} {mistakes === 1 ? 'word' : 'words'} you’ve slipped up on — let’s nail them.
           </p>
           <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
-            Start review
+            Review now
             <span className="transition-transform group-hover:translate-x-1">→</span>
           </span>
         </Link>
       )}
+
+      {/* Quiet progress line — no XP, just what matters */}
+      <p className="text-center text-xs text-ink-soft dark:text-stone-500 font-medium pt-1">
+        🔥 {streak} day streak · {wordsKnown} words known
+      </p>
     </div>
   );
 
@@ -365,7 +324,7 @@ export default function LessonsPage() {
 
           {/* Desktop sidebar — pinned below the nav, scrolls on its own */}
           <aside className="hidden lg:block">
-            <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pb-6 pr-1">
+            <div className="no-scrollbar sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pb-6">
               {sidebar}
             </div>
           </aside>

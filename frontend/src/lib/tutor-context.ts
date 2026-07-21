@@ -10,7 +10,8 @@
  */
 import { curriculum, type CurriculumLesson } from './curriculum';
 import { loadProgress } from './progress';
-import { loadProfile, isEvaluationDue } from './tutor-memory';
+import { loadProfile, isEvaluationDue, dueWeaknessesFirst } from './tutor-memory';
+import { buildLessonInsights } from './learner-insights';
 
 export interface TutorContext {
   level: 'beginner' | 'intermediate' | 'advanced';
@@ -28,6 +29,12 @@ export interface TutorContext {
   pace: 'slow' | 'steady' | 'brisk';
   /** True when it's time for a short evaluation conversation. */
   evaluation: boolean;
+  /** Weak spots (tutor memory + lesson mistakes + pronunciation), worst first. */
+  weaknesses: string[];
+  /** Strengths (tutor memory + words nailed in lessons). */
+  strengths: string[];
+  /** Running summary of the learner from past conversations. */
+  profileSummary?: string;
 }
 
 // vocab id -> Spanish, built once.
@@ -125,7 +132,20 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   const pace: TutorContext['pace'] =
     acc === null || graded < 10 ? 'steady' : acc >= 0.85 ? 'brisk' : acc <= 0.6 ? 'slow' : 'steady';
 
-  const evaluation = isEvaluationDue(loadProfile());
+  const profile = loadProfile();
+  const evaluation = isEvaluationDue(profile);
+
+  // Merge what the tutor remembers (from conversations) with what the lessons
+  // reveal (mistakes + pronunciation) — so each lesson teaches the tutor about
+  // the learner. Deduped, weak spots worst-first, capped for a lean prompt.
+  const insights = buildLessonInsights();
+  const dedupe = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+  const weaknesses = dedupe([
+    ...dueWeaknessesFirst(profile),
+    ...insights.strugglingVocab,
+    ...insights.pronunciationTrouble,
+  ]).slice(0, 16);
+  const strengths = dedupe([...(profile?.strengths ?? []), ...insights.strongVocab]).slice(0, 14);
 
   // Session focus: an explicit lesson (if launched from one), else the learner's
   // most recent completed lesson — so every call consolidates learned material
@@ -139,11 +159,16 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     .map((v) => `${v.es} (${v.en})`)
     .join(', ');
 
+  const coveredLine = insights.coveredRecently.length
+    ? `Recently they've covered: ${insights.coveredRecently.join(', ')}. `
+    : '';
+
   const plan =
     `Practise and build confidence with what the learner has ALREADY learned — everything up to week ${weekReached}, and NOTHING beyond it. ` +
     `Anchor today around their recent lesson "${lesson.title}"${
       lesson.subtitle ? ` (${lesson.subtitle})` : ''
     }. ` +
+    coveredLine +
     (targetWords ? `Naturally reuse some of these words they know: ${targetWords}. ` : '') +
     `The real goal is for them to get comfortable being able to ${canDoGoal(lesson.theme)}. ` +
     `Keep it a flowing conversation, not a checklist.`;
@@ -157,5 +182,8 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     plan,
     pace,
     evaluation,
+    weaknesses,
+    strengths,
+    profileSummary: profile?.summary,
   };
 }

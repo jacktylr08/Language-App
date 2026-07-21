@@ -11,6 +11,9 @@ export interface WordState {
   wrong: number;
   lastSeen: string; // ISO date
   nextReview: string; // ISO date
+  /** Speaking-exercise attempts — the pronunciation signal. */
+  pronCorrect?: number;
+  pronWrong?: number;
 }
 
 export interface LessonRecord {
@@ -152,6 +155,26 @@ export function recordWordResult(wordId: string, correct: boolean): void {
   save(state);
 }
 
+/**
+ * Record the outcome of a speaking exercise for a word — a separate signal
+ * from vocab knowledge, so the tutor can tell "knows the word but mispronounces
+ * it" from "doesn't know the word".
+ */
+export function recordPronunciationResult(wordId: string, correct: boolean): void {
+  const state = loadProgress();
+  const w: WordState = state.words[wordId] || {
+    strength: 0,
+    correct: 0,
+    wrong: 0,
+    lastSeen: '',
+    nextReview: '',
+  };
+  if (correct) w.pronCorrect = (w.pronCorrect || 0) + 1;
+  else w.pronWrong = (w.pronWrong || 0) + 1;
+  state.words[wordId] = w;
+  save(state);
+}
+
 export function completeLessonLocal(slug: string, accuracy: number): ProgressState {
   const state = loadProgress();
   touchToday(state);
@@ -182,6 +205,24 @@ export function getReviewWordIds(limit = 12): { due: string[]; weak: string[] } 
     .sort((a, b) => a[1].strength - b[1].strength || b[1].wrong - a[1].wrong)
     .map(([id]) => id);
   return { due: due.slice(0, limit), weak: weak.slice(0, limit) };
+}
+
+/**
+ * Words the learner has actually got wrong and not yet nailed down — the raw
+ * material for a "review your mistakes" session. Sorted worst-first.
+ */
+export function getMistakeWordIds(limit = 40): string[] {
+  const state = loadProgress();
+  return Object.entries(state.words)
+    .filter(([, w]) => w.wrong > 0 && w.strength < 4)
+    .sort((a, b) => b[1].wrong - a[1].wrong || a[1].strength - b[1].strength)
+    .map(([id]) => id)
+    .slice(0, limit);
+}
+
+export function mistakeWordCount(): number {
+  const state = loadProgress();
+  return Object.values(state.words).filter((w) => w.wrong > 0 && w.strength < 4).length;
 }
 
 export function knownWordCount(state: ProgressState): number {

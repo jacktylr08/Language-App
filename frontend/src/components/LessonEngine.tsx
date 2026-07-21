@@ -10,10 +10,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CurriculumLesson, VocabItem, GrammarSlide, DialogueTurn, getAllVocab } from '@/lib/curriculum';
-import { Exercise, buildLessonSession, buildReviewSession, buildRetry } from '@/lib/exercise-engine';
+import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry } from '@/lib/exercise-engine';
 import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
-import { addXp, completeLessonLocal, recordWordResult, loadProgress, currentStreak } from '@/lib/progress';
+import { addXp, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
 
 type Feedback =
   | { kind: 'correct'; note?: string }
@@ -29,8 +29,11 @@ interface SessionStats {
 
 interface LessonEngineProps {
   lesson: CurriculumLesson | null;
-  /** 'lesson' runs the lesson curriculum; 'practice' runs a review session */
-  mode?: 'lesson' | 'practice';
+  /**
+   * 'lesson' runs the lesson curriculum; 'practice' runs a review session;
+   * 'mistakes' drills only the words the learner has got wrong.
+   */
+  mode?: 'lesson' | 'practice' | 'mistakes';
 }
 
 const ACCENT_CHARS = ['á', 'é', 'í', 'ó', 'ú', 'ñ', '¿', '¡'];
@@ -41,6 +44,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const allVocab = useMemo(() => getAllVocab(), []);
 
   const [queue, setQueue] = useState<Exercise[]>([]);
+  const [built, setBuilt] = useState(false);
   const [index, setIndex] = useState(0);
   const [started, setStarted] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -65,11 +69,14 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
   // Build the session
   useEffect(() => {
-    if (mode === 'practice') {
+    if (mode === 'mistakes') {
+      setQueue(buildMistakesSession(srAvailable));
+    } else if (mode === 'practice') {
       setQueue(buildReviewSession(null, srAvailable));
     } else if (lesson) {
       setQueue(buildLessonSession(lesson, srAvailable));
     }
+    setBuilt(true);
   }, [lesson, mode, srAvailable]);
 
   // Reset per-exercise state and auto-play audio for listening/teach exercises
@@ -103,7 +110,11 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     (correct: boolean, correctAnswer: string, note?: string) => {
       if (!current) return;
       const firstTry = !current.isRetry;
-      if (!current.noWordTracking) recordWordResult(current.word.id, correct);
+      if (!current.noWordTracking) {
+        recordWordResult(current.word.id, correct);
+        // Speaking exercises also feed the pronunciation signal the tutor uses.
+        if (current.type === 'speak') recordPronunciationResult(current.word.id, correct);
+      }
 
       if (correct) {
         const comboNext = combo + 1;
@@ -141,7 +152,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       // Session complete
       const accuracy = stats.answered > 0 ? Math.round((stats.firstTryCorrect / stats.answered) * 100) : 100;
       if (mode === 'lesson' && lesson) completeLessonLocal(lesson.slug, accuracy);
-      else if (mode === 'practice') addXp(0); // touch streak even if all skipped
+      else addXp(0); // practice/mistakes: touch streak even if all skipped
       setFinished(true);
     } else {
       setIndex((i) => i + 1);
@@ -281,6 +292,29 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   if (!lesson && mode === 'lesson') return null;
 
   if (queue.length === 0) {
+    // Mistakes mode with nothing to fix — celebrate instead of spinning.
+    if (built && mode === 'mistakes') {
+      return (
+        <div className="min-h-screen bg-paper dark:bg-paper-dark flex flex-col">
+          <TopExitBar onExit={() => router.push('/lessons')} />
+          <div className="flex-1 flex items-center justify-center px-6">
+            <div className="max-w-md w-full text-center">
+              <p className="text-6xl mb-4">🎉</p>
+              <h1 className="font-display text-3xl font-black text-ink dark:text-white mb-2">
+                No mistakes to fix
+              </h1>
+              <p className="text-ink-soft dark:text-stone-400 mb-8">
+                Nothing you’ve slipped up on is outstanding right now. Keep it going with a lesson
+                or a chat with your tutor.
+              </p>
+              <button onClick={() => router.push('/lessons')} className="btn-primary px-8 py-3">
+                Back to lessons
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper dark:bg-paper-dark">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
@@ -297,13 +331,15 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
             <div className="mx-auto mb-6 w-24 h-24 rounded-[28px] bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-5xl shadow-glow ring-1 ring-black/5 animate-pop">
-              <span className="drop-shadow-sm">{lesson?.emoji || '⚡'}</span>
+              <span className="drop-shadow-sm">{lesson?.emoji || (mode === 'mistakes' ? '🩹' : '⚡')}</span>
             </div>
             <h1 className="font-display text-4xl font-black text-ink dark:text-white mb-3 leading-tight">
-              {mode === 'practice' ? 'Smart Practice' : lesson?.title}
+              {mode === 'mistakes' ? 'Fix your mistakes' : mode === 'practice' ? 'Smart Practice' : lesson?.title}
             </h1>
             <p className="text-ink-soft dark:text-stone-400 mb-6">
-              {mode === 'practice'
+              {mode === 'mistakes'
+                ? 'A quick session on the exact words you’ve slipped up on — in lessons or with your tutor.'
+                : mode === 'practice'
                 ? 'A personalised session targeting the words your memory is about to drop.'
                 : lesson?.description}
             </p>
@@ -327,7 +363,9 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             <div className="rounded-2xl bg-saffron-400/10 border border-saffron-400/30 p-4 mb-8 text-left">
               <p className="text-sm text-saffron-600 dark:text-saffron-300">
                 <span className="font-bold">💡 Tip:</span>{' '}
-                {mode === 'practice'
+                {mode === 'mistakes'
+                  ? 'Getting a word wrong, then nailing it soon after, is exactly how it sticks for good.'
+                  : mode === 'practice'
                   ? 'Reviewing a word right before you forget it is what moves it to long-term memory.'
                   : lesson?.tip}
               </p>
@@ -336,7 +374,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               onClick={() => setStarted(true)}
               className="btn-primary w-full py-4 text-lg"
             >
-              {mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
+              {mode === 'mistakes' ? 'FIX THESE' : mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
             </button>
             <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
               {total} exercises · 🔥 {currentStreak(p)} day streak
