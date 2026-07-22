@@ -3,7 +3,7 @@ import { verifyToken, AuthRequest } from '@/middleware/auth';
 import { tutorRealtimeLimiter, tutorSpeakLimiter, tutorWritingLimiter } from '@/middleware/rate-limit';
 import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
-import { createRealtimeClientSecret } from '@/services/openai-service';
+import { createRealtimeClientSecret, REALTIME_VOICES } from '@/services/openai-service';
 import { logger } from '@/utils/logger';
 
 const router = Router();
@@ -136,7 +136,7 @@ router.post('/reflect', verifyToken, async (req: AuthRequest, res: Response): Pr
  * Mint an ephemeral token for a LIVE voice call (OpenAI Realtime API).
  *
  * POST /api/v1/tutor/realtime
- * Body: { level?, focus?, weekReached?, knownVocab?, weaknesses?, strengths?, profileSummary?, learnerName? }
+ * Body: { level?, focus?, weekReached?, knownVocab?, weaknesses?, strengths?, profileSummary?, learnerName?, voice? }
  *
  * The learner's level + memory are baked into the session instructions here,
  * server-side, so the browser only ever receives a short-lived ek_… token —
@@ -162,7 +162,11 @@ router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequ
       daysSinceLastSession: typeof b.daysSinceLastSession === 'number' ? b.daysSinceLastSession : undefined,
     });
 
-    const session = await createRealtimeClientSecret({ instructions });
+    const voice =
+      typeof b.voice === 'string' && (REALTIME_VOICES as readonly string[]).includes(b.voice)
+        ? b.voice
+        : undefined;
+    const session = await createRealtimeClientSecret({ instructions, voice });
     res.json(session);
   } catch (err: any) {
     const message = err instanceof Error ? err.message : 'Failed to start the voice session';

@@ -8,6 +8,7 @@ import {
   type RealtimeState,
 } from '@/lib/realtime';
 import type { TutorContext } from '@/lib/tutor-context';
+import { loadTutorVoice } from '@/lib/tutor-voice';
 
 interface RealtimeCallProps {
   context: TutorContext | null;
@@ -127,6 +128,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           profileSummary: c?.profileSummary,
           lastSessionNote: c?.lastSessionNote,
           daysSinceLastSession: c?.daysSinceLastSession,
+          voice: loadTutorVoice(),
         });
         return { token: res.data.token as string, model: res.data.model as string };
       } catch (err: any) {

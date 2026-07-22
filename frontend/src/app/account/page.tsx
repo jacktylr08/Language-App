@@ -17,6 +17,7 @@ import {
 } from '@/lib/progress';
 import { curriculum } from '@/lib/curriculum';
 import { pushSupported, getExistingSubscription, enablePushReminders, disablePushReminders } from '@/lib/push';
+import { TUTOR_VOICES, loadTutorVoice, saveTutorVoice } from '@/lib/tutor-voice';
 
 interface Profile {
   email: string;
@@ -45,8 +46,12 @@ export default function AccountPage() {
   const [remindersError, setRemindersError] = useState('');
   const [remindersChecked, setRemindersChecked] = useState(false);
 
+  // Profe's voice
+  const [tutorVoice, setTutorVoice] = useState('cedar');
+
   useEffect(() => {
     setProgress(loadProgress());
+    setTutorVoice(loadTutorVoice());
     if (pushSupported()) {
       getExistingSubscription()
         .then((sub) => setRemindersOn(!!sub))
@@ -103,6 +108,11 @@ export default function AccountPage() {
   const handleSignOut = () => {
     clearAuth();
     router.push('/login');
+  };
+
+  const handleSelectVoice = (id: string) => {
+    setTutorVoice(id);
+    saveTutorVoice(id);
   };
 
   const handleToggleReminders = async () => {
@@ -232,6 +242,30 @@ export default function AccountPage() {
 
         {/* What Profe knows about this learner — the personalisation, made visible */}
         <TutorProfilePanel />
+
+        {/* Profe's voice */}
+        <section className="surface p-6 mb-6">
+          <h2 className="font-extrabold text-ink dark:text-white">🧑‍🏫 Profe's voice</h2>
+          <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5 mb-4">
+            Pick the voice Profe uses on your next live call.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TUTOR_VOICES.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => handleSelectVoice(v.id)}
+                className={`rounded-xl border-2 px-3 py-2.5 text-left transition-colors ${
+                  tutorVoice === v.id
+                    ? 'border-brand-500 bg-brand-500/10'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-brand-300'
+                }`}
+              >
+                <p className="font-bold text-sm text-ink dark:text-white">{v.label}</p>
+                <p className="text-xs text-ink-soft dark:text-stone-400 mt-0.5">{v.vibe}</p>
+              </button>
+            ))}
+          </div>
+        </section>
 
         {/* Practice reminders */}
         {remindersChecked && pushSupported() && (

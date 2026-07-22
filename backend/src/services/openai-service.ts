@@ -64,6 +64,23 @@ export async function openaiChat(
   return content.trim();
 }
 
+// Every voice the Realtime API currently supports for speech-to-speech audio
+// output. Kept here (not just inline in the route) so both the route's
+// validation and any future caller share one source of truth.
+export const REALTIME_VOICES = [
+  'cedar',
+  'marin',
+  'alloy',
+  'ash',
+  'ballad',
+  'coral',
+  'echo',
+  'sage',
+  'shimmer',
+  'verse',
+] as const;
+export type RealtimeVoice = (typeof REALTIME_VOICES)[number];
+
 export interface RealtimeSessionConfig {
   instructions: string;
   /** Voice name (e.g. "cedar", "marin", "alloy"). */
