@@ -1,4 +1,5 @@
-import { addXp, currentStreak, recordWordResult, getMistakeWordIds, loadProgress } from '../progress';
+import { touchStreak, currentStreak, recordWordResult, getMistakeWordIds, loadProgress, recentActivity } from '../progress';
+import type { ProgressState } from '../progress';
 
 function setNow(iso: string) {
   jest.setSystemTime(new Date(iso));
@@ -15,7 +16,7 @@ describe('streaks', () => {
 
   it('starts a streak of 1 on the first day of activity', () => {
     setNow('2026-01-10T09:00:00.000Z');
-    const state = addXp(10);
+    const state = touchStreak();
     expect(state.streak).toBe(1);
     expect(state.bestStreak).toBe(1);
     expect(currentStreak(state)).toBe(1);
@@ -23,37 +24,36 @@ describe('streaks', () => {
 
   it('extends the streak on consecutive days', () => {
     setNow('2026-01-10T09:00:00.000Z');
-    addXp(10);
+    touchStreak();
     setNow('2026-01-11T09:00:00.000Z');
-    const state = addXp(10);
+    const state = touchStreak();
     expect(state.streak).toBe(2);
     expect(state.bestStreak).toBe(2);
   });
 
   it('resets the streak to 1 after a missed day', () => {
     setNow('2026-01-10T09:00:00.000Z');
-    addXp(10);
+    touchStreak();
     setNow('2026-01-13T09:00:00.000Z'); // skipped the 11th and 12th
-    const state = addXp(10);
+    const state = touchStreak();
     expect(state.streak).toBe(1);
     expect(state.bestStreak).toBe(1); // the earlier streak of 1 isn't beaten
   });
 
   it('reports 0 once a day has been missed, without corrupting stored state', () => {
     setNow('2026-01-10T09:00:00.000Z');
-    addXp(10);
+    touchStreak();
     setNow('2026-01-13T09:00:00.000Z');
     const stale = loadProgress();
     expect(currentStreak(stale)).toBe(0);
     expect(stale.streak).toBe(1); // the raw stored value is untouched until they act again
   });
 
-  it('does not double-count XP or bump the streak twice on the same day', () => {
+  it('does not bump the streak twice on the same day', () => {
     setNow('2026-01-10T09:00:00.000Z');
-    addXp(10);
-    const state = addXp(5);
+    touchStreak();
+    const state = touchStreak();
     expect(state.streak).toBe(1);
-    expect(state.xp).toBe(15);
   });
 });
 
@@ -101,5 +101,26 @@ describe('getMistakeWordIds', () => {
     recordWordResult('adios', false);
 
     expect(getMistakeWordIds()[0]).toBe('hola');
+  });
+});
+
+describe('recentActivity', () => {
+  function state(activeDays: string[]): ProgressState {
+    return { streak: 0, bestStreak: 0, lastActiveDay: '', activeDays, lessons: {}, words: {} };
+  }
+
+  it('returns one entry per day, oldest first, ending today', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-01-10T12:00:00.000Z'));
+
+    const days = recentActivity(state(['2026-01-10', '2026-01-08']), 5);
+
+    // 2026-01-06, 07, 08, 09, 10
+    expect(days).toEqual([false, false, true, false, true]);
+    jest.useRealTimers();
+  });
+
+  it('reports all-inactive for a brand-new learner with no activity yet', () => {
+    expect(recentActivity(state([]), 7)).toEqual(new Array(7).fill(false));
   });
 });

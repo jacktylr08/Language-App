@@ -7,6 +7,7 @@ import { useRequireAuth } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { getAuth, clearAuth } from '@/lib/auth';
 import { TutorProfilePanel } from '@/components/TutorProfilePanel';
+import { CourseChip } from '@/components/CourseChip';
 import {
   loadProgress,
   currentStreak,
@@ -125,9 +126,12 @@ export default function AccountPage() {
           >
             <span aria-hidden>←</span> Back to lessons
           </Link>
-          <Link href="/" className="font-display text-xl font-black text-brand-600 dark:text-brand-400">
-            Aprende
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <Link href="/" className="font-display text-xl font-black text-brand-600 dark:text-brand-400">
+              Fluenta
+            </Link>
+            <CourseChip />
+          </div>
         </div>
       </nav>
 

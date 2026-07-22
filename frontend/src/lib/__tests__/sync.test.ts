@@ -4,13 +4,10 @@ import type { LearnerProfile } from '../tutor-memory';
 
 function progress(overrides: Partial<ProgressState> = {}): ProgressState {
   return {
-    xp: 0,
     streak: 0,
     bestStreak: 0,
     lastActiveDay: '',
     activeDays: [],
-    dailyXp: {},
-    dailyGoal: 30,
     lessons: {},
     words: {},
     ...overrides,
@@ -19,20 +16,18 @@ function progress(overrides: Partial<ProgressState> = {}): ProgressState {
 
 describe('mergeProgress', () => {
   it('returns whichever side exists when the other is missing', () => {
-    const a = progress({ xp: 10 });
+    const a = progress({ streak: 3 });
     expect(mergeProgress(a, undefined)).toBe(a);
     expect(mergeProgress(undefined, a)).toBe(a);
   });
 
-  it('is additive: never loses XP, streak, or lesson completion from either device', () => {
+  it('is additive: never loses streak or lesson completion from either device', () => {
     const a = progress({
-      xp: 50,
       streak: 3,
       bestStreak: 5,
       lessons: { 'greetings-essentials': { completed: true, bestAccuracy: 80, timesCompleted: 1 } },
     });
     const b = progress({
-      xp: 30, // lower than a — must not overwrite a's higher value
       streak: 1,
       bestStreak: 2,
       lessons: { 'greetings-essentials': { completed: false, bestAccuracy: 95, timesCompleted: 2 } },
@@ -40,7 +35,6 @@ describe('mergeProgress', () => {
 
     const merged = mergeProgress(a, b)!;
 
-    expect(merged.xp).toBe(50); // max, never regresses to the lower side
     expect(merged.bestStreak).toBe(5);
     expect(merged.lessons['greetings-essentials'].completed).toBe(true); // OR: completed on either side stays completed
     expect(merged.lessons['greetings-essentials'].bestAccuracy).toBe(95); // max

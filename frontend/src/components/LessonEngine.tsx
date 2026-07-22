@@ -13,7 +13,7 @@ import { CurriculumLesson, VocabItem, GrammarSlide, DialogueTurn, getAllVocab } 
 import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry } from '@/lib/exercise-engine';
 import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
-import { addXp, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
+import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
 import { buildTutorContext } from '@/lib/tutor-context';
 import { api } from '@/lib/api';
 
@@ -25,7 +25,6 @@ type Feedback =
 interface SessionStats {
   answered: number;
   firstTryCorrect: number;
-  xp: number;
   bestCombo: number;
 }
 
@@ -51,7 +50,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const [started, setStarted] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [combo, setCombo] = useState(0);
-  const [stats, setStats] = useState<SessionStats>({ answered: 0, firstTryCorrect: 0, xp: 0, bestCombo: 0 });
+  const [stats, setStats] = useState<SessionStats>({ answered: 0, firstTryCorrect: 0, bestCombo: 0 });
   const [finished, setFinished] = useState(false);
   // Per-exercise UI state
   const [selected, setSelected] = useState<string | null>(null);
@@ -124,14 +123,11 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
       if (correct) {
         const comboNext = combo + 1;
-        const bonus = comboNext >= 5 ? 5 : comboNext >= 3 ? 2 : 0;
-        const earned = (firstTry ? 10 : 5) + bonus;
-        addXp(earned);
+        touchStreak();
         setCombo(comboNext);
         setStats((s) => ({
           answered: s.answered + 1,
           firstTryCorrect: s.firstTryCorrect + (firstTry ? 1 : 0),
-          xp: s.xp + earned,
           bestCombo: Math.max(s.bestCombo, comboNext),
         }));
         setFeedback({ kind: 'correct', note });
@@ -158,7 +154,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       // Session complete
       const accuracy = stats.answered > 0 ? Math.round((stats.firstTryCorrect / stats.answered) * 100) : 100;
       if (mode === 'lesson' && lesson) completeLessonLocal(lesson.slug, accuracy);
-      else addXp(0); // practice/mistakes: touch streak even if all skipped
+      else touchStreak(); // practice/mistakes: touch streak even if all skipped
       setFinished(true);
     } else {
       setIndex((i) => i + 1);
@@ -442,10 +438,9 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             {mode === 'practice' ? 'Practice session complete' : `${lesson?.title} complete`}
           </p>
 
-          <div className="grid grid-cols-3 gap-3 mb-8">
-            <StatCard label="XP earned" value={`+${stats.xp}`} color="text-saffron-500" delay="0ms" />
-            <StatCard label="Accuracy" value={`${accuracy}%`} color="text-brand-500" delay="150ms" />
-            <StatCard label="Best combo" value={`${stats.bestCombo}x`} color="text-terra-500" delay="300ms" />
+          <div className="grid grid-cols-2 gap-3 mb-8">
+            <StatCard label="Accuracy" value={`${accuracy}%`} color="text-brand-500" delay="0ms" />
+            <StatCard label="Best combo" value={`${stats.bestCombo}x`} color="text-terra-500" delay="150ms" />
           </div>
 
           <div className="surface p-4 mb-8 flex items-center justify-center gap-3">

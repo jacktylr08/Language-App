@@ -10,10 +10,12 @@ import {
   currentStreak,
   knownWordCount,
   lessonStars,
+  recentActivity,
   ProgressState,
 } from '@/lib/progress';
 import { combinedMistakeCount } from '@/lib/learner-insights';
 import { buildTutorContext } from '@/lib/tutor-context';
+import { CourseChip } from '@/components/CourseChip';
 
 /** A cadence line so the tutor card reflects an actual relationship, not a static pitch. */
 function cadenceLabel(days: number | undefined): string {
@@ -58,6 +60,7 @@ export default function LessonsPage() {
   const mistakes = combinedMistakeCount();
   const lessonsDone = curriculum.filter((l) => progress.lessons[l.slug]?.completed).length;
   const coursePct = Math.round((lessonsDone / curriculum.length) * 100);
+  const activity = recentActivity(progress, 14);
 
   // A lesson unlocks when the previous one is completed
   const isUnlocked = (index: number): boolean => {
@@ -165,10 +168,47 @@ export default function LessonsPage() {
         </Link>
       )}
 
-      {/* Quiet progress line — no XP, just what matters */}
-      <p className="text-center text-xs text-ink-soft dark:text-stone-500 font-medium pt-1">
-        🔥 {streak} day streak · {wordsKnown} words known
-      </p>
+      {/* Your journey — a real summary to end the sidebar on, not a vanity number */}
+      <div className="surface p-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft dark:text-stone-400">
+            Your journey
+          </p>
+          <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400">
+            {coursePct}%
+          </span>
+        </div>
+        <div className="h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-4">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
+            style={{ width: `${Math.max(coursePct, 2)}%` }}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
+              {wordsKnown}
+            </p>
+            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">words known</p>
+          </div>
+          <div>
+            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
+              {progress.bestStreak}
+            </p>
+            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">best streak</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1" title="Last 14 days">
+          {activity.map((active, i) => (
+            <span
+              key={i}
+              className={`h-2 flex-1 rounded-full ${
+                active ? 'bg-terra-500' : 'bg-stone-200 dark:bg-stone-800'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 
@@ -177,9 +217,12 @@ export default function LessonsPage() {
       {/* Header */}
       <nav className="sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
         <div className="max-w-5xl mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
-          <Link href="/" className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
-            Aprende
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <Link href="/" className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
+              Fluenta
+            </Link>
+            <CourseChip />
+          </div>
           <div className="flex items-center gap-3 text-sm font-extrabold">
             <span
               className={`flex items-center gap-1 rounded-full px-3 py-1.5 ${
@@ -190,12 +233,6 @@ export default function LessonsPage() {
               title="Day streak"
             >
               🔥 {streak}
-            </span>
-            <span
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 bg-saffron-500/10 text-saffron-600 dark:text-saffron-400"
-              title="Total XP"
-            >
-              ⚡ {progress.xp}
             </span>
             <Link
               href="/account"
@@ -348,9 +385,13 @@ export default function LessonsPage() {
             </p>
           </div>
 
-          {/* Desktop sidebar — pinned below the nav, scrolls on its own */}
+          {/* Desktop sidebar — pinned below the nav, scrolls on its own until
+              you reach its end, then scroll continues naturally onto the
+              page (overscroll-contain previously blocked that handoff, so
+              wheel/trackpad scrolling just dead-ended at the sidebar's own
+              bottom instead of continuing). */}
           <aside className="hidden lg:block">
-            <div className="no-scrollbar sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pb-6">
+            <div className="no-scrollbar sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pb-6">
               {sidebar}
             </div>
           </aside>

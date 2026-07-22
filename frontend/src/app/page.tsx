@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CourseChip } from '@/components/CourseChip';
 
 const phases = [
   { n: '01', title: 'Foundations', desc: 'Your first words, sounds and sentences.' },
@@ -14,9 +15,12 @@ export default function HomePage() {
     <div className="min-h-screen">
       <nav className="sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
         <div className="max-w-6xl mx-auto px-6 py-3.5 flex justify-between items-center">
-          <h1 className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
-            Aprende
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
+              Fluenta
+            </h1>
+            <CourseChip />
+          </div>
           <div className="flex gap-3 items-center">
             <Link
               href="/login"
@@ -169,7 +173,7 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-stone-200/70 dark:border-stone-800 py-8 text-center">
-        <p className="font-display text-lg font-black text-brand-600 dark:text-brand-400">Aprende</p>
+        <p className="font-display text-lg font-black text-brand-600 dark:text-brand-400">Fluenta</p>
         <p className="text-xs text-stone-400 dark:text-stone-600 mt-1">
           Hasta la fluidez, siempre. 🇪🇸
         </p>

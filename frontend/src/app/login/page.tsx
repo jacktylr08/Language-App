@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/store';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
+import { CourseChip } from '@/components/CourseChip';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -51,8 +52,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-8 surface !rounded-[28px]">
         <div className="text-center mb-8">
           <h1 className="font-display text-4xl font-black text-brand-600 dark:text-brand-400 mb-2">
-            Aprende Español
+            Fluenta
           </h1>
+          <div className="flex justify-center mb-2">
+            <CourseChip />
+          </div>
           <p className="text-stone-600 dark:text-stone-400">Learn Spanish the right way</p>
         </div>
 

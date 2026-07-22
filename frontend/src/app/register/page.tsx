@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/store';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
+import { CourseChip } from '@/components/CourseChip';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -61,6 +62,9 @@ export default function RegisterPage() {
           <h1 className="font-display text-4xl font-black text-brand-600 dark:text-brand-400 mb-2">
             Start Learning Spanish
           </h1>
+          <div className="flex justify-center mb-2">
+            <CourseChip />
+          </div>
           <p className="text-stone-600 dark:text-stone-400">Create your account</p>
         </div>
 

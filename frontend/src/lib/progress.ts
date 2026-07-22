@@ -1,6 +1,6 @@
 /**
  * Learner progress store — persisted in localStorage.
- * Tracks XP, daily streak, lesson completion, and per-word memory strength
+ * Tracks daily streak, lesson completion, and per-word memory strength
  * (a lightweight SM-2 spaced-repetition model) so the app adapts to the learner.
  */
 
@@ -24,13 +24,10 @@ export interface LessonRecord {
 }
 
 export interface ProgressState {
-  xp: number;
   streak: number;
   bestStreak: number;
   lastActiveDay: string; // YYYY-MM-DD
   activeDays: string[]; // recent YYYY-MM-DD days (capped)
-  dailyXp: Record<string, number>; // YYYY-MM-DD -> xp earned that day
-  dailyGoal: number;
   lessons: Record<string, LessonRecord>; // slug -> record
   words: Record<string, WordState>; // vocab id -> state
 }
@@ -42,7 +39,7 @@ const KEY = PROGRESS_KEY;
 
 /**
  * A fresh default state. This MUST be a factory (not a shared constant) —
- * callers go on to mutate the nested `words`/`lessons`/`dailyXp` objects
+ * callers go on to mutate the nested `words`/`lessons` objects
  * in-place (recordWordResult, completeLessonLocal, etc.) before saving. A
  * shared constant's nested objects would leak those mutations into every
  * future "no data yet" read for the lifetime of the page, until the first
@@ -50,13 +47,10 @@ const KEY = PROGRESS_KEY;
  */
 function defaultState(): ProgressState {
   return {
-    xp: 0,
     streak: 0,
     bestStreak: 0,
     lastActiveDay: '',
     activeDays: [],
-    dailyXp: {},
-    dailyGoal: 30,
     lessons: {},
     words: {},
   };
@@ -102,6 +96,18 @@ export function currentStreak(state: ProgressState): number {
   return 0;
 }
 
+/** Which of the last `days` days (oldest first, ending today) had activity — for a small streak strip. */
+export function recentActivity(state: ProgressState, days = 14): boolean[] {
+  const active = new Set(state.activeDays);
+  const out: boolean[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    out.push(active.has(d.toISOString().slice(0, 10)));
+  }
+  return out;
+}
+
 /** Register activity today: maintains the streak chain. Mutates + saves. */
 function touchToday(state: ProgressState): void {
   const t = today();
@@ -119,23 +125,12 @@ function touchToday(state: ProgressState): void {
   }
 }
 
-export function addXp(amount: number): ProgressState {
+/** Register today's activity for the streak — the only thing that persists across a session. */
+export function touchStreak(): ProgressState {
   const state = loadProgress();
   touchToday(state);
-  state.xp += amount;
-  const t = today();
-  state.dailyXp[t] = (state.dailyXp[t] || 0) + amount;
-  // Keep dailyXp map small
-  const keys = Object.keys(state.dailyXp).sort();
-  if (keys.length > 60) {
-    for (const k of keys.slice(0, keys.length - 60)) delete state.dailyXp[k];
-  }
   save(state);
   return state;
-}
-
-export function todaysXp(state: ProgressState): number {
-  return state.dailyXp[today()] || 0;
 }
 
 /** SM-2-lite intervals (days) by strength level */

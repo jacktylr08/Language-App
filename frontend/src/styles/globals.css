@@ -149,6 +149,31 @@ body {
   background: radial-gradient(circle, rgba(237, 164, 23, 0.08), transparent 70%);
 }
 
+/*
+ * Course-language flag — a large, faint waving flag along the left edge,
+ * so the app reads as "you're in the Spanish course" at a glance. The wave
+ * itself lives in the SVG (LanguageFlagBanner, feTurbulence-driven); this
+ * just sizes and fades the whole banner.
+ */
+.ambient-flag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: -1;
+  width: clamp(120px, 26vw, 440px);
+  pointer-events: none;
+  opacity: 0.28;
+}
+.ambient-flag svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.dark .ambient-flag {
+  opacity: 0.34;
+}
+
 /* ---------- Motion ---------- */
 
 @keyframes slide-up {

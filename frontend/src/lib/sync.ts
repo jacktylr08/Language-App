@@ -131,26 +131,15 @@ export function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressSta
       : wb;
   }
 
-  const dailyXp: Record<string, number> = { ...a.dailyXp };
-  for (const [day, xp] of Object.entries(b.dailyXp || {})) {
-    dailyXp[day] = Math.max(dailyXp[day] || 0, xp);
-  }
-
   const activeDays = Array.from(new Set([...(a.activeDays || []), ...(b.activeDays || [])]))
     .sort()
     .slice(-60);
 
-  // Preferences (goal) follow whichever side was touched most recently.
-  const newer = later(a.lastActiveDay, b.lastActiveDay) === b.lastActiveDay ? b : a;
-
   return {
-    xp: Math.max(a.xp, b.xp),
     streak: Math.max(a.streak, b.streak),
     bestStreak: Math.max(a.bestStreak, b.bestStreak),
     lastActiveDay: later(a.lastActiveDay, b.lastActiveDay),
     activeDays,
-    dailyXp,
-    dailyGoal: newer.dailyGoal || a.dailyGoal || b.dailyGoal,
     lessons,
     words,
   };
