@@ -76,7 +76,49 @@ export default function LessonsPage() {
 
   const sidebar = (
     <div className="space-y-4">
-      {/* Continue — the main call-to-action, right at the top */}
+      {/* Your journey — the main summary, shown first */}
+      <div className="surface p-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft dark:text-stone-400">
+            Your journey
+          </p>
+          <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400">
+            {coursePct}%
+          </span>
+        </div>
+        <div className="h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-4">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
+            style={{ width: `${Math.max(coursePct, 2)}%` }}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
+              {wordsKnown}
+            </p>
+            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">words known</p>
+          </div>
+          <div>
+            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
+              {progress.bestStreak}
+            </p>
+            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">best streak</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1" title="Last 14 days">
+          {activity.map((active, i) => (
+            <span
+              key={i}
+              className={`h-2 flex-1 rounded-full ${
+                active ? 'bg-terra-500' : 'bg-stone-200 dark:bg-stone-800'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Continue — pick up where you left off, right next to the journey summary */}
       {nextLesson ? (
         <Link
           href={`/lessons/${nextLesson.slug}`}
@@ -167,48 +209,6 @@ export default function LessonsPage() {
           </span>
         </Link>
       )}
-
-      {/* Your journey — a real summary to end the sidebar on, not a vanity number */}
-      <div className="surface p-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft dark:text-stone-400">
-            Your journey
-          </p>
-          <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400">
-            {coursePct}%
-          </span>
-        </div>
-        <div className="h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-4">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
-            style={{ width: `${Math.max(coursePct, 2)}%` }}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
-              {wordsKnown}
-            </p>
-            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">words known</p>
-          </div>
-          <div>
-            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
-              {progress.bestStreak}
-            </p>
-            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">best streak</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1" title="Last 14 days">
-          {activity.map((active, i) => (
-            <span
-              key={i}
-              className={`h-2 flex-1 rounded-full ${
-                active ? 'bg-terra-500' : 'bg-stone-200 dark:bg-stone-800'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
     </div>
   );
 
