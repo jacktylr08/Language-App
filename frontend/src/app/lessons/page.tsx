@@ -13,6 +13,16 @@ import {
   ProgressState,
 } from '@/lib/progress';
 import { combinedMistakeCount } from '@/lib/learner-insights';
+import { buildTutorContext } from '@/lib/tutor-context';
+
+/** A cadence line so the tutor card reflects an actual relationship, not a static pitch. */
+function cadenceLabel(days: number | undefined): string {
+  if (days === undefined) return "Say hello to Profe";
+  if (days <= 0) return 'You talked today';
+  if (days === 1) return 'You talked yesterday';
+  if (days < 7) return `${days} days since you last talked`;
+  return "It's been a while — Profe's ready when you are";
+}
 
 const themeAccents: Record<string, string> = {
   phonetics: 'from-stone-400 to-stone-600',
@@ -28,9 +38,11 @@ const themeAccents: Record<string, string> = {
 export default function LessonsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [tutorCtx, setTutorCtx] = useState<ReturnType<typeof buildTutorContext> | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
+    setTutorCtx(buildTutorContext());
   }, []);
 
   if (authLoading || !progress) {
@@ -101,7 +113,7 @@ export default function LessonsPage() {
       {/* Practical "can-do" abilities — progress by what you can actually do */}
       <AbilitiesPanel />
 
-      {/* Talk to the AI tutor — a live voice call */}
+      {/* Talk to the AI tutor — reflects the actual relationship, not a static pitch */}
       <Link
         href="/tutor"
         className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-terra-500 via-terra-400 to-saffron-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
@@ -109,12 +121,26 @@ export default function LessonsPage() {
         <div className="absolute -right-5 -top-7 text-[92px] opacity-15 -rotate-12 select-none" aria-hidden>
           🧑‍🏫
         </div>
-        <p className="font-extrabold text-white text-lg">Talk to your tutor</p>
-        <p className="text-white/90 text-sm mt-1 leading-snug">
-          A live voice conversation with Profe — speak naturally, get corrected, at your level.
-        </p>
+        {tutorCtx?.lastSessionNote ? (
+          <>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+              {cadenceLabel(tutorCtx.daysSinceLastSession)}
+            </p>
+            <p className="font-extrabold text-white text-lg mt-1 leading-tight">Continue with Profe</p>
+            <p className="text-white/90 text-sm mt-1 leading-snug line-clamp-2">
+              &ldquo;{tutorCtx.lastSessionNote}&rdquo;
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-extrabold text-white text-lg">Talk to your tutor</p>
+            <p className="text-white/90 text-sm mt-1 leading-snug">
+              A live voice conversation with Profe — speak naturally, get corrected, at your level.
+            </p>
+          </>
+        )}
         <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
-          Start a call
+          {tutorCtx?.lastSessionNote ? 'Continue the conversation' : 'Start a call'}
           <span className="transition-transform group-hover:translate-x-1">→</span>
         </span>
       </Link>
