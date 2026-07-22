@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { getAuth, clearAuth } from '@/lib/auth';
+import { clearLocalLearnerState } from '@/lib/sync';
 import { TutorProfilePanel } from '@/components/TutorProfilePanel';
 import { CourseChip } from '@/components/CourseChip';
 import {
@@ -106,7 +107,11 @@ export default function AccountPage() {
   };
 
   const handleSignOut = () => {
+    // Not just the auth token — every bit of this account's local learner
+    // state, so a different account signing in on this same device next
+    // never gets its progress silently merged with what's left behind here.
     clearAuth();
+    clearLocalLearnerState();
     router.push('/login');
   };
 

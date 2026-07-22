@@ -1,4 +1,5 @@
-import { mergeProgress, mergeProfile } from '../sync';
+import { mergeProgress, mergeProfile, clearLocalLearnerState } from '../sync';
+import { PROGRESS_KEY, TUTOR_PROFILE_KEY, ONBOARDING_KEY, LEARNER_GOAL_KEY } from '../keys';
 import type { ProgressState } from '../progress';
 import type { LearnerProfile } from '../tutor-memory';
 
@@ -135,5 +136,26 @@ describe('mergeProfile', () => {
 
     const merged = mergeProfile(a, b)!;
     expect(merged.history).toHaveLength(1);
+  });
+});
+
+describe('clearLocalLearnerState', () => {
+  it('wipes every local learner state key, not just progress', () => {
+    // Regression: signing into a DIFFERENT account on the same browser was
+    // silently merging the previous account's leftover localStorage progress
+    // into the new account's server-side state (mergeProgress/mergeProfile
+    // are additive by design — they never wipe anything). This is the
+    // function that must run before that merge is ever allowed to happen.
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify({ streak: 5 }));
+    localStorage.setItem(TUTOR_PROFILE_KEY, JSON.stringify({ summary: 'test' }));
+    localStorage.setItem(ONBOARDING_KEY, 'true');
+    localStorage.setItem(LEARNER_GOAL_KEY, 'travel');
+
+    clearLocalLearnerState();
+
+    expect(localStorage.getItem(PROGRESS_KEY)).toBeNull();
+    expect(localStorage.getItem(TUTOR_PROFILE_KEY)).toBeNull();
+    expect(localStorage.getItem(ONBOARDING_KEY)).toBeNull();
+    expect(localStorage.getItem(LEARNER_GOAL_KEY)).toBeNull();
   });
 });

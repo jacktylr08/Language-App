@@ -196,6 +196,23 @@ function applyBlob(blob: SyncBlob): void {
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pulledThisSession = false;
 
+/**
+ * Wipes every piece of local learner state (progress, tutor memory,
+ * onboarding flag, learner goal) — used when switching to a different
+ * account on this device. Without this, whatever the previous account left
+ * in localStorage gets additively merged into the new account's server-side
+ * state the next time syncOnLoad runs, permanently blending the two
+ * accounts' progress together.
+ */
+export function clearLocalLearnerState(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(PROGRESS_KEY);
+  localStorage.removeItem(TUTOR_PROFILE_KEY);
+  localStorage.removeItem(ONBOARDING_KEY);
+  localStorage.removeItem(LEARNER_GOAL_KEY);
+  pulledThisSession = false;
+}
+
 async function pushNow(): Promise<void> {
   if (!isAuthenticated()) return;
   try {

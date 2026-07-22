@@ -1,5 +1,25 @@
 import { create } from 'zustand';
 import { AuthState, getAuth, setAuth, clearAuth as clearAuthStorage } from './auth';
+import { clearLocalLearnerState } from './sync';
+import { LAST_USER_ID_KEY } from './keys';
+
+/**
+ * Guards against a returning bug: signing into a DIFFERENT account on a
+ * browser that still has a previous account's progress sitting in
+ * localStorage. syncOnLoad's merge is additive (union) by design — it never
+ * wipes anything — so without this check, the old account's local progress
+ * would get permanently blended into the new account's server-side state the
+ * first time it syncs. If the account switched, wipe local state first so
+ * the new session starts clean and pulls only its own data.
+ */
+function guardAgainstAccountSwitch(userId: string): void {
+  if (typeof window === 'undefined') return;
+  const lastUserId = localStorage.getItem(LAST_USER_ID_KEY);
+  if (lastUserId && lastUserId !== userId) {
+    clearLocalLearnerState();
+  }
+  localStorage.setItem(LAST_USER_ID_KEY, userId);
+}
 
 interface User {
   id: string;
@@ -55,6 +75,7 @@ export const useAuth = create<AuthStore>((set) => {
           user: response.data.user,
         };
 
+        guardAgainstAccountSwitch(response.data.user.id);
         setAuth(auth);
         set({
           user: response.data.user,
@@ -89,6 +110,7 @@ export const useAuth = create<AuthStore>((set) => {
           user: response.data.user,
         };
 
+        guardAgainstAccountSwitch(response.data.user.id);
         setAuth(auth);
         set({
           user: response.data.user,
@@ -113,6 +135,7 @@ export const useAuth = create<AuthStore>((set) => {
 
     logout: () => {
       clearAuthStorage();
+      clearLocalLearnerState();
       set({ user: null, accessToken: null });
     },
 
