@@ -73,7 +73,10 @@ function localBlob(): SyncBlob {
 
 const later = (a?: string, b?: string): string => ((a || '') >= (b || '') ? a || '' : b || '');
 
-function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressState | undefined {
+// Exported (not just used internally) so the merge semantics — the part of
+// this module where a bug could silently corrupt or drop a learner's data —
+// can be unit tested directly.
+export function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressState | undefined {
   if (!a) return b;
   if (!b) return a;
 
@@ -129,7 +132,7 @@ function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressState | un
   };
 }
 
-function mergeProfile(
+export function mergeProfile(
   a?: LearnerProfile | null,
   b?: LearnerProfile | null
 ): LearnerProfile | null {

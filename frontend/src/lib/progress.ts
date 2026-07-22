@@ -40,17 +40,27 @@ import { scheduleSync } from './sync';
 
 const KEY = PROGRESS_KEY;
 
-const DEFAULT_STATE: ProgressState = {
-  xp: 0,
-  streak: 0,
-  bestStreak: 0,
-  lastActiveDay: '',
-  activeDays: [],
-  dailyXp: {},
-  dailyGoal: 30,
-  lessons: {},
-  words: {},
-};
+/**
+ * A fresh default state. This MUST be a factory (not a shared constant) —
+ * callers go on to mutate the nested `words`/`lessons`/`dailyXp` objects
+ * in-place (recordWordResult, completeLessonLocal, etc.) before saving. A
+ * shared constant's nested objects would leak those mutations into every
+ * future "no data yet" read for the lifetime of the page, until the first
+ * save ever lands.
+ */
+function defaultState(): ProgressState {
+  return {
+    xp: 0,
+    streak: 0,
+    bestStreak: 0,
+    lastActiveDay: '',
+    activeDays: [],
+    dailyXp: {},
+    dailyGoal: 30,
+    lessons: {},
+    words: {},
+  };
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -63,13 +73,13 @@ function yesterday(): string {
 }
 
 export function loadProgress(): ProgressState {
-  if (typeof window === 'undefined') return { ...DEFAULT_STATE };
+  if (typeof window === 'undefined') return defaultState();
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT_STATE };
-    return { ...DEFAULT_STATE, ...JSON.parse(raw) };
+    if (!raw) return defaultState();
+    return { ...defaultState(), ...JSON.parse(raw) };
   } catch {
-    return { ...DEFAULT_STATE };
+    return defaultState();
   }
 }
 
@@ -218,11 +228,6 @@ export function getMistakeWordIds(limit = 40): string[] {
     .sort((a, b) => b[1].wrong - a[1].wrong || a[1].strength - b[1].strength)
     .map(([id]) => id)
     .slice(0, limit);
-}
-
-export function mistakeWordCount(): number {
-  const state = loadProgress();
-  return Object.values(state.words).filter((w) => w.wrong > 0 && w.strength < 4).length;
 }
 
 export function knownWordCount(state: ProgressState): number {

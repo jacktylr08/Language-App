@@ -95,7 +95,7 @@ export function saveProfile(profile: LearnerProfile): void {
  * are still weak) get pushed further out; brand-new weak spots start due now;
  * weak spots that dropped off the list are considered resolved and forgotten.
  */
-function reconcileReviews(
+export function reconcileReviews(
   weaknesses: string[],
   prev: Record<string, WeaknessReview>,
   now: number
