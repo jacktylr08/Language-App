@@ -11,6 +11,10 @@ const router = Router();
 const strList = (v: any): string[] | undefined =>
   Array.isArray(v) ? v.filter((x: any) => typeof x === 'string' && x.trim()) : undefined;
 
+/** The course language's English name (e.g. "Spanish"). Only Spanish exists today, but every prompt-building call takes this rather than hardcoding it. */
+const langOf = (v: any): string | undefined =>
+  typeof v === 'string' && v.trim() ? v.trim().slice(0, 40) : undefined;
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -46,7 +50,7 @@ function sanitizeMessages(messages: any[]): ChatMessage[] {
  */
 router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { messages, focus, vocab, level, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName, plan, pace, evaluation } =
+    const { messages, focus, vocab, level, language, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName, plan, pace, evaluation } =
       req.body ?? {};
     const paceVal = pace === 'slow' || pace === 'brisk' ? pace : undefined;
 
@@ -64,6 +68,7 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
 
     const reply = await tutorService.chat(clean, {
       level: typeof level === 'string' ? level : undefined,
+      language: langOf(language),
       focus: typeof focus === 'string' ? focus : undefined,
       vocab: strList(vocab),
       weekReached: typeof weekReached === 'number' ? weekReached : undefined,
@@ -100,7 +105,7 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
  */
 router.post('/reflect', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { messages, profile } = req.body ?? {};
+    const { messages, profile, language } = req.body ?? {};
 
     if (!Array.isArray(messages) || messages.length < 2) {
       res.status(400).json({ error: 'messages must contain at least a couple of turns' });
@@ -119,7 +124,7 @@ router.post('/reflect', verifyToken, async (req: AuthRequest, res: Response): Pr
           }
         : null;
 
-    const updated = await tutorService.reflect(clean, previous);
+    const updated = await tutorService.reflect(clean, previous, langOf(language) || 'Spanish');
     res.json({ profile: updated });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : 'Failed to update the learner profile';
@@ -148,6 +153,7 @@ router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequ
     const b = req.body ?? {};
     const instructions = tutorService.buildLiveInstructions({
       level: typeof b.level === 'string' ? b.level : undefined,
+      language: langOf(b.language),
       focus: typeof b.focus === 'string' ? b.focus : undefined,
       weekReached: typeof b.weekReached === 'number' ? b.weekReached : undefined,
       knownVocab: strList(b.knownVocab),
@@ -231,7 +237,7 @@ router.post('/speak', verifyToken, tutorSpeakLimiter, async (req: AuthRequest, r
  */
 router.post('/grade-writing', verifyToken, tutorWritingLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { instruction, suggestedVocab, answer, level } = req.body ?? {};
+    const { instruction, suggestedVocab, answer, level, language } = req.body ?? {};
 
     if (typeof instruction !== 'string' || !instruction.trim()) {
       res.status(400).json({ error: 'instruction is required' });
@@ -244,6 +250,7 @@ router.post('/grade-writing', verifyToken, tutorWritingLimiter, async (req: Auth
 
     const result = await tutorService.gradeWriting({
       level: typeof level === 'string' ? level : 'beginner',
+      language: langOf(language),
       instruction: instruction.trim().slice(0, 300),
       suggestedVocab: strList(suggestedVocab)?.slice(0, 10) ?? [],
       answer: answer.trim().slice(0, 600),

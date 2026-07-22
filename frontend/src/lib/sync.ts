@@ -12,7 +12,8 @@
  */
 import { api } from './api';
 import { isAuthenticated } from './auth';
-import { PROGRESS_KEY, TUTOR_PROFILE_KEY, ONBOARDING_KEY, LEARNER_GOAL_KEY } from './keys';
+import { progressKeyFor, tutorProfileKeyFor, ONBOARDING_KEY, LEARNER_GOAL_KEY, ACTIVE_LANGUAGE_KEY } from './keys';
+import { LANGUAGES, getActiveLanguageId } from './languages';
 import type { ProgressState } from './progress';
 import type { LearnerProfile } from './tutor-memory';
 import type { LearnerGoal } from './learner-goal';
@@ -84,10 +85,16 @@ function writeGoal(goal: LearnerGoal): void {
   }
 }
 
+// Syncs only the ACTIVE language's progress/tutor memory. With a single
+// registered language this is everything there is to sync; once a second
+// language exists, syncing every language at once would need the server's
+// state blob to become language-keyed too (POST /api/v1/state currently
+// stores one flat blob per account) — a backend change, out of scope here.
 function localBlob(): SyncBlob {
+  const languageId = getActiveLanguageId();
   return {
-    progress: readJSON<ProgressState>(PROGRESS_KEY) ?? undefined,
-    tutorProfile: readJSON<LearnerProfile>(TUTOR_PROFILE_KEY),
+    progress: readJSON<ProgressState>(progressKeyFor(languageId)) ?? undefined,
+    tutorProfile: readJSON<LearnerProfile>(tutorProfileKeyFor(languageId)),
     onboardingComplete: readOnboarding(),
     learnerGoal: readGoal(),
   };
@@ -185,8 +192,9 @@ function mergeBlob(a: SyncBlob, b: SyncBlob): SyncBlob {
 }
 
 function applyBlob(blob: SyncBlob): void {
-  if (blob.progress) writeJSON(PROGRESS_KEY, blob.progress);
-  if (blob.tutorProfile) writeJSON(TUTOR_PROFILE_KEY, blob.tutorProfile);
+  const languageId = getActiveLanguageId();
+  if (blob.progress) writeJSON(progressKeyFor(languageId), blob.progress);
+  if (blob.tutorProfile) writeJSON(tutorProfileKeyFor(languageId), blob.tutorProfile);
   if (blob.onboardingComplete) writeOnboarding(true);
   if (blob.learnerGoal) writeGoal(blob.learnerGoal);
 }
@@ -206,10 +214,17 @@ let pulledThisSession = false;
  */
 export function clearLocalLearnerState(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(PROGRESS_KEY);
-  localStorage.removeItem(TUTOR_PROFILE_KEY);
+  // Every registered language, not just the active one — an account switch
+  // must never leave a different language's progress behind either.
+  for (const lang of LANGUAGES) {
+    localStorage.removeItem(progressKeyFor(lang.id));
+    localStorage.removeItem(tutorProfileKeyFor(lang.id));
+  }
   localStorage.removeItem(ONBOARDING_KEY);
   localStorage.removeItem(LEARNER_GOAL_KEY);
+  // Which language an account is studying is itself per-account data — the
+  // next account on this device should default fresh, not inherit this one's.
+  localStorage.removeItem(ACTIVE_LANGUAGE_KEY);
   pulledThisSession = false;
 }
 

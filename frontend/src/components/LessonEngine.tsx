@@ -231,12 +231,13 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     if (feedback || !current?.writingPrompt || !writingText.trim() || gradingWriting) return;
     setGradingWriting(true);
     try {
-      const { level } = buildTutorContext();
+      const { level, languageName } = buildTutorContext();
       const res = await api.post('/tutor/grade-writing', {
         instruction: current.writingPrompt.instruction,
         suggestedVocab: current.writingPrompt.suggested,
         answer: writingText.trim(),
         level,
+        language: languageName,
       });
       const { correct, feedback: note, corrected } = res.data ?? {};
       grade(!!correct, typeof corrected === 'string' ? corrected : '', note || undefined);

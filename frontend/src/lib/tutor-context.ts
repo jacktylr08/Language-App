@@ -13,13 +13,16 @@ import { loadProgress, weekReachedFor } from './progress';
 import { loadProfile, isEvaluationDue, dueWeaknessesFirst } from './tutor-memory';
 import { buildLessonInsights } from './learner-insights';
 import { loadLearnerGoal, GOAL_LABELS, type LearnerGoal } from './learner-goal';
+import { getActiveLanguage } from './languages';
 import type { Scenario } from './scenarios';
 
 export interface TutorContext {
   level: 'beginner' | 'intermediate' | 'advanced';
+  /** English name of the course language, e.g. "Spanish" — what the backend prompt is actually teaching. */
+  languageName: string;
   /** Highest course week the learner has completed a lesson in. */
   weekReached: number;
-  /** Spanish the learner already knows — safe for Profe to use freely. */
+  /** Target-language words the learner already knows — safe for Profe to use freely. */
   knownVocab: string[];
   /** The lesson the session is focused on (title). */
   focus?: string;
@@ -215,6 +218,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
 
   return {
     level,
+    languageName: getActiveLanguage().name,
     weekReached,
     knownVocab: Array.from(known).slice(0, 150),
     focus: lesson.title,

@@ -117,6 +117,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
       try {
         const res = await api.post('/tutor/realtime', {
           level: c?.level,
+          language: c?.languageName,
           focus: c?.focus,
           weekReached: c?.weekReached,
           knownVocab: c?.knownVocab,

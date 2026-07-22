@@ -8,8 +8,14 @@
  * recycles the things you keep getting wrong instead of letting them fade.
  */
 import { api } from './api';
-import { TUTOR_PROFILE_KEY } from './keys';
+import { tutorProfileKeyFor } from './keys';
 import { scheduleSync } from './sync';
+import { getActiveLanguageId, getLanguage } from './languages';
+
+/** Resolved fresh each call — mistakes in one language aren't mistakes in another. */
+function activeKey(): string {
+  return tutorProfileKeyFor(getActiveLanguageId());
+}
 
 /** A weak spot's review schedule. */
 export interface WeaknessReview {
@@ -88,7 +94,7 @@ export function trimTranscript(
 export function loadProfile(): LearnerProfile | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(TUTOR_PROFILE_KEY);
+    const raw = localStorage.getItem(activeKey());
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p || typeof p !== 'object') return null;
@@ -111,7 +117,7 @@ export function loadProfile(): LearnerProfile | null {
 export function saveProfile(profile: LearnerProfile): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(TUTOR_PROFILE_KEY, JSON.stringify(profile));
+    localStorage.setItem(activeKey(), JSON.stringify(profile));
     scheduleSync();
   } catch {
     /* storage full/unavailable — memory just won't persist */
@@ -194,6 +200,7 @@ export async function reflectAndSave(
     const res = await api.post('/tutor/reflect', {
       messages,
       profile: prev,
+      language: getLanguage(getActiveLanguageId()).name,
     });
     const fresh: LearnerProfile | undefined = res.data?.profile;
     if (fresh) {

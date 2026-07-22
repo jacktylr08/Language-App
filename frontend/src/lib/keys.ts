@@ -14,3 +14,21 @@ export const TUTOR_VOICE_KEY = 'aprende-tutor-voice-v1';
 // ever runs — otherwise its additive (union) merge would permanently blend
 // the old account's progress into the new account's server-side row.
 export const LAST_USER_ID_KEY = 'aprende-last-user-id';
+// The account's chosen course language (see lib/languages.ts).
+export const ACTIVE_LANGUAGE_KEY = 'aprende-active-language';
+
+// Spanish ('es') is the original, default course — its data keeps the exact
+// existing key names so no current learner's progress ever needs migrating.
+// Any OTHER language gets its own namespaced key, so a future second course
+// can never mix with or overwrite Spanish data (or vice versa).
+const DEFAULT_LANGUAGE_ID = 'es';
+
+/** Progress (lessons/words) is per-language — different courses, different vocab. */
+export function progressKeyFor(languageId: string): string {
+  return languageId === DEFAULT_LANGUAGE_ID ? PROGRESS_KEY : `${PROGRESS_KEY}-${languageId}`;
+}
+
+/** Tutor memory (weaknesses/strengths/history) is per-language — mistakes in French aren't mistakes in Spanish. */
+export function tutorProfileKeyFor(languageId: string): string {
+  return languageId === DEFAULT_LANGUAGE_ID ? TUTOR_PROFILE_KEY : `${TUTOR_PROFILE_KEY}-${languageId}`;
+}

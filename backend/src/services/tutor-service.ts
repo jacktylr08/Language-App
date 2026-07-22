@@ -8,11 +8,13 @@ export interface ChatTurnInput {
 /** Level + memory context the client sends so Profe teaches at the right level. */
 export interface TutorChatOptions {
   level?: string;
+  /** English name of the course language, e.g. "Spanish", "French". Defaults to Spanish — the only course that exists today. */
+  language?: string;
   focus?: string;
   vocab?: string[];
   /** Highest course week the learner has completed — a hard ceiling on difficulty. */
   weekReached?: number;
-  /** Spanish the learner already knows (safe to use freely). */
+  /** Target-language words the learner already knows (safe to use freely). */
   knownVocab?: string[];
   /** Things they keep getting wrong — to work on gently. */
   weaknesses?: string[];
@@ -47,26 +49,28 @@ function evaluationFragment(on?: boolean): string {
 }
 
 /**
- * How much of the conversation should actually be in Spanish versus English —
- * a completely different axis from vocabulary difficulty. Even a sentence
- * built entirely from words a learner has "met" is often unparseable by ear
- * in their first few weeks; ability to follow spoken Spanish lags well behind
- * recognising it on a page. Ties to the course's own week numbering (24 weeks,
- * 6 phases) rather than the coarser beginner/intermediate/advanced bucket, so
- * the ratio actually shifts gradually as they progress instead of jumping.
+ * How much of the conversation should actually be in the target language
+ * versus English — a completely different axis from vocabulary difficulty.
+ * Even a sentence built entirely from words a learner has "met" is often
+ * unparseable by ear in their first few weeks; ability to follow spoken
+ * language lags well behind recognising it on a page. Ties to the course's
+ * own week numbering (24 weeks, 6 phases) rather than the coarser
+ * beginner/intermediate/advanced bucket, so the ratio actually shifts
+ * gradually as they progress instead of jumping.
  */
-function languageMixFragment(weekReached?: number): string {
+function languageMixFragment(weekReached: number | undefined, language: string): string {
   const week = weekReached ?? 1;
+  const LANG = language.toUpperCase();
   if (week <= 4) {
-    return "This learner has barely started — they're in their first few weeks, ever. Speak MAINLY IN ENGLISH, like a friend teaching them Spanish one bit at a time, not a Spanish speaker having a conversation with them. Use Spanish only for single words or very short phrases they've actually been taught, and ALWAYS say what it means in English straight after, every single time — never leave them guessing. This is an English conversation ABOUT Spanish, with a little Spanish sprinkled in for practice, not the other way round.";
+    return `This learner has barely started — they're in their first few weeks, ever. Speak MAINLY IN ENGLISH, like a friend teaching them ${language} one bit at a time, not a ${language} speaker having a conversation with them. Use ${language} only for single words or very short phrases they've actually been taught, and ALWAYS say what it means in English straight after, every single time — never leave them guessing. This is an English conversation ABOUT ${language}, with a little ${language} sprinkled in for practice, not the other way round.`;
   }
   if (week <= 11) {
-    return "This learner has a few months in — aim for roughly HALF ENGLISH, HALF SPANISH. Have a go at short Spanish sentences built from words they know, but gloss anything that isn't rock solid for them, and switch back to English readily the moment they hesitate or seem lost.";
+    return `This learner has a few months in — aim for roughly HALF ENGLISH, HALF ${LANG}. Have a go at short ${language} sentences built from words they know, but gloss anything that isn't rock solid for them, and switch back to English readily the moment they hesitate or seem lost.`;
   }
   if (week <= 19) {
-    return "This learner is well into the course — lean MOSTLY SPANISH now, the way you would with a genuinely capable student, but still gloss newer or trickier phrasing in English, and drop into English at once if they get stuck.";
+    return `This learner is well into the course — lean MOSTLY ${LANG} now, the way you would with a genuinely capable student, but still gloss newer or trickier phrasing in English, and drop into English at once if they get stuck.`;
   }
-  return "This learner is near-fluent — speak MAINLY IN SPANISH, as you would with someone who can hold a real conversation. Use English sparingly, just to unstick a genuine snag.";
+  return `This learner is near-fluent — speak MAINLY IN ${LANG}, as you would with someone who can hold a real conversation. Use English sparingly, just to unstick a genuine snag.`;
 }
 /**
  * A real tutor remembers their student between lessons. This gives the model
@@ -103,13 +107,14 @@ export class TutorService {
    */
   async chat(messages: ChatTurnInput[], opts: TutorChatOptions = {}): Promise<string> {
     const level = opts.level || 'beginner';
+    const language = opts.language || 'Spanish';
 
     const focusLine = opts.focus
       ? `\nRight now the learner is working on the lesson "${opts.focus}". Lean the chat toward this when it's natural, but follow their lead.`
       : '';
 
-    // Hard scope: never introduce Spanish beyond what the learner has actually
-    // studied. This is the "don't hit me with week 5 stuff in week 1" rule.
+    // Hard scope: never introduce material beyond what the learner has
+    // actually studied. This is the "don't hit me with week 5 stuff in week 1" rule.
     const weekLine =
       typeof opts.weekReached === 'number'
         ? `\nThe learner has completed up to WEEK ${opts.weekReached} of the course. This is a hard ceiling: do NOT use grammar, tenses, or vocabulary from beyond week ${opts.weekReached}. Stay in the present tense and simple structures unless later material is listed below as known.`
@@ -117,7 +122,7 @@ export class TutorService {
 
     const knownVocabLine =
       opts.knownVocab && opts.knownVocab.length
-        ? `\nSpanish the learner already knows (safe to use freely): ${opts.knownVocab.slice(0, 120).join(', ')}. Prefer these words. If you must introduce a new word, introduce just one, and always gloss it in English.`
+        ? `\n${language} the learner already knows (safe to use freely): ${opts.knownVocab.slice(0, 120).join(', ')}. Prefer these words. If you must introduce a new word, introduce just one, and always gloss it in English.`
         : '';
 
     const weaknessLine =
@@ -136,12 +141,12 @@ export class TutorService {
     const paceLine = paceFragment(opts.pace);
     const evalLine = evaluationFragment(opts.evaluation);
 
-    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding Spanish tutor having a LIVE, flowing conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}
+    const systemPrompt = `You are "Profe", a warm, patient, genuinely human-sounding ${language} tutor having a LIVE, flowing conversation with a ${level} learner. You are their friendly teacher, not a textbook or a robot.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}
 
 How you talk:
 - Sound like a real person: warm, encouraging, a little playful. Never robotic or listy.
 - Keep every reply SHORT — 1 to 3 sentences. No walls of text, no bullet points, no lists.
-- ${languageMixFragment(opts.weekReached)} When you do use Spanish, immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)" — never leave them guessing.
+- ${languageMixFragment(opts.weekReached, language)} When you do use ${language}, immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)" — never leave them guessing.
 - When you use English, use BRITISH English wording ("brilliant", "lovely", "have a go", "a bit", "cheers") — never American phrasing.
 - Ask exactly ONE question at a time, then stop and wait. Keep it a natural back-and-forth; follow their lead.
 - Never make them repeat something to get it "perfect", and don't nitpick. Correct only real, meaningful mistakes — just use the right version naturally in your reply, then move on. Don't open replies with praise ("great", "nice", "¡muy bien!") or echo back what they said; respond to what they mean like a real person. Prioritise flow and confidence over correctness.
@@ -162,6 +167,7 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
    */
   buildLiveInstructions(opts: TutorChatOptions = {}): string {
     const level = opts.level || 'beginner';
+    const language = opts.language || 'Spanish';
 
     const focusLine = opts.focus
       ? ` The learner is currently working on the lesson "${opts.focus}"; lean there when natural, but follow their lead.`
@@ -172,7 +178,7 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
         : '';
     const knownVocabLine =
       opts.knownVocab && opts.knownVocab.length
-        ? ` Spanish they already know (use freely): ${opts.knownVocab.slice(0, 120).join(', ')}.`
+        ? ` ${language} they already know (use freely): ${opts.knownVocab.slice(0, 120).join(', ')}.`
         : '';
     const weaknessLine =
       opts.weaknesses && opts.weaknesses.length
@@ -205,10 +211,11 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
 
     // Its own prominent, early paragraph rather than one bullet buried under
     // "Be bilingual to help" — a learner who just started reported getting a
-    // full Spanish-only call and having no idea what was being said, because a
-    // mid-prompt bullet wasn't a strong enough signal against "Spanish tutor"
-    // being the very first thing the model reads about its own persona.
-    const languageMixLine = `\n\nLANGUAGE — THIS MATTERS MOST, GET IT RIGHT: ${languageMixFragment(opts.weekReached)} Whenever you do use Spanish, say it then immediately give the English right after (e.g. "¿Qué tal? … how's it going?") — never leave them guessing what something meant.`;
+    // full target-language-only call and having no idea what was being said,
+    // because a mid-prompt bullet wasn't a strong enough signal against
+    // "{language} tutor" being the very first thing the model reads about its
+    // own persona.
+    const languageMixLine = `\n\nLANGUAGE — THIS MATTERS MOST, GET IT RIGHT: ${languageMixFragment(opts.weekReached, language)} Whenever you do use ${language}, say it then immediately give the English right after (e.g. "¿Qué tal? … how's it going?") — never leave them guessing what something meant.`;
 
     // Also its own prominent early paragraph, with banned phrases spelled out —
     // a learner reported getting looped into repeating the same sentence back
@@ -218,7 +225,7 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
     // and banned explicitly, right where the model can't miss it.
     const noRepeatLine = `\n\nNEVER ASK THEM TO REPEAT SOMETHING — this is banned, no exceptions, even as a gentle nudge: do not say "say it once more", "try that again", "let's say it once more", "repeat after me", "one more time", or anything with that shape. You cannot hear their pronunciation — you only see an imperfect transcript — so there is nothing to fix by making them re-say it. If something they said was a little off, just use the correct version yourself in your own very next reply and keep the conversation moving forward. Never loop back to the same line twice.`;
 
-    return `You are "Profe", a warm, genuinely human Spanish tutor on a LIVE VOICE CALL with a ${level} learner. Picture a great private one-to-one class: relaxed, engaged, genuinely interested in the person in front of you.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}${languageMixLine}${noRepeatLine}
+    return `You are "Profe", a warm, genuinely human ${language} tutor on a LIVE VOICE CALL with a ${level} learner. Picture a great private one-to-one class: relaxed, engaged, genuinely interested in the person in front of you.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}${languageMixLine}${noRepeatLine}
 
 Talk like a real person in a real conversation:
 - Respond to what they actually SAID — the meaning of it. Show you were listening: react to the content, offer a little of your own (a thought, a related question, a small opinion), and move the conversation forward on the topic. Be curious about them.
@@ -238,7 +245,7 @@ Corrections — light, human, and infrequent:
 - Flow and confidence beat correctness. A real conversation with a few uncorrected slips is far better than nitpicking.
 
 Being bilingual:
-- Follow the LANGUAGE guidance above on the English/Spanish balance — it's not optional, it's the difference between a call they can follow and one they can't.
+- Follow the LANGUAGE guidance above on the English/${language} balance — it's not optional, it's the difference between a call they can follow and one they can't.
 - When you speak English, use BRITISH English wording ("brilliant", "lovely", "have a go", "a bit", "keen", "cheers") — never American phrasing.
 
 Teach lightly:
@@ -258,7 +265,8 @@ Teach lightly:
    */
   async reflect(
     messages: ChatTurnInput[],
-    previous: LearnerProfile | null = null
+    previous: LearnerProfile | null = null,
+    language = 'Spanish'
   ): Promise<LearnerProfile> {
     const prev = previous
       ? `Here is what you already knew about this learner (merge new observations into it, don't lose old ones unless they've clearly improved):\n${JSON.stringify(
@@ -266,7 +274,7 @@ Teach lightly:
         )}`
       : 'There is no previous profile for this learner yet — build one from scratch.';
 
-    const system = `You are an expert Spanish teacher reviewing a lesson transcript to update your private notes on a student. ${prev}
+    const system = `You are an expert ${language} teacher reviewing a lesson transcript to update your private notes on a student. ${prev}
 
 Read the conversation and return a JSON object with EXACTLY these keys:
 {
@@ -319,19 +327,21 @@ Be specific and actionable — these notes decide what the tutor drills next tim
     instruction: string;
     suggestedVocab: string[];
     answer: string;
+    language?: string;
   }): Promise<{ correct: boolean; feedback: string; corrected: string }> {
-    const system = `You are "Profe", a warm Spanish tutor marking one short piece of free writing from a ${opts.level} learner.
+    const language = opts.language || 'Spanish';
+    const system = `You are "Profe", a warm ${language} tutor marking one short piece of free writing from a ${opts.level} learner.
 
 The prompt they were given: "${opts.instruction}"
 Words they were nudged to try using (not mandatory): ${opts.suggestedVocab.join(', ') || 'none specified'}.
 
-Judge their answer on its own terms — does it make sense, is it recognisably Spanish, does it respond to the prompt? Minor typos, missing accents, or a slightly different word choice than expected are all FINE — this is not a strict dictation test. Only mark it incorrect if it's not real Spanish, doesn't address the prompt at all, or is mostly the English left untranslated.
+Judge their answer on its own terms — does it make sense, is it recognisably ${language}, does it respond to the prompt? Minor typos, missing accents, or a slightly different word choice than expected are all FINE — this is not a strict dictation test. Only mark it incorrect if it's not real ${language}, doesn't address the prompt at all, or is mostly the English left untranslated.
 
 Return a JSON object with EXACTLY these keys:
 {
   "correct": boolean,   // true if this is a genuine, reasonable attempt at the prompt
   "feedback": string,   // ONE short, warm sentence (under 140 chars). If there's a genuine issue, NAME the exact word or phrase from their answer (quote it) and what it should be instead — e.g. "Close! swap 'estaba' for 'estuve' — a one-off finished action, not a background state." Never a vague "some grammar to review" — vague feedback teaches nothing. If it's already good, say specifically what worked instead of a generic "nice job".
-  "corrected": string   // a natural, correct Spanish version of what they were trying to say. If their answer was already great, this can match it closely.
+  "corrected": string   // a natural, correct ${language} version of what they were trying to say. If their answer was already great, this can match it closely.
 }
 
 Return ONLY the JSON object.`;

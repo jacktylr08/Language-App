@@ -79,11 +79,20 @@ export interface ProgressState {
   words: Record<string, WordState>; // vocab id -> state
 }
 
-import { PROGRESS_KEY } from './keys';
+import { progressKeyFor } from './keys';
 import { scheduleSync } from './sync';
 import { curriculum } from './curriculum';
+import { getActiveLanguageId } from './languages';
 
-const KEY = PROGRESS_KEY;
+/**
+ * Resolved fresh on every read/write (not cached) — the active language is
+ * a real, changeable preference, not a build-time constant. Spanish's key
+ * is unchanged from before this was language-aware, so no current learner's
+ * data needs migrating.
+ */
+function activeKey(): string {
+  return progressKeyFor(getActiveLanguageId());
+}
 
 /**
  * A fresh default state. This MUST be a factory (not a shared constant) —
@@ -117,7 +126,7 @@ function yesterday(): string {
 export function loadProgress(): ProgressState {
   if (typeof window === 'undefined') return defaultState();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(activeKey());
     if (!raw) return defaultState();
     return { ...defaultState(), ...JSON.parse(raw) };
   } catch {
@@ -128,7 +137,7 @@ export function loadProgress(): ProgressState {
 function save(state: ProgressState): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(activeKey(), JSON.stringify(state));
     // Mirror the change to the account so it follows the learner across devices.
     scheduleSync();
   } catch {

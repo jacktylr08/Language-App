@@ -1,10 +1,18 @@
 /**
- * The course language this build is teaching. Fluenta is built to grow into
- * more languages over time — everything that's specific to "which language"
- * (flag, display name, native name) reads from here, so adding a second
- * course later is a matter of extending this, not hunting down hardcoded
- * "Spanish"/🇪🇸 strings across the app.
+ * The course language registry. Fluenta is built to grow into more languages
+ * over time — everything that's specific to "which language" (flag, display
+ * name, native name, and which curriculum/progress/tutor-memory data belongs
+ * to it) reads from here, so adding a second course later means registering
+ * it below, not hunting down hardcoded "Spanish"/🇪🇸 strings across the app.
+ *
+ * Only Spanish is registered today. Adding a real second language is a
+ * separate, much bigger task (authoring its curriculum) — this module is
+ * just the architecture: an account's active language is a real, persisted
+ * choice, and every other module (curriculum, progress, tutor-memory,
+ * tutor-context) reads it from here rather than assuming Spanish.
  */
+import { ACTIVE_LANGUAGE_KEY } from './keys';
+
 export interface CourseLanguage {
   id: string;
   /** English name, e.g. "Spanish". */
@@ -22,14 +30,54 @@ export interface CourseLanguage {
   flagBands: Array<{ color: string; weight: number }>;
 }
 
-export const CURRENT_LANGUAGE: CourseLanguage = {
-  id: 'es',
-  name: 'Spanish',
-  nativeName: 'Español',
-  flag: '🇪🇸',
-  flagBands: [
-    { color: '#AA151B', weight: 0.25 },
-    { color: '#F1BF00', weight: 0.5 },
-    { color: '#AA151B', weight: 0.25 },
-  ],
-};
+export const LANGUAGES: CourseLanguage[] = [
+  {
+    id: 'es',
+    name: 'Spanish',
+    nativeName: 'Español',
+    flag: '🇪🇸',
+    flagBands: [
+      { color: '#AA151B', weight: 0.25 },
+      { color: '#F1BF00', weight: 0.5 },
+      { color: '#AA151B', weight: 0.25 },
+    ],
+  },
+];
+
+const DEFAULT_LANGUAGE_ID = 'es';
+
+export function getLanguage(id: string): CourseLanguage {
+  return LANGUAGES.find((l) => l.id === id) ?? LANGUAGES[0];
+}
+
+/** The account's active course language id — persisted, defaults to Spanish. */
+export function getActiveLanguageId(): string {
+  if (typeof window === 'undefined') return DEFAULT_LANGUAGE_ID;
+  try {
+    const stored = localStorage.getItem(ACTIVE_LANGUAGE_KEY);
+    return stored && LANGUAGES.some((l) => l.id === stored) ? stored : DEFAULT_LANGUAGE_ID;
+  } catch {
+    return DEFAULT_LANGUAGE_ID;
+  }
+}
+
+export function setActiveLanguageId(id: string): void {
+  if (typeof window === 'undefined' || !LANGUAGES.some((l) => l.id === id)) return;
+  try {
+    localStorage.setItem(ACTIVE_LANGUAGE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getActiveLanguage(): CourseLanguage {
+  return getLanguage(getActiveLanguageId());
+}
+
+/**
+ * Backward-compatible: the app's only display-layer consumers (CourseChip,
+ * LanguageFlagBanner) read this directly. With a single registered language
+ * it's identical to getActiveLanguage() at any point in time — kept as a
+ * plain value (not a function) so those components don't need to change.
+ */
+export const CURRENT_LANGUAGE: CourseLanguage = getActiveLanguage();

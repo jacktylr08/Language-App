@@ -1,4 +1,11 @@
+jest.mock('@/services/openai-service', () => ({
+  openaiChat: jest.fn(),
+}));
+
 import { tutorService } from '@/services/tutor-service';
+import { openaiChat } from '@/services/openai-service';
+
+const mockedOpenaiChat = openaiChat as jest.Mock;
 
 describe('buildLiveInstructions — language mix by course progress', () => {
   it('tells the tutor to speak mainly English for a learner in their first few weeks', () => {
@@ -34,6 +41,67 @@ describe('buildLiveInstructions — language mix by course progress', () => {
     const talkLikeIdx = instructions.indexOf('Talk like a real person');
     expect(languageIdx).toBeGreaterThan(-1);
     expect(languageIdx).toBeLessThan(talkLikeIdx);
+  });
+});
+
+describe('buildLiveInstructions — language parameterization (multi-language architecture)', () => {
+  it('defaults to Spanish when no language is given, unchanged from before this was parameterized', () => {
+    const instructions = tutorService.buildLiveInstructions({ weekReached: 1 });
+    expect(instructions).toMatch(/genuinely human Spanish tutor/);
+  });
+
+  it('uses whatever language is passed instead of hardcoding Spanish', () => {
+    const instructions = tutorService.buildLiveInstructions({ weekReached: 1, language: 'French' });
+    expect(instructions).toMatch(/genuinely human French tutor/);
+    expect(instructions).not.toMatch(/\bSpanish\b/);
+  });
+
+  it('threads the language through the language-mix guidance at every course stage', () => {
+    expect(tutorService.buildLiveInstructions({ weekReached: 1, language: 'German' })).toMatch(
+      /teaching them German one bit at a time/
+    );
+    expect(tutorService.buildLiveInstructions({ weekReached: 8, language: 'German' })).toMatch(
+      /HALF ENGLISH, HALF GERMAN/
+    );
+    expect(tutorService.buildLiveInstructions({ weekReached: 15, language: 'German' })).toMatch(
+      /MOSTLY GERMAN/
+    );
+    expect(tutorService.buildLiveInstructions({ weekReached: 22, language: 'German' })).toMatch(
+      /MAINLY IN GERMAN/
+    );
+  });
+});
+
+describe('gradeWriting — language parameterization', () => {
+  beforeEach(() => {
+    mockedOpenaiChat.mockReset();
+    mockedOpenaiChat.mockResolvedValue(
+      JSON.stringify({ correct: true, feedback: 'Nice!', corrected: 'Hoy fue un buen día' })
+    );
+  });
+
+  it('defaults to Spanish in the system prompt when no language is given', async () => {
+    await tutorService.gradeWriting({
+      level: 'beginner',
+      instruction: 'Describe your day',
+      suggestedVocab: [],
+      answer: 'Hoy fue un buen día',
+    });
+    const systemPrompt = mockedOpenaiChat.mock.calls[0][0];
+    expect(systemPrompt).toMatch(/warm Spanish tutor/);
+  });
+
+  it('uses the given language in the system prompt instead of hardcoding Spanish', async () => {
+    await tutorService.gradeWriting({
+      level: 'beginner',
+      instruction: 'Describe your day',
+      suggestedVocab: [],
+      answer: "Aujourd'hui était une bonne journée",
+      language: 'French',
+    });
+    const systemPrompt = mockedOpenaiChat.mock.calls[0][0];
+    expect(systemPrompt).toMatch(/warm French tutor/);
+    expect(systemPrompt).not.toMatch(/\bSpanish\b/);
   });
 });
 
