@@ -36,3 +36,20 @@ describe('buildLiveInstructions — language mix by course progress', () => {
     expect(languageIdx).toBeLessThan(talkLikeIdx);
   });
 });
+
+describe('buildLiveInstructions — never ask the learner to repeat themselves', () => {
+  it('explicitly bans asking the learner to repeat a phrase', () => {
+    const instructions = tutorService.buildLiveInstructions({ weekReached: 5 });
+    expect(instructions).toMatch(/NEVER ASK THEM TO REPEAT/);
+    expect(instructions).toMatch(/say it once more/i);
+    expect(instructions).toMatch(/repeat after me/i);
+  });
+
+  it('puts the no-repeat rule in its own early paragraph, not buried in a bullet list', () => {
+    const instructions = tutorService.buildLiveInstructions({ weekReached: 5 });
+    const noRepeatIdx = instructions.indexOf('NEVER ASK THEM TO REPEAT');
+    const talkLikeIdx = instructions.indexOf('Talk like a real person');
+    expect(noRepeatIdx).toBeGreaterThan(-1);
+    expect(noRepeatIdx).toBeLessThan(talkLikeIdx);
+  });
+});
