@@ -61,7 +61,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/language_app
           REDIS_URL: redis://localhost:6379
-        run: npm test
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
 
   frontend:
     runs-on: ubuntu-latest
@@ -87,6 +90,9 @@ jobs:
 
       - name: Type check
         run: npm run type-check
+
+      - name: Run tests
+        run: npm test -- --watchAll=false
 
       - name: Build
         run: npm run build

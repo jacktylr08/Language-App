@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
 import { LanguageFlagBanner } from '@/components/LanguageFlagBanner';
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
   title: 'Fluenta — Learn Spanish for real',
@@ -17,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans">
+        <ServiceWorkerRegister />
         <div className="ambient" aria-hidden="true" />
         <LanguageFlagBanner />
         <main className="min-h-screen">{children}</main>

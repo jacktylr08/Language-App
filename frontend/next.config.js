@@ -20,7 +20,9 @@ const nextConfig = {
   headers: async () => {
     return [
       {
-        source: '/service-worker.js',
+        // next-pwa's real generated service worker — force revalidation on
+        // every load so an update is never stuck behind a cached copy.
+        source: '/sw.js',
         headers: [
           {
             key: 'Cache-Control',

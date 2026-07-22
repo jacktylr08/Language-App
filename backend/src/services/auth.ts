@@ -3,7 +3,18 @@ import bcryptjs from 'bcryptjs';
 import { User } from '@/models/User';
 import { logger } from '@/utils/logger';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
+const FALLBACK_JWT_SECRET = 'dev-secret-key-change-in-production';
+
+// That fallback string is sitting in source control, so it must never be the
+// real secret in production — anyone who's read the repo could otherwise
+// forge a token for any account. Refuse to boot rather than run insecurely.
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === FALLBACK_JWT_SECRET)) {
+  throw new Error(
+    'JWT_SECRET must be set to a real secret in production (it is currently unset or equal to the public dev fallback).'
+  );
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || FALLBACK_JWT_SECRET;
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '30d';
 

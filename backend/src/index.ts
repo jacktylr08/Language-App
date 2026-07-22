@@ -17,6 +17,15 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 3001;
 
+// Railway (and every platform PaaS) sits behind an edge proxy that sets
+// X-Forwarded-For on every request. Without `trust proxy`, express-rate-limit's
+// default keyGenerator throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR the moment
+// that header shows up — which took down every /auth/register and /auth/login
+// request in production (those two limiters are the only ones using the
+// default IP-based keyGenerator). `1` trusts exactly one hop, matching a
+// single reverse proxy in front of this process.
+app.set('trust proxy', 1);
+
 // CORS: scoped to CORS_ORIGIN (comma-separated) when set. Bearer-token auth
 // limits the real-world blast radius of a wide-open origin, but it should
 // still be locked down in production. Defaults to allow-all only so this

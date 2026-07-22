@@ -54,7 +54,7 @@ describe('Authentication Service', () => {
       expect(payload).toBeNull();
     });
 
-    it('should reject expired token', () => {
+    it('should reject expired token', async () => {
       // Create a token with very short expiry for testing
       const jwt = require('jsonwebtoken');
       const expiredToken = jwt.sign(
@@ -63,11 +63,13 @@ describe('Authentication Service', () => {
         { expiresIn: '0s' }
       );
 
-      // Wait a bit to ensure expiry
-      setTimeout(() => {
-        const payload = auth.verifyToken(expiredToken);
-        expect(payload).toBeNull();
-      }, 100);
+      // Wait a bit to ensure expiry — awaited so the assertion below actually
+      // runs before Jest considers the test complete (a bare setTimeout with
+      // no done callback previously let this test "pass" without ever
+      // checking anything).
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const payload = auth.verifyToken(expiredToken);
+      expect(payload).toBeNull();
     });
   });
 });

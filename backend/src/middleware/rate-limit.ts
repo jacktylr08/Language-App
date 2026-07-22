@@ -39,6 +39,29 @@ function userKey(req: AuthRequest): string {
   return req.userId || ipKeyGenerator(req.ip || 'unknown');
 }
 
+// A text chat turn happens once per message in a back-and-forth conversation,
+// so this needs real headroom for legitimate use — bounded mainly to stop a
+// runaway retry loop or a leaked token from running up an unbounded OpenAI bill.
+export const tutorChatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  message: tutorMessage,
+});
+
+// Reflection runs once at the end of a session (or a few times in a long one),
+// never per-message — much tighter headroom than chat is appropriate.
+export const tutorReflectLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  message: tutorMessage,
+});
+
 // One real-time voice session is several minutes of audio — generous but
 // bounded so a stuck client can't open unlimited sessions per hour.
 export const tutorRealtimeLimiter = rateLimit({

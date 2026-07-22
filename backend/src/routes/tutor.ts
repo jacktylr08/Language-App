@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import express from 'express';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
-import { tutorRealtimeLimiter, tutorSpeakLimiter, tutorWritingLimiter, pronunciationLimiter } from '@/middleware/rate-limit';
+import { tutorChatLimiter, tutorReflectLimiter, tutorRealtimeLimiter, tutorSpeakLimiter, tutorWritingLimiter, pronunciationLimiter } from '@/middleware/rate-limit';
 import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
 import { createRealtimeClientSecret, REALTIME_VOICES } from '@/services/openai-service';
@@ -50,7 +50,7 @@ function sanitizeMessages(messages: any[]): ChatMessage[] {
  * tutor isn't configured (no OPENAI_API_KEY), we answer 503 so the UI can
  * show a friendly "not switched on yet" notice instead of a hard error.
  */
-router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/chat', verifyToken, tutorChatLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { messages, focus, vocab, level, language, weekReached, knownVocab, weaknesses, strengths, profileSummary, learnerName, plan, pace, evaluation } =
       req.body ?? {};
@@ -105,7 +105,7 @@ router.post('/chat', verifyToken, async (req: AuthRequest, res: Response): Promi
  * POST /api/v1/tutor/reflect
  * Body: { messages: ChatMessage[], profile?: LearnerProfile }
  */
-router.post('/reflect', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/reflect', verifyToken, tutorReflectLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { messages, profile, language } = req.body ?? {};
 
