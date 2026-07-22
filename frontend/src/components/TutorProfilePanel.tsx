@@ -24,6 +24,7 @@ function relativeDate(iso: string): string {
 export function TutorProfilePanel() {
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [openTranscript, setOpenTranscript] = useState<string | null>(null);
 
   useEffect(() => {
     const refresh = () => setProfile(loadProfile());
@@ -117,21 +118,50 @@ export function TutorProfilePanel() {
                 Recent sessions
               </p>
               <ul className="space-y-3">
-                {visibleHistory.map((h, i) => (
-                  <li key={i} className="flex gap-3 text-sm">
-                    <span className="shrink-0 text-ink-soft/70 dark:text-stone-500 text-xs font-semibold w-20 pt-0.5">
-                      {relativeDate(h.date)}
-                    </span>
-                    <span className="text-ink dark:text-stone-200 leading-snug">
-                      {h.wasEvaluation && (
-                        <span className="mr-1.5 inline-block text-[10px] font-extrabold uppercase tracking-wide text-saffron-600 dark:text-saffron-400">
-                          Check-in
+                {visibleHistory.map((h, i) => {
+                  const isOpen = openTranscript === h.date;
+                  return (
+                    <li key={i}>
+                      <div className="flex gap-3 text-sm">
+                        <span className="shrink-0 text-ink-soft/70 dark:text-stone-500 text-xs font-semibold w-20 pt-0.5">
+                          {relativeDate(h.date)}
                         </span>
+                        <span className="text-ink dark:text-stone-200 leading-snug flex-1">
+                          {h.wasEvaluation && (
+                            <span className="mr-1.5 inline-block text-[10px] font-extrabold uppercase tracking-wide text-saffron-600 dark:text-saffron-400">
+                              Check-in
+                            </span>
+                          )}
+                          {h.note}
+                          {h.transcript && h.transcript.length > 0 && (
+                            <button
+                              onClick={() => setOpenTranscript(isOpen ? null : h.date)}
+                              className="ml-2 text-xs font-bold text-brand-600 dark:text-brand-400 whitespace-nowrap"
+                            >
+                              {isOpen ? 'Hide transcript' : 'View transcript'}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+
+                      {isOpen && h.transcript && (
+                        <div className="mt-2 ml-[92px] max-h-72 overflow-y-auto rounded-xl bg-paper dark:bg-paper-dark border border-stone-100 dark:border-stone-800 p-3 space-y-2">
+                          {h.transcript.map((turn, ti) => (
+                            <div
+                              key={ti}
+                              className={`text-[13px] leading-snug ${
+                                turn.role === 'user' ? 'text-ink dark:text-stone-200' : 'text-ink-soft dark:text-stone-400'
+                              }`}
+                            >
+                              <span className="font-bold">{turn.role === 'user' ? 'You: ' : 'Profe: '}</span>
+                              {turn.content}
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      {h.note}
-                    </span>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
               {history.length > 3 && (
                 <button

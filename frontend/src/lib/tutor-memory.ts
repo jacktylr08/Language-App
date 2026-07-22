@@ -19,6 +19,12 @@ export interface WeaknessReview {
   streak: number;
 }
 
+/** One turn of a session transcript. */
+export interface TranscriptTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 /** One completed session, for the "what we've covered" history log. */
 export interface SessionEntry {
   /** ISO timestamp of when the session was reflected on. */
@@ -29,6 +35,13 @@ export interface SessionEntry {
   mistakes: string[];
   /** True if this session was a periodic evaluation check-in. */
   wasEvaluation?: boolean;
+  /**
+   * The actual back-and-forth, so the learner can look back at exactly what
+   * was said — not just the one-line note. Capped per-session (turns and
+   * per-turn length) so the whole profile stays well within the sync size
+   * limit even with a full history of long calls.
+   */
+  transcript?: TranscriptTurn[];
 }
 
 export interface LearnerProfile {
@@ -56,6 +69,21 @@ const INTERVALS = [0, 1, 3, 7, 16, 35];
 const EVAL_EVERY = 5;
 // Keep the history log bounded — plenty for "what we've covered lately".
 const MAX_HISTORY = 20;
+// Per-session transcript bounds — generous for a real call (the tutor's own
+// turns are already kept to 1-3 short sentences), bounded so a full 20-session
+// history stays a small fraction of the state sync size limit even at worst case.
+const MAX_TRANSCRIPT_TURNS = 40;
+const MAX_TURN_CHARS = 300;
+
+/** Cap a transcript's length and each turn's size before storing it. */
+export function trimTranscript(
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+): TranscriptTurn[] {
+  return messages.slice(-MAX_TRANSCRIPT_TURNS).map((m) => ({
+    role: m.role,
+    content: m.content.length > MAX_TURN_CHARS ? m.content.slice(0, MAX_TURN_CHARS) + '…' : m.content,
+  }));
+}
 
 export function loadProfile(): LearnerProfile | null {
   if (typeof window === 'undefined') return null;
@@ -176,6 +204,7 @@ export async function reflectAndSave(
         note: fresh.sessionNote || 'Had a conversation with Profe.',
         mistakes: fresh.mistakes,
         wasEvaluation: wasEvaluation || undefined,
+        transcript: trimTranscript(messages),
       };
       fresh.history = [entry, ...(prev?.history ?? [])].slice(0, MAX_HISTORY);
 

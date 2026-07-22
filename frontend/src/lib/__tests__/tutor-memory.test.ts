@@ -1,4 +1,4 @@
-import { reconcileReviews, dueWeaknessesFirst, isEvaluationDue } from '../tutor-memory';
+import { reconcileReviews, dueWeaknessesFirst, isEvaluationDue, trimTranscript } from '../tutor-memory';
 import type { LearnerProfile } from '../tutor-memory';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -70,5 +70,33 @@ describe('isEvaluationDue', () => {
 
   it('is not due again immediately after an evaluation just happened', () => {
     expect(isEvaluationDue(baseProfile({ sessions: 5, lastEvalSession: 5 }))).toBe(false);
+  });
+});
+
+describe('trimTranscript', () => {
+  it('passes short conversations through unchanged', () => {
+    const messages = [
+      { role: 'user' as const, content: 'Hola' },
+      { role: 'assistant' as const, content: '¡Hola! ¿Cómo estás?' },
+    ];
+    expect(trimTranscript(messages)).toEqual(messages);
+  });
+
+  it('keeps only the most recent turns once a call runs long', () => {
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = Array.from(
+      { length: 60 },
+      (_, i) => ({ role: i % 2 === 0 ? 'user' : 'assistant', content: `turn ${i}` })
+    );
+    const trimmed = trimTranscript(messages);
+    expect(trimmed).toHaveLength(40);
+    expect(trimmed[0].content).toBe('turn 20'); // the oldest 20 turns were dropped
+    expect(trimmed[trimmed.length - 1].content).toBe('turn 59');
+  });
+
+  it('truncates an unusually long single turn instead of storing it whole', () => {
+    const longTurn = 'x'.repeat(1000);
+    const trimmed = trimTranscript([{ role: 'user', content: longTurn }]);
+    expect(trimmed[0].content.length).toBeLessThan(400);
+    expect(trimmed[0].content.endsWith('…')).toBe(true);
   });
 });
