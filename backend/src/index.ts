@@ -7,9 +7,6 @@ import { initRedis } from '@/config/redis';
 import { knexInstance } from '@/config/database';
 import { errorHandler } from '@/middleware/auth';
 import authRoutes from '@/routes/auth';
-import lessonsRoutes from '@/routes/lessons';
-import vocabularyRoutes from '@/routes/vocabulary';
-import reviewsRoutes from '@/routes/reviews';
 import tutorRoutes from '@/routes/tutor';
 import stateRoutes from '@/routes/state';
 
@@ -39,9 +36,6 @@ app.get('/api/v1/status', (_req: Request, res: Response) => {
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/lessons', lessonsRoutes);
-app.use('/api/v1/vocabulary', vocabularyRoutes);
-app.use('/api/v1/reviews', reviewsRoutes);
 app.use('/api/v1/tutor', tutorRoutes);
 app.use('/api/v1/state', stateRoutes);
 
@@ -80,7 +74,7 @@ const start = async (): Promise<void> => {
       logger.warn(`Redis unavailable — continuing without cache: ${err.message}`)
     );
 
-  // Database: connect, migrate, and seed automatically.
+  // Database: connect and migrate automatically.
   try {
     await knexInstance.raw('SELECT 1');
     logger.info('Database connected');
@@ -93,38 +87,6 @@ const start = async (): Promise<void> => {
       logger.info(`Ran ${applied.length} migration(s) (batch ${batch})`);
     } else {
       logger.info('Database schema up to date');
-    }
-
-    // Seed when there are no lessons yet OR when Phase 1 lessons are missing.
-    // The seed only touches content tables (never users or their progress),
-    // so this is safe to run on a database that already has registered users.
-    const [{ count }] = await knexInstance('lessons').count('id as count');
-    const phase1Lesson = await knexInstance('lessons')
-      .where('title', 'Phonetics & First Sounds')
-      .first();
-
-    if (Number(count) === 0 || !phase1Lesson) {
-      logger.info(
-        `Seeding content (lessons=${count}, phase1Exists=${!!phase1Lesson})...`
-      );
-      await knexInstance.seed.run({
-        directory: path.join(__dirname, 'database/seeds'),
-      });
-      logger.info('Seed data inserted');
-    } else {
-      logger.info(`Content already seeded (${count} lessons, Phase 1 present)`);
-    }
-
-    // One-off data hygiene: earlier seeds stored non-existent placeholder
-    // audio URLs, which render a broken player. Null them out so the
-    // lesson UI cleanly omits the audio section. Idempotent.
-    const cleaned = await knexInstance('lessons')
-      .where('audio_url', 'like', '%audio.placeholder.com%')
-      .orWhere('audio_url', 'like', '/audio/lesson-%')
-      .orWhere('audio_url', 'like', 'https://example.com/audio/%')
-      .update({ audio_url: null });
-    if (cleaned > 0) {
-      logger.info(`Cleared ${cleaned} placeholder audio URL(s)`);
     }
   } catch (error) {
     logger.error(
