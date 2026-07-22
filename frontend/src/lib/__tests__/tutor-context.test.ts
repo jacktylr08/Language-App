@@ -45,4 +45,20 @@ describe('buildTutorContext', () => {
     const ctx = buildTutorContext('daily-verbs');
     expect(ctx.focus).toBe('Daily Action Verbs');
   });
+
+  it('regression: the plan reflects the specific lesson, not a generic theme bucket', () => {
+    // Reported bug: "ser-identity" (introduce yourself, say where you're
+    // from) shares its `theme` ('verbs') with the unrelated "daily-verbs"
+    // lesson (talk about your daily routine). Deriving the topic from theme
+    // alone made the tutor ask generic "how's your day" chit-chat instead of
+    // anything about identity — the plan must use the lesson's own
+    // description instead.
+    completeLessonLocal('greetings-essentials', 90);
+    completeLessonLocal('ser-identity', 85);
+
+    const ctx = buildTutorContext();
+
+    expect(ctx.plan).toContain('Introduce yourself and describe people');
+    expect(ctx.plan).not.toMatch(/day to day/i);
+  });
 });

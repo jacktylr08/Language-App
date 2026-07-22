@@ -174,15 +174,19 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     ? `Recently they've covered: ${insights.coveredRecently.join(', ')}. `
     : '';
 
+  // Use the lesson's own hand-written description as the topic — not a
+  // coarse per-theme bucket. Themes like "verbs" cover both "ser-identity"
+  // (introduce yourself) AND "daily-verbs" (your daily routine): collapsing
+  // those into one generic goal is exactly what made calls feel generic
+  // instead of tailored to what was actually just taught.
   const plan =
-    `Practise and build confidence with what the learner has ALREADY learned — everything up to week ${weekReached}, and NOTHING beyond it. ` +
-    `Anchor today around their recent lesson "${lesson.title}"${
+    `TODAY'S TOPIC — make the conversation genuinely explore this, not generic small talk: their most recent lesson was "${lesson.title}"${
       lesson.subtitle ? ` (${lesson.subtitle})` : ''
-    }. ` +
+    } — ${lesson.description} ` +
     coveredLine +
-    (targetWords ? `Naturally reuse some of these words they know: ${targetWords}. ` : '') +
-    `The real goal is for them to get comfortable being able to ${canDoGoal(lesson.theme)}. ` +
-    `Keep it a flowing conversation, not a checklist.`;
+    (targetWords ? `Words from it to naturally reuse: ${targetWords}. ` : '') +
+    `Practise and build confidence with what the learner has ALREADY learned — everything up to week ${weekReached}, and NOTHING beyond it. ` +
+    `Keep it a flowing conversation, not a checklist — but steer it toward this actual topic rather than defaulting to "how's your day".`;
 
   return {
     level,
