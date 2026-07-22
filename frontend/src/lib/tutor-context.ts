@@ -35,6 +35,10 @@ export interface TutorContext {
   strengths: string[];
   /** Running summary of the learner from past conversations. */
   profileSummary?: string;
+  /** The diary note from the learner's most recent session, if any. */
+  lastSessionNote?: string;
+  /** Days since that last session (0 = today). */
+  daysSinceLastSession?: number;
 }
 
 // vocab id -> Spanish, built once.
@@ -147,6 +151,13 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   ]).slice(0, 16);
   const strengths = dedupe([...(profile?.strengths ?? []), ...insights.strongVocab]).slice(0, 14);
 
+  // The most recent session, so the tutor can pick the conversation back up
+  // like a real person would ("how did that go since last time?").
+  const lastSession = profile?.history?.[0];
+  const daysSinceLastSession = lastSession
+    ? Math.max(0, Math.floor((Date.now() - new Date(lastSession.date).getTime()) / (24 * 60 * 60 * 1000)))
+    : undefined;
+
   // Session focus: an explicit lesson (if launched from one), else the learner's
   // most recent completed lesson — so every call consolidates learned material
   // and never drifts into lessons they haven't done.
@@ -185,5 +196,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     weaknesses,
     strengths,
     profileSummary: profile?.summary,
+    lastSessionNote: lastSession?.note,
+    daysSinceLastSession,
   };
 }

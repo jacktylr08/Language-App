@@ -43,6 +43,10 @@ export interface TutorChatOptions {
   pace?: 'slow' | 'steady' | 'brisk';
   /** When true, run a short, friendly evaluation conversation. */
   evaluation?: boolean;
+  /** The diary note from the learner's most recent session, if any. */
+  lastSessionNote?: string;
+  /** Days since that last session (0 = today). */
+  daysSinceLastSession?: number;
 }
 
 /** Shared prompt fragments so the text chat and the live call stay consistent. */
@@ -56,6 +60,17 @@ function paceFragment(pace?: string): string {
 function evaluationFragment(on?: boolean): string {
   if (!on) return '';
   return " \n\nThis session doubles quietly as a check-in. WITHOUT announcing it or making it feel like a test, steer the natural conversation so it happens to touch a few areas of recent material and their known weak spots. Just notice how they do — do not quiz them or rattle off questions. It should feel like any other chat.";
+}
+/**
+ * A real tutor remembers their student between lessons. This gives the model
+ * something concrete to (optionally, casually) pick back up on — never a
+ * scripted recap, and never forced into every single call.
+ */
+function memoryCallbackFragment(note?: string, days?: number): string {
+  if (!note) return '';
+  const when =
+    days === undefined ? 'last time' : days <= 0 ? 'earlier today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  return ` From ${when}: "${note}"`;
 }
 
 /** Persisted learner profile — the tutor's memory of one learner. */
@@ -300,8 +315,13 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
     const evalLine = evaluationFragment(opts.evaluation);
 
     // Open like a real person picking up a conversation — no lesson-plan
-    // announcement, no scripted "let's revisit your weak spot".
-    const callback = `\n\nStart the call the way a real tutor would: a quick, warm hello and ONE easy, genuine question to get them talking (their day, their weekend, how they're feeling). Don't announce a plan or list what you'll cover.`;
+    // announcement, no scripted "let's revisit your weak spot". If there's
+    // something memorable from last time, it's material the tutor MAY use —
+    // not a mandatory recap.
+    const memory = memoryCallbackFragment(opts.lastSessionNote, opts.daysSinceLastSession);
+    const callback = memory
+      ? `\n\nStart the call the way a real tutor would: a quick, warm hello.${memory} If — and only if — it feels natural, casually pick that back up in your own words early on (e.g. "hey, how did things go with…" or "did you get a chance to…"), the way someone genuinely remembers their student between lessons. Never recite it verbatim, never make it sound like a report, and don't force it if it doesn't fit — a plain, genuine "how's your day been?" is just as good. Either way, get to ONE easy question quickly and let them talk.`
+      : `\n\nStart the call the way a real tutor would: a quick, warm hello and ONE easy, genuine question to get them talking (their day, their weekend, how they're feeling). Don't announce a plan or list what you'll cover.`;
 
     return `You are "Profe", a warm, genuinely human Spanish tutor on a LIVE VOICE CALL with a ${level} learner. Picture a great private one-to-one class: relaxed, engaged, genuinely interested in the person in front of you.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}
 

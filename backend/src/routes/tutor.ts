@@ -157,6 +157,8 @@ router.post('/realtime', verifyToken, async (req: AuthRequest, res: Response): P
       plan: typeof b.plan === 'string' ? b.plan.slice(0, 800) : undefined,
       pace: b.pace === 'slow' || b.pace === 'brisk' ? b.pace : undefined,
       evaluation: b.evaluation === true,
+      lastSessionNote: typeof b.lastSessionNote === 'string' ? b.lastSessionNote.slice(0, 200) : undefined,
+      daysSinceLastSession: typeof b.daysSinceLastSession === 'number' ? b.daysSinceLastSession : undefined,
     });
 
     const session = await createRealtimeClientSecret({ instructions });

@@ -79,6 +79,8 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           weaknesses: c?.weaknesses,
           strengths: c?.strengths,
           profileSummary: c?.profileSummary,
+          lastSessionNote: c?.lastSessionNote,
+          daysSinceLastSession: c?.daysSinceLastSession,
         });
         return { token: res.data.token as string, model: res.data.model as string };
       } catch (err: any) {
