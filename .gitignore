@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .next/
+.claude/worktrees/
 .DS_Store
 *.log
 .env
