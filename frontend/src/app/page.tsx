@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import { CourseChip } from '@/components/CourseChip';
+import { useRedirectIfAuthenticated } from '@/lib/hooks';
 
 const phases = [
   { n: '01', title: 'Foundations', desc: 'Your first words, sounds and sentences.' },
@@ -11,6 +14,22 @@ const phases = [
 ];
 
 export default function HomePage() {
+  // Already signed in? This landing page ("start learning") is for visitors —
+  // bounce straight to the real dashboard instead, same pattern as /login
+  // and /register redirecting an already-authenticated visitor away from
+  // forms they don't need. This is also what makes clicking the "Fluenta"
+  // wordmark from anywhere in the app behave like a real home button: signed
+  // in takes you to your dashboard, signed out takes you to this page.
+  const { isLoading: redirectLoading } = useRedirectIfAuthenticated();
+
+  if (redirectLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <nav className="sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
