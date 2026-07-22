@@ -244,6 +244,24 @@ export default function LessonsPage() {
         </span>
       </Link>
 
+      {/* Extensive reading — real Spanish text, tap to translate */}
+      <Link
+        href="/read"
+        className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-violet-500 via-violet-400 to-purple-500 p-5 shadow-glow transition-transform active:scale-[0.99]"
+      >
+        <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
+          📖
+        </div>
+        <p className="font-extrabold text-white text-lg">Read in Spanish</p>
+        <p className="text-white/90 text-sm mt-1 leading-snug">
+          Short passages at your level — tap any word instead of a full translation.
+        </p>
+        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
+          Start reading
+          <span className="transition-transform group-hover:translate-x-1">→</span>
+        </span>
+      </Link>
+
       {/* Review your mistakes — built from what you've got wrong */}
       {mistakes > 0 && (
         <Link

@@ -315,13 +315,18 @@ export function normalizeToken(raw: string): string {
     .replace(/["'»).,;:!?\]—-]+$/, '');
 }
 
-// Single-word vocab -> {id, en}, built once. Multi-word entries ("por
-// favor") aren't reachable by per-token lookup — a passage's own glossary
-// covers those explicitly where needed.
+// Single-word vocab -> {id, en}, built once. Most tracked nouns are stored
+// WITH their article ("la familia", "el hermano") since that's how they're
+// taught — strip a leading article so the bare noun (as it actually appears
+// mid-sentence in a reading passage) still resolves. Genuinely multi-word
+// phrases beyond that ("por favor") still aren't reachable by per-token
+// lookup — a passage's own glossary covers those explicitly where needed.
+const ARTICLE_PREFIX = /^(el|la|los|las|un|una)\s+/i;
 const vocabByToken = new Map<string, { id: string; en: string }>();
 for (const v of getAllVocab()) {
-  if (!v.es.includes(' ')) {
-    vocabByToken.set(v.es.toLowerCase(), { id: v.id, en: v.en });
+  const bare = v.es.replace(ARTICLE_PREFIX, '');
+  if (!bare.includes(' ')) {
+    vocabByToken.set(bare.toLowerCase(), { id: v.id, en: v.en });
   }
 }
 
@@ -341,6 +346,13 @@ export function lookupWord(rawToken: string, passage: ReadingPassage): WordLooku
   return null;
 }
 
+export interface ReadingResult {
+  /** Unique tracked words read straight through without ever tapping. */
+  recognized: number;
+  /** Unique tracked words tapped for help — scheduled for review sooner. */
+  reviewed: number;
+}
+
 /**
  * Called once, when the learner finishes a passage. `tappedVocabIds` is
  * every unique tracked word they tapped at least once (they needed help) —
@@ -351,14 +363,23 @@ export function lookupWord(rawToken: string, passage: ReadingPassage): WordLooku
  * at all — they're supplementary reading vocabulary, not part of the core
  * tracked list.
  */
-export function reconcileReadingProgress(passage: ReadingPassage, tappedVocabIds: Set<string>): void {
+export function reconcileReadingProgress(
+  passage: ReadingPassage,
+  tappedVocabIds: Set<string>
+): ReadingResult {
   const seen = new Set<string>();
+  let recognized = 0;
+  let reviewed = 0;
   for (const raw of passage.text.split(/\s+/)) {
     const key = normalizeToken(raw);
     if (!key || seen.has(key)) continue;
     const tracked = vocabByToken.get(key);
     if (!tracked) continue;
     seen.add(key);
-    recordWordResult(tracked.id, !tappedVocabIds.has(tracked.id), true);
+    const knewIt = !tappedVocabIds.has(tracked.id);
+    recordWordResult(tracked.id, knewIt, true);
+    if (knewIt) recognized += 1;
+    else reviewed += 1;
   }
+  return { recognized, reviewed };
 }
