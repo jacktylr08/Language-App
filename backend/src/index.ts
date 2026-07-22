@@ -15,8 +15,20 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 3001;
 
+// CORS: scoped to CORS_ORIGIN (comma-separated) when set. Bearer-token auth
+// limits the real-world blast radius of a wide-open origin, but it should
+// still be locked down in production. Defaults to allow-all only so this
+// doesn't silently break the app before the env var is configured — set
+// CORS_ORIGIN to the real frontend URL(s) to close this off.
+const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean);
+if (!corsOrigins?.length) {
+  logger.warn(
+    'CORS_ORIGIN is not set — allowing all origins. Set it to your frontend URL(s) (comma-separated) to lock this down.'
+  );
+}
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOrigins?.length ? { origin: corsOrigins } : undefined));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

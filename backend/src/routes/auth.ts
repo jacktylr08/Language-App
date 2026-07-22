@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import Joi from 'joi';
 import { auth } from '@/services/auth';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
+import { loginLimiter, registerLimiter } from '@/middleware/rate-limit';
 import { logger } from '@/utils/logger';
 
 const router = Router();
@@ -22,7 +23,7 @@ const changePasswordSchema = Joi.object({
 });
 
 // Register
-router.post('/register', async (req, res: Response): Promise<void> => {
+router.post('/register', registerLimiter, async (req, res: Response): Promise<void> => {
   try {
     const { error, value } = registerSchema.validate(req.body);
     if (error) {
@@ -45,7 +46,7 @@ router.post('/register', async (req, res: Response): Promise<void> => {
 });
 
 // Login
-router.post('/login', async (req, res: Response): Promise<void> => {
+router.post('/login', loginLimiter, async (req, res: Response): Promise<void> => {
   try {
     const { error, value } = loginSchema.validate(req.body);
     if (error) {

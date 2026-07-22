@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
+import { tutorRealtimeLimiter, tutorSpeakLimiter } from '@/middleware/rate-limit';
 import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
 import { createRealtimeClientSecret } from '@/services/openai-service';
@@ -142,7 +143,7 @@ router.post('/reflect', verifyToken, async (req: AuthRequest, res: Response): Pr
  * never the API key. The browser uses the token to open a WebRTC connection
  * directly to OpenAI. 503 when the tutor isn't configured.
  */
-router.post('/realtime', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const b = req.body ?? {};
     const instructions = tutorService.buildLiveInstructions({
@@ -190,7 +191,7 @@ router.post('/realtime', verifyToken, async (req: AuthRequest, res: Response): P
  * Returns audio/mpeg on success. If voice isn't configured (no OPENAI_API_KEY)
  * we answer 503 so the client can fall back to the free browser voice.
  */
-router.post('/speak', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/speak', verifyToken, tutorSpeakLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { text } = req.body ?? {};
     if (typeof text !== 'string' || !text.trim()) {
