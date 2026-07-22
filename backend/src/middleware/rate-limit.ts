@@ -60,3 +60,14 @@ export const tutorSpeakLimiter = rateLimit({
   keyGenerator: userKey,
   message: tutorMessage,
 });
+
+// One grading call per writing exercise — at most a handful per lesson, so
+// this just needs to stop abuse, not accommodate heavy legitimate use.
+export const tutorWritingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  message: tutorMessage,
+});

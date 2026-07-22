@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
-import { tutorRealtimeLimiter, tutorSpeakLimiter } from '@/middleware/rate-limit';
+import { tutorRealtimeLimiter, tutorSpeakLimiter, tutorWritingLimiter } from '@/middleware/rate-limit';
 import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
 import { createRealtimeClientSecret } from '@/services/openai-service';
@@ -213,6 +213,47 @@ router.post('/speak', verifyToken, tutorSpeakLimiter, async (req: AuthRequest, r
     // Don't log the raw arraybuffer error body — just the status.
     logger.error('Tutor speak error:', err?.response?.status ?? '', err?.message ?? err);
     res.status(502).json({ error: 'The voice service failed.' });
+  }
+});
+
+/**
+ * Grade a free-composition writing exercise — the learner writes their own
+ * Spanish (not picking from options), and since any number of sentences
+ * could correctly answer the same prompt, this needs a tutor's judgement
+ * rather than an exact-match check.
+ *
+ * POST /api/v1/tutor/grade-writing
+ * Body: { instruction: string, suggestedVocab?: string[], answer: string, level?: string }
+ */
+router.post('/grade-writing', verifyToken, tutorWritingLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { instruction, suggestedVocab, answer, level } = req.body ?? {};
+
+    if (typeof instruction !== 'string' || !instruction.trim()) {
+      res.status(400).json({ error: 'instruction is required' });
+      return;
+    }
+    if (typeof answer !== 'string' || !answer.trim()) {
+      res.status(400).json({ error: 'answer is required' });
+      return;
+    }
+
+    const result = await tutorService.gradeWriting({
+      level: typeof level === 'string' ? level : 'beginner',
+      instruction: instruction.trim().slice(0, 300),
+      suggestedVocab: strList(suggestedVocab)?.slice(0, 10) ?? [],
+      answer: answer.trim().slice(0, 600),
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : 'Failed to grade the answer';
+    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
+      res.status(503).json({ error: message, code: 'tutor_not_configured' });
+      return;
+    }
+    logger.error('Writing grading error:', err?.response?.status ?? '', message);
+    res.status(500).json({ error: message });
   }
 });
 

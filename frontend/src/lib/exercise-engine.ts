@@ -32,7 +32,8 @@ export type ExerciseType =
   | 'type_es' // see English, type the Spanish
   | 'fill_blank' // complete the sentence
   | 'match_pairs' // match Spanish to English
-  | 'speak'; // say the Spanish out loud
+  | 'speak' // say the Spanish out loud
+  | 'write_answer'; // free composition, graded by the tutor
 
 export interface Exercise {
   type: ExerciseType;
@@ -53,6 +54,8 @@ export interface Exercise {
   build?: SentenceBuild;
   /** For build_sentence: shuffled word tiles (correct words + distractors) */
   tiles?: string[];
+  /** For write_answer: the free-composition prompt and words to try using */
+  writingPrompt?: { instruction: string; suggested: string[] };
   /** Don't record this result against a real vocab word (synthetic anchors) */
   noWordTracking?: boolean;
   /** Marks re-queued exercises after a miss */
@@ -174,6 +177,27 @@ export function sentenceTiles(es: string): string[] {
     .filter((w) => w.length > 0);
 }
 
+/**
+ * The capstone production task: no options to pick from, no tiles to arrange
+ * — just write. Nudges the learner toward a few of this lesson's own words
+ * (stripped of leading articles/pronouns so they read as bare vocabulary),
+ * but the prompt is deliberately open so any genuine attempt is gradeable.
+ */
+function writeAnswer(lesson: CurriculumLesson): Exercise {
+  const suggested = shuffle(lesson.vocab)
+    .slice(0, 3)
+    .map((w) => w.es.replace(/^(el|la|los|las|yo|tú|él|ella|nosotros)\s+/i, ''));
+  return {
+    type: 'write_answer',
+    word: syntheticWord(`wa-${lesson.slug}`, '', ''),
+    writingPrompt: {
+      instruction: 'Write 1–2 sentences in Spanish using at least two of these words.',
+      suggested,
+    },
+    noWordTracking: true,
+  };
+}
+
 function buildSentence(build: SentenceBuild, lessonSlug: string, idx: number, pool: VocabItem[]): Exercise {
   const words = sentenceTiles(build.es);
   const inSentence = new Set(words.map((w) => w.toLowerCase()));
@@ -252,6 +276,10 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
   (lesson.builds ?? []).forEach((b, i) => {
     queue.push(buildSentence(b, lesson.slug, i, pool));
   });
+
+  // 5b. Free composition — the real test: write your own sentence, no
+  // scaffolding. One per lesson, as the capstone before the challenge round.
+  if (vocab.length >= 3) queue.push(writeAnswer(lesson));
 
   // 6. Challenge round: harder production on a sample of the vocab
   const challenge = shuffle(vocab).slice(0, 6);
@@ -378,6 +406,11 @@ export function buildRetry(missed: Exercise, pool: VocabItem[]): Exercise {
     case 'concept_check':
     case 'build_sentence':
       retry = { ...missed, tiles: missed.tiles ? shuffle(missed.tiles) : undefined };
+      break;
+    // Same prompt again — the point is to have another go with the tutor's
+    // corrected version fresh in mind, not to test a different word.
+    case 'write_answer':
+      retry = { ...missed };
       break;
     case 'type_es':
     case 'speak':

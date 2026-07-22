@@ -267,6 +267,55 @@ Be specific and actionable — these notes decide what the tutor drills next tim
       updatedAt: new Date().toISOString(),
     };
   }
+
+  /**
+   * Grade a learner's free-composition writing answer — the one exercise type
+   * that can't be checked by exact string match, since any number of correct
+   * Spanish sentences could satisfy the same prompt. A real tutor reads what
+   * you wrote, judges it on its own terms, and gives one encouraging but
+   * honest note plus a natural-sounding corrected version.
+   */
+  async gradeWriting(opts: {
+    level: string;
+    instruction: string;
+    suggestedVocab: string[];
+    answer: string;
+  }): Promise<{ correct: boolean; feedback: string; corrected: string }> {
+    const system = `You are "Profe", a warm Spanish tutor marking one short piece of free writing from a ${opts.level} learner.
+
+The prompt they were given: "${opts.instruction}"
+Words they were nudged to try using (not mandatory): ${opts.suggestedVocab.join(', ') || 'none specified'}.
+
+Judge their answer on its own terms — does it make sense, is it recognisably Spanish, does it respond to the prompt? Minor typos, missing accents, or a slightly different word choice than expected are all FINE — this is not a strict dictation test. Only mark it incorrect if it's not real Spanish, doesn't address the prompt at all, or is mostly the English left untranslated.
+
+Return a JSON object with EXACTLY these keys:
+{
+  "correct": boolean,   // true if this is a genuine, reasonable attempt at the prompt
+  "feedback": string,   // ONE short, warm sentence (under 140 chars) — what's good, or the one thing to fix. Never a wall of text.
+  "corrected": string   // a natural, correct Spanish version of what they were trying to say. If their answer was already great, this can match it closely.
+}
+
+Return ONLY the JSON object.`;
+
+    const raw = await openaiChat(
+      system,
+      [{ role: 'user', content: opts.answer }],
+      { maxTokens: 300, temperature: 0.3, json: true }
+    );
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Could not parse writing feedback from the model');
+    }
+
+    return {
+      correct: parsed.correct === true,
+      feedback: typeof parsed.feedback === 'string' ? parsed.feedback.slice(0, 200) : '',
+      corrected: typeof parsed.corrected === 'string' ? parsed.corrected.slice(0, 300) : opts.answer,
+    };
+  }
 }
 
 export const tutorService = new TutorService();

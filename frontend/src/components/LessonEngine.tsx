@@ -14,6 +14,8 @@ import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession,
 import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { addXp, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
+import { buildTutorContext } from '@/lib/tutor-context';
+import { api } from '@/lib/api';
 
 type Feedback =
   | { kind: 'correct'; note?: string }
@@ -61,6 +63,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const [pairShake, setPairShake] = useState<string | null>(null);
   const [pairMistakes, setPairMistakes] = useState(0);
   const [pickedTiles, setPickedTiles] = useState<number[]>([]);
+  const [writingText, setWritingText] = useState('');
+  const [gradingWriting, setGradingWriting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
 
@@ -89,6 +93,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     setPairSelection(null);
     setPairMistakes(0);
     setPickedTiles([]);
+    setWritingText('');
+    setGradingWriting(false);
     setFeedback(null);
     if (!current || !started) return;
     if (current.type === 'teach') {
@@ -212,6 +218,28 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     else if (quality === 'accents') grade(true, current.word.es, `Watch the accents: ${current.word.es}`);
     else if (quality === 'close') grade(true, current.word.es, `Almost — it's spelled: ${current.word.es}`);
     else grade(false, current.word.es);
+  };
+
+  const submitWriting = async () => {
+    if (feedback || !current?.writingPrompt || !writingText.trim() || gradingWriting) return;
+    setGradingWriting(true);
+    try {
+      const { level } = buildTutorContext();
+      const res = await api.post('/tutor/grade-writing', {
+        instruction: current.writingPrompt.instruction,
+        suggestedVocab: current.writingPrompt.suggested,
+        answer: writingText.trim(),
+        level,
+      });
+      const { correct, feedback: note, corrected } = res.data ?? {};
+      grade(!!correct, typeof corrected === 'string' ? corrected : '', note || undefined);
+    } catch {
+      // The tutor's grading is a nice-to-have, not a gate — if it's not
+      // configured or the network hiccups, don't block the learner's progress.
+      grade(true, '', "Couldn't check that automatically this time — no worries, moving on.");
+    } finally {
+      setGradingWriting(false);
+    }
   };
 
   const startListening = async () => {
@@ -357,6 +385,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   {(lesson.builds ?? []).length > 0 && (
                     <li>🔨 Build {lesson.builds!.length} full sentences yourself</li>
                   )}
+                  {lesson.vocab.length >= 3 && <li>✍️ Write your own sentence, marked by Profe</li>}
                 </ul>
               </div>
             )}
@@ -702,6 +731,47 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           </div>
         )}
 
+        {current.type === 'write_answer' && current.writingPrompt && (
+          <div className="flex-1 flex flex-col justify-center">
+            <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
+              ✍️ Write it yourself
+            </p>
+            <p className="font-display text-center text-2xl font-black text-ink dark:text-white mb-4 leading-snug">
+              {current.writingPrompt.instruction}
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center mb-5">
+              {current.writingPrompt.suggested.map((w, i) => (
+                <span
+                  key={i}
+                  className="px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-sm font-bold text-brand-700 dark:text-brand-300"
+                >
+                  {w}
+                </span>
+              ))}
+            </div>
+            <textarea
+              value={writingText}
+              onChange={(e) => setWritingText(e.target.value)}
+              disabled={!!feedback || gradingWriting}
+              placeholder="Escribe en español…"
+              rows={3}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full text-lg px-5 py-4 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark-soft text-ink dark:text-white shadow-card dark:shadow-card-dark focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all resize-none"
+            />
+            {!feedback && (
+              <button
+                onClick={submitWriting}
+                disabled={!writingText.trim() || gradingWriting}
+                className="mt-6 btn-primary w-full py-4"
+              >
+                {gradingWriting ? 'Checking…' : 'CHECK'}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Continue button for ungraded teaching cards */}
         {(current.type === 'teach' ||
           current.type === 'grammar_slide' ||
@@ -755,7 +825,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                 {feedback.kind === 'wrong' && feedback.correctAnswer && (
                   <div className="text-sm text-terra-600 dark:text-terra-300 mt-1">
                     <p>
-                      Correct answer: <span className="font-bold">{feedback.correctAnswer}</span>
+                      {current.type === 'write_answer' ? 'A natural way to say it: ' : 'Correct answer: '}
+                      <span className="font-bold">{feedback.correctAnswer}</span>
                     </p>
                     {feedback.note && (
                       <p className="mt-1.5 bg-white/60 dark:bg-black/20 rounded-lg px-3 py-2 leading-snug">
