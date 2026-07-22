@@ -9,7 +9,7 @@
  * into random phrases.
  */
 import { curriculum, type CurriculumLesson } from './curriculum';
-import { loadProgress } from './progress';
+import { loadProgress, weekReachedFor } from './progress';
 import { loadProfile, isEvaluationDue, dueWeaknessesFirst } from './tutor-memory';
 import { buildLessonInsights } from './learner-insights';
 import { loadLearnerGoal, GOAL_LABELS, type LearnerGoal } from './learner-goal';
@@ -120,11 +120,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
       .map(([slug]) => slug)
   );
 
-  // Reached week = highest week done or placed-out-of (default: week 1).
-  let weekReached = 1;
-  for (const lesson of curriculum) {
-    if (doneOrPlaced.has(lesson.slug)) weekReached = Math.max(weekReached, lesson.week);
-  }
+  const weekReached = weekReachedFor(progress);
 
   // Known vocab: everything from lessons done or placed-out-of (a learner
   // placed ahead at onboarding said they already know this — Profe should

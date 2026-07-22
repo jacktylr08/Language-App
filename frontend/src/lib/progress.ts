@@ -61,6 +61,15 @@ export function isLessonDone(rec?: LessonRecord): boolean {
   return !!(rec?.completed || rec?.skipped);
 }
 
+/** Highest course week behind the learner — done or placed-out-of. Default: week 1. */
+export function weekReachedFor(state: ProgressState): number {
+  let week = 1;
+  for (const lesson of curriculum) {
+    if (isLessonDone(state.lessons[lesson.slug])) week = Math.max(week, lesson.week);
+  }
+  return week;
+}
+
 export interface ProgressState {
   streak: number;
   bestStreak: number;
