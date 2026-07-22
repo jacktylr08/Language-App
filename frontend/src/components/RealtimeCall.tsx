@@ -24,6 +24,11 @@ const STATE_LABEL: Record<RealtimeState, string> = {
   closed: 'Ended',
 };
 
+// If we've been "listening" this long with nothing transcribed, the mic is
+// probably not actually picking anything up (common on mobile) — say so
+// instead of leaving the learner staring at a silent orb.
+const QUIET_HINT_MS = 12000;
+
 export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [state, setState] = useState<RealtimeState>('connecting');
   const [assistantLine, setAssistantLine] = useState('');
@@ -32,6 +37,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [notConfigured, setNotConfigured] = useState(false);
   const [muted, setMuted] = useState(false);
   const [started, setStarted] = useState(false);
+  const [quietHint, setQuietHint] = useState(false);
 
   const sessionRef = useRef<RealtimeSession | null>(null);
   const endedRef = useRef(false);
@@ -46,11 +52,20 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     onClose(transcript);
   });
 
-  // Connect the call. Triggered by the learner's tap — that gesture is what
-  // lets the browser grant the mic and play the tutor's audio.
-  const connect = useCallback(() => {
+  // (Re)connect the call. Always closes any previous session first, so a
+  // retry after a stuck/failed attempt can never pile a second live mic
+  // stream + peer connection on top of one still mid-setup — that pile-up is
+  // what made the app appear to freeze on a second tap.
+  const startCall = useCallback(() => {
+    sessionRef.current?.close();
+    sessionRef.current = null;
+
     setStarted(true);
     setError('');
+    setQuietHint(false);
+    setUserLine('');
+    setAssistantLine('');
+
     if (!realtimeSupported()) {
       setError('unsupported');
       return;
@@ -108,6 +123,15 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Flag when "listening" has gone quiet for a while with nothing heard —
+  // the clearest sign the mic isn't actually capturing on this device.
+  useEffect(() => {
+    setQuietHint(false);
+    if (state !== 'listening') return;
+    const t = setTimeout(() => setQuietHint(true), QUIET_HINT_MS);
+    return () => clearTimeout(t);
+  }, [state, userLine]);
+
   const toggleMute = () => {
     setMuted((m) => {
       sessionRef.current?.setMuted(!m);
@@ -117,6 +141,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
 
   const active = state === 'user_speaking' || state === 'listening';
   const speaking = state === 'assistant_speaking';
+  const hasError = !!error && error !== 'unsupported';
 
   // Ready screen: one tap starts the conversation (and grants mic + audio).
   if (!started) {
@@ -143,7 +168,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
               : 'A live Spanish chat. Speak naturally; Profe listens and talks back.'}
           </p>
           <button
-            onClick={connect}
+            onClick={startCall}
             className="mt-9 h-16 px-10 rounded-full bg-gradient-to-r from-brand-500 to-brand-600 text-white font-extrabold text-lg shadow-glow hover:brightness-105 transition-all inline-flex items-center gap-3"
           >
             🎙️ Start talking
@@ -213,7 +238,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
             </div>
 
             <p className="text-sm font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400 mb-3">
-              {STATE_LABEL[state]}
+              {hasError ? 'Connection trouble' : STATE_LABEL[state]}
             </p>
 
             {/* Live captions */}
@@ -228,8 +253,22 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
               )}
             </div>
 
-            {error && error !== 'unsupported' && (
-              <p className="mt-4 text-sm text-terra-600 dark:text-terra-300">{error}</p>
+            {quietHint && !hasError && state === 'listening' && (
+              <p className="mt-2 text-sm text-saffron-600 dark:text-saffron-400">
+                Not hearing you — check your mic isn’t muted, or that this site has mic permission.
+              </p>
+            )}
+
+            {hasError && (
+              <div className="mt-4">
+                <p className="text-sm text-terra-600 dark:text-terra-300">{error}</p>
+                <button
+                  onClick={startCall}
+                  className="mt-3 h-11 px-6 rounded-full bg-brand-600 text-white font-bold shadow-card hover:brightness-105 transition-all"
+                >
+                  Try again
+                </button>
+              </div>
             )}
           </>
         )}
@@ -237,7 +276,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
 
       {/* Controls */}
       <div className="shrink-0 px-6 pb-10 pt-4 flex items-center justify-center gap-6">
-        {!notConfigured && error !== 'unsupported' && (
+        {!notConfigured && error !== 'unsupported' && !hasError && (
           <button
             onClick={toggleMute}
             title={muted ? 'Unmute your mic' : 'Mute your mic'}

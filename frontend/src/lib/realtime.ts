@@ -39,6 +39,11 @@ export interface EphemeralToken {
 }
 
 const CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
+// If the handshake hasn't reached "listening" within this window, something's
+// stuck (common on flaky mobile networks/mic permission dialogs) — fail
+// cleanly instead of leaving the call hanging on "Connecting…" forever, which
+// is what previously made a retry pile a second session on top of a stuck one.
+const CONNECT_TIMEOUT_MS = 20000;
 
 export function realtimeSupported(): boolean {
   return (
@@ -54,72 +59,120 @@ export class RealtimeSession {
   private micStream: MediaStream | null = null;
   private audioEl: HTMLAudioElement | null = null;
   private closed = false;
+  private connecting = false;
 
   private assistantBuffer = '';
   private transcript: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
   constructor(private cb: RealtimeCallbacks) {}
 
+  /** True while a connection attempt is in flight — guards against double-starts. */
+  isConnecting(): boolean {
+    return this.connecting;
+  }
+
   /** Connect and start the conversation. `fetchToken` calls our backend. */
   async start(fetchToken: () => Promise<EphemeralToken>): Promise<void> {
+    if (this.connecting || this.pc) {
+      // Already starting/started — never open a second peer connection and
+      // mic stream on top of one that's still mid-setup (the exact scenario
+      // that made mobile browsers lock up on a retry tap).
+      return;
+    }
+    this.connecting = true;
     this.setState('connecting');
 
-    const { token, model } = await fetchToken();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      this.cb.onError?.('Could not connect — please try again.');
+      this.close();
+    }, CONNECT_TIMEOUT_MS);
 
-    const pc = new RTCPeerConnection();
-    this.pc = pc;
+    try {
+      const { token, model } = await fetchToken();
+      if (timedOut) return;
 
-    // Play the model's voice.
-    const audioEl = new Audio();
-    audioEl.autoplay = true;
-    this.audioEl = audioEl;
-    pc.ontrack = (e) => {
-      audioEl.srcObject = e.streams[0];
-    };
+      const pc = new RTCPeerConnection();
+      this.pc = pc;
 
-    // Capture the mic. Echo cancellation matters — it stops the model hearing
-    // its own voice through the speakers.
-    this.micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    for (const track of this.micStream.getTracks()) pc.addTrack(track, this.micStream);
+      // Play the model's voice. Attached to the DOM (hidden) and played
+      // explicitly — some mobile browsers are unreliable about autoplay on an
+      // audio element that's never actually in the document.
+      const audioEl = document.createElement('audio');
+      audioEl.autoplay = true;
+      audioEl.setAttribute('playsinline', 'true');
+      audioEl.style.display = 'none';
+      document.body.appendChild(audioEl);
+      this.audioEl = audioEl;
+      pc.ontrack = (e) => {
+        audioEl.srcObject = e.streams[0];
+        audioEl.play().catch(() => {
+          // Autoplay can still be blocked until the next user gesture —
+          // harmless, playback resumes once the user taps anything.
+        });
+      };
 
-    // Events channel.
-    const dc = pc.createDataChannel('oai-events');
-    this.dc = dc;
-    dc.onmessage = (e) => this.handleEvent(e.data);
-    dc.onopen = () => {
-      // Ask Profe to open the conversation (greet first), per the instructions.
-      this.send({ type: 'response.create' });
-      this.setState('listening');
-    };
+      // Capture the mic. Echo cancellation matters — it stops the model
+      // hearing its own voice through the speakers.
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      if (timedOut) return;
+      for (const track of this.micStream.getTracks()) pc.addTrack(track, this.micStream);
 
-    pc.onconnectionstatechange = () => {
-      if (['failed', 'disconnected', 'closed'].includes(pc.connectionState) && !this.closed) {
-        this.cb.onError?.('The voice connection dropped.');
-        this.close();
+      // Events channel.
+      const dc = pc.createDataChannel('oai-events');
+      this.dc = dc;
+      dc.onmessage = (e) => this.handleEvent(e.data);
+      dc.onopen = () => {
+        clearTimeout(timeout);
+        this.connecting = false;
+        // Ask Profe to open the conversation (greet first), per the instructions.
+        this.send({ type: 'response.create' });
+        this.setState('listening');
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (['failed', 'disconnected', 'closed'].includes(pc.connectionState) && !this.closed) {
+          this.cb.onError?.('The voice connection dropped.');
+          this.close();
+        }
+      };
+
+      // SDP offer → OpenAI → answer.
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (timedOut) return;
+
+      const resp = await fetch(`${CALLS_URL}?model=${encodeURIComponent(model)}`, {
+        method: 'POST',
+        body: offer.sdp,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/sdp',
+        },
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Realtime handshake failed (${resp.status})`);
       }
-    };
+      if (timedOut) return;
 
-    // SDP offer → OpenAI → answer.
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    const resp = await fetch(`${CALLS_URL}?model=${encodeURIComponent(model)}`, {
-      method: 'POST',
-      body: offer.sdp,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/sdp',
-      },
-    });
-
-    if (!resp.ok) {
-      throw new Error(`Realtime handshake failed (${resp.status})`);
+      const answer = { type: 'answer' as const, sdp: await resp.text() };
+      await pc.setRemoteDescription(answer);
+    } catch (err) {
+      clearTimeout(timeout);
+      this.connecting = false;
+      // If we already timed out, the timeout handler above already closed
+      // everything and reported the error — don't double-report.
+      if (timedOut) return;
+      // Clean up whatever got partially set up before rethrowing, so a failed
+      // attempt never leaves a dangling mic stream / peer connection for the
+      // next attempt to collide with.
+      this.close();
+      throw err;
     }
-
-    const answer = { type: 'answer' as const, sdp: await resp.text() };
-    await pc.setRemoteDescription(answer);
   }
 
   private send(event: Record<string, unknown>): void {
@@ -204,6 +257,7 @@ export class RealtimeSession {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.connecting = false;
     try {
       this.dc?.close();
     } catch {
@@ -218,7 +272,9 @@ export class RealtimeSession {
       for (const t of this.micStream.getTracks()) t.stop();
     }
     if (this.audioEl) {
+      this.audioEl.pause();
       this.audioEl.srcObject = null;
+      this.audioEl.remove();
       this.audioEl = null;
     }
     this.pc = null;
