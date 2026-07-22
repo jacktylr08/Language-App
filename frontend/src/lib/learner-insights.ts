@@ -8,7 +8,9 @@
  * All derived from the same synced progress store — no extra storage needed.
  */
 import { curriculum } from './curriculum';
-import { loadProgress } from './progress';
+import { loadProgress, getMistakeWordIds } from './progress';
+import { normalizeLoose } from './speech';
+import { loadProfile, type LearnerProfile } from './tutor-memory';
 
 const vocabMeta = new Map<string, { es: string; en: string }>();
 for (const lesson of curriculum) {
@@ -66,4 +68,44 @@ export function buildLessonInsights(): LessonInsights {
     pronunciationTrouble: pron.slice(0, 8),
     coveredRecently,
   };
+}
+
+/**
+ * Cross-references the tutor's free-text weaknesses/mistakes (from live
+ * conversations, e.g. "confuses ser and estar") against the curriculum's
+ * vocabulary, so a review session can target the exact words behind a
+ * tutor-flagged confusion — not just words missed in lesson exercises.
+ *
+ * A lightweight text match, not full NLP: single words must appear as a whole
+ * token (avoids short words like "es" matching inside "estas"); multi-word
+ * phrases match as a substring since they're distinctive enough on their own.
+ */
+export function tutorFlaggedVocabIds(profile: LearnerProfile | null): string[] {
+  if (!profile) return [];
+  const blob = normalizeLoose([...(profile.weaknesses ?? []), ...(profile.mistakes ?? [])].join(' . '));
+  if (!blob) return [];
+
+  const tokens = new Set(blob.split(/[^a-z0-9]+/i).filter(Boolean));
+  const ids: string[] = [];
+
+  for (const lesson of curriculum) {
+    for (const v of lesson.vocab) {
+      const word = normalizeLoose(v.es);
+      if (!word) continue;
+      const isPhrase = word.includes(' ');
+      const matches = isPhrase ? word.length >= 5 && blob.includes(word) : word.length >= 4 && tokens.has(word);
+      if (matches) ids.push(v.id);
+    }
+  }
+  return Array.from(new Set(ids));
+}
+
+/**
+ * Total distinct words worth reviewing in "Fix your mistakes" — lesson/practice
+ * misses plus tutor-flagged confusions, deduped. Drives the sidebar badge.
+ */
+export function combinedMistakeCount(): number {
+  const fromExercises = getMistakeWordIds(999);
+  const fromTutor = tutorFlaggedVocabIds(loadProfile());
+  return new Set([...fromExercises, ...fromTutor]).size;
 }

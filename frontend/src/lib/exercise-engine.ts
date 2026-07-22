@@ -16,6 +16,8 @@ import {
   getVocabById,
 } from './curriculum';
 import { getReviewWordIds, getMistakeWordIds } from './progress';
+import { loadProfile } from './tutor-memory';
+import { tutorFlaggedVocabIds } from './learner-insights';
 
 export type ExerciseType =
   | 'teach' // flashcard-style introduction, no grading
@@ -325,15 +327,19 @@ export function buildReviewSession(
 }
 
 /**
- * A session built purely from the words the learner has actually got wrong
- * (in lessons or practice) and not yet nailed. Same mix of exercise angles as
- * review, but the queue is their mistakes.
+ * A session built from the words the learner has actually got wrong — both in
+ * lesson/practice exercises AND things Profe has flagged in live conversation
+ * (e.g. "confuses ser and estar" maps back to the actual vocab involved).
+ * Tutor-flagged words come first since a named confusion is a stronger signal
+ * than an exercise miss. Same mix of exercise angles as review.
  */
 export function buildMistakesSession(
   speechRecognitionAvailable: boolean,
   size = 16
 ): Exercise[] {
-  const ids = getMistakeWordIds(size);
+  const tutorIds = tutorFlaggedVocabIds(loadProfile());
+  const exerciseIds = getMistakeWordIds(size);
+  const ids = Array.from(new Set([...tutorIds, ...exerciseIds])).slice(0, size);
   const words = ids.map((id) => getVocabById(id)).filter((w): w is VocabItem => !!w);
   if (words.length === 0) return [];
 

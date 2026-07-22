@@ -9,10 +9,10 @@ import {
   loadProgress,
   currentStreak,
   knownWordCount,
-  mistakeWordCount,
   lessonStars,
   ProgressState,
 } from '@/lib/progress';
+import { combinedMistakeCount } from '@/lib/learner-insights';
 
 const themeAccents: Record<string, string> = {
   phonetics: 'from-stone-400 to-stone-600',
@@ -43,7 +43,7 @@ export default function LessonsPage() {
 
   const streak = currentStreak(progress);
   const wordsKnown = knownWordCount(progress);
-  const mistakes = mistakeWordCount();
+  const mistakes = combinedMistakeCount();
   const lessonsDone = curriculum.filter((l) => progress.lessons[l.slug]?.completed).length;
   const coursePct = Math.round((lessonsDone / curriculum.length) * 100);
 
