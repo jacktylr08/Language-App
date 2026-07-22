@@ -64,6 +64,13 @@ export class RealtimeSession {
   private assistantBuffer = '';
   private transcript: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
+  // Barge-in bookkeeping — lets the learner cut in mid-sentence like a real
+  // conversation instead of waiting for Profe to finish (see handleEvent's
+  // input_audio_buffer.speech_started handler).
+  private state: RealtimeState = 'connecting';
+  private currentItemId: string | null = null;
+  private assistantSpeechStartedAt: number | null = null;
+
   constructor(private cb: RealtimeCallbacks) {}
 
   /** True while a connection attempt is in flight — guards against double-starts. */
@@ -190,8 +197,42 @@ export class RealtimeSession {
     }
     const type: string = evt.type || '';
 
+    // A new assistant item started — remember its id and when its audio
+    // began, so a mid-sentence interruption can tell the server exactly how
+    // much was actually heard (see speech_started below).
+    if (type.includes('output_item.added')) {
+      const itemId = evt.item?.id;
+      if (itemId) {
+        this.currentItemId = itemId;
+        this.assistantSpeechStartedAt = Date.now();
+      }
+      return;
+    }
+
     // The learner started/stopped speaking (server VAD).
     if (type === 'input_audio_buffer.speech_started') {
+      // Real barge-in: if Profe was mid-response, stop it immediately rather
+      // than letting it talk over the learner. Explicit response.cancel +
+      // conversation.item.truncate (rather than relying only on whatever the
+      // server does implicitly) so the model's own memory of the
+      // conversation matches what the learner actually heard — otherwise it
+      // can carry on next turn as if it had finished a sentence it never got
+      // to say.
+      if (this.state === 'assistant_speaking' || this.state === 'thinking') {
+        this.send({ type: 'response.cancel' });
+        if (this.currentItemId && this.assistantSpeechStartedAt !== null) {
+          const audioEndMs = Math.max(0, Date.now() - this.assistantSpeechStartedAt);
+          this.send({
+            type: 'conversation.item.truncate',
+            item_id: this.currentItemId,
+            content_index: 0,
+            audio_end_ms: audioEndMs,
+          });
+        }
+        this.assistantBuffer = '';
+        this.currentItemId = null;
+        this.assistantSpeechStartedAt = null;
+      }
       this.setState('user_speaking');
       return;
     }
@@ -232,6 +273,8 @@ export class RealtimeSession {
 
     // Assistant finished this response — back to listening.
     if (type === 'response.done') {
+      this.currentItemId = null;
+      this.assistantSpeechStartedAt = null;
       if (!this.closed) this.setState('listening');
       return;
     }
@@ -284,6 +327,7 @@ export class RealtimeSession {
   }
 
   private setState(state: RealtimeState): void {
+    this.state = state;
     this.cb.onStateChange?.(state);
   }
 }
