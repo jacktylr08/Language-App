@@ -4,19 +4,28 @@ import { Suspense, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { RealtimeCall } from '@/components/RealtimeCall';
-import { buildTutorContext } from '@/lib/tutor-context';
+import { buildTutorContext, buildScenarioContext } from '@/lib/tutor-context';
 import { reflectAndSave, markEvaluationDone } from '@/lib/tutor-memory';
+import { getScenario } from '@/lib/scenarios';
 
 function TutorPageInner() {
   const { isLoading } = useRequireAuth();
   const router = useRouter();
   const params = useSearchParams();
   const slug = params.get('lesson') || undefined;
+  const scenario = getScenario(params.get('scenario'));
 
   // Built client-side from the learner's progress + memory once authed.
+  // A scenario (if picked) replaces the curriculum-driven plan/focus but
+  // keeps every other constraint (level ceiling, known vocab, memory).
   const ctx = useMemo(
-    () => (typeof window === 'undefined' || isLoading ? null : buildTutorContext(slug)),
-    [isLoading, slug]
+    () =>
+      typeof window === 'undefined' || isLoading
+        ? null
+        : scenario
+        ? buildScenarioContext(scenario)
+        : buildTutorContext(slug),
+    [isLoading, slug, scenario]
   );
 
   // The call ended — distil it into the tutor's memory, then head back.

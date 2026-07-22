@@ -1,7 +1,8 @@
-import { buildTutorContext } from '../tutor-context';
+import { buildTutorContext, buildScenarioContext } from '../tutor-context';
 import { completeLessonLocal } from '../progress';
 import { curriculum } from '../curriculum';
 import { saveLearnerGoal } from '../learner-goal';
+import { SCENARIOS } from '../scenarios';
 
 describe('buildTutorContext', () => {
   beforeEach(() => {
@@ -74,5 +75,32 @@ describe('buildTutorContext', () => {
     const ctx = buildTutorContext();
     expect(ctx.learnerGoal).toBeNull();
     expect(ctx.plan).not.toMatch(/stated goal/i);
+  });
+});
+
+describe('buildScenarioContext', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('replaces the focus/plan with the scenario, but keeps the level ceiling from real progress', () => {
+    for (const lesson of curriculum.filter((l) => l.week <= 5)) {
+      completeLessonLocal(lesson.slug, 90);
+    }
+    const restaurant = SCENARIOS.find((s) => s.id === 'restaurant')!;
+    const ctx = buildScenarioContext(restaurant);
+
+    expect(ctx.focus).toBe('At a restaurant');
+    expect(ctx.plan).toContain('SCENARIO PRACTICE');
+    expect(ctx.plan).toContain(restaurant.prompt);
+    // Everything that stops the tutor teaching ahead still comes from real progress.
+    expect(ctx.weekReached).toBeGreaterThanOrEqual(5);
+    expect(ctx.level).toBe('intermediate');
+  });
+
+  it('never lets a scenario bypass the level ceiling for a brand-new learner', () => {
+    const jobInterview = SCENARIOS.find((s) => s.id === 'job-interview')!;
+    const ctx = buildScenarioContext(jobInterview);
+    expect(ctx.weekReached).toBe(1);
+    expect(ctx.level).toBe('beginner');
+    expect(ctx.plan).toMatch(/level and known-vocabulary limits/i);
   });
 });

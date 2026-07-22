@@ -144,10 +144,14 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   // Clean up on unmount if the call never got an explicit End (navigated away
   // mid-call). Same grace period as an explicit End — the session object
   // itself doesn't depend on the component staying mounted, so it's safe to
-  // finish capturing the transcript and close it a beat later.
+  // finish capturing the transcript and close it a beat later. Only fires
+  // onClose if a call had actually started (sessionRef set) — otherwise
+  // React 18 StrictMode's dev-only mount→cleanup→remount cycle fires this on
+  // the very first render, before "Start talking" was ever tapped, bouncing
+  // straight back out of the page.
   useEffect(() => {
     return () => {
-      if (!endedRef.current) {
+      if (!endedRef.current && sessionRef.current) {
         endedRef.current = true;
         const session = sessionRef.current;
         setTimeout(() => {

@@ -13,6 +13,7 @@ import { loadProgress } from './progress';
 import { loadProfile, isEvaluationDue, dueWeaknessesFirst } from './tutor-memory';
 import { buildLessonInsights } from './learner-insights';
 import { loadLearnerGoal, GOAL_LABELS, type LearnerGoal } from './learner-goal';
+import type { Scenario } from './scenarios';
 
 export interface TutorContext {
   level: 'beginner' | 'intermediate' | 'advanced';
@@ -212,5 +213,22 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     profileSummary: profile?.summary,
     lastSessionNote: lastSession?.note,
     daysSinceLastSession,
+  };
+}
+
+/**
+ * The same context as buildTutorContext (level ceiling, known vocab, memory,
+ * pace — everything that stops the tutor teaching ahead of the learner) but
+ * with the plan replaced by a specific real-world scenario to role-play,
+ * instead of "continue the most recent lesson". A scenario never overrides
+ * the level ceiling — it's a different *topic*, not permission to use
+ * material the learner hasn't met yet.
+ */
+export function buildScenarioContext(scenario: Scenario): TutorContext {
+  const ctx = buildTutorContext();
+  return {
+    ...ctx,
+    focus: scenario.label,
+    plan: `SCENARIO PRACTICE — ${scenario.prompt} Stay within everything they've already learned (the level and known-vocabulary limits above still apply in full) — if the scenario naturally needs something beyond that, simplify it rather than introduce new material. Keep it a flowing conversation, not a checklist.`,
   };
 }

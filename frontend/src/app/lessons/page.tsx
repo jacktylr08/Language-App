@@ -16,6 +16,7 @@ import {
 import { combinedMistakeCount } from '@/lib/learner-insights';
 import { buildTutorContext } from '@/lib/tutor-context';
 import { CourseChip } from '@/components/CourseChip';
+import { SCENARIOS } from '@/lib/scenarios';
 
 /** A cadence line so the tutor card reflects an actual relationship, not a static pitch. */
 function cadenceLabel(days: number | undefined): string {
@@ -189,6 +190,28 @@ export default function LessonsPage() {
           <span className="transition-transform group-hover:translate-x-1">→</span>
         </span>
       </Link>
+
+      {/* Practice a specific real-world scenario with the tutor */}
+      <div className="surface p-5">
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft dark:text-stone-400 mb-3">
+          Practice a scenario
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {SCENARIOS.map((s) => (
+            <Link
+              key={s.id}
+              href={`/tutor?scenario=${s.id}`}
+              className="flex items-center gap-2 rounded-xl bg-stone-50 dark:bg-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800 px-3 py-2.5 transition-colors"
+              title={s.description}
+            >
+              <span className="text-lg" aria-hidden>{s.emoji}</span>
+              <span className="text-[13px] font-bold text-ink dark:text-stone-200 leading-tight">
+                {s.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
 
       {/* Review your mistakes — built from what you've got wrong */}
       {mistakes > 0 && (
