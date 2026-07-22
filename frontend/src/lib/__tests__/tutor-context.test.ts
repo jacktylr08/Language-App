@@ -1,5 +1,5 @@
 import { buildTutorContext, buildScenarioContext } from '../tutor-context';
-import { completeLessonLocal } from '../progress';
+import { completeLessonLocal, placeLearnerAtWeek } from '../progress';
 import { curriculum } from '../curriculum';
 import { saveLearnerGoal } from '../learner-goal';
 import { SCENARIOS } from '../scenarios';
@@ -75,6 +75,46 @@ describe('buildTutorContext', () => {
     const ctx = buildTutorContext();
     expect(ctx.learnerGoal).toBeNull();
     expect(ctx.plan).not.toMatch(/stated goal/i);
+  });
+});
+
+describe('buildTutorContext with onboarding placement (skipped lessons)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('raises the level ceiling and known vocab for a learner placed ahead at onboarding, with zero real completions', () => {
+    placeLearnerAtWeek(5); // "beginner" level — skips Phase 1 (weeks 1-4)
+    const ctx = buildTutorContext();
+
+    expect(ctx.weekReached).toBeGreaterThanOrEqual(4);
+    // The skipped lessons' vocab is "known" — Profe should use it freely,
+    // exactly as if the learner had actually completed those lessons.
+    const skippedLesson = curriculum.find((l) => l.slug === 'greetings-essentials')!;
+    expect(ctx.knownVocab).toEqual(expect.arrayContaining(skippedLesson.vocab.map((v) => v.es)));
+  });
+
+  it('anchors on the first real lesson to do, not the last one placed past, when nothing has actually been completed', () => {
+    placeLearnerAtWeek(5);
+    const ctx = buildTutorContext();
+
+    // Should focus on the first week-5 lesson (their actual next real
+    // lesson) — never a skipped lesson they never studied in the app.
+    const firstRealLesson = [...curriculum].sort((a, b) => a.week - b.week || a.order - b.order)
+      .find((l) => l.week >= 5)!;
+    expect(ctx.focus).toBe(firstRealLesson.title);
+  });
+
+  it('still anchors on the most recent REAL completion when one exists, ignoring skipped lessons entirely', () => {
+    placeLearnerAtWeek(5);
+    completeLessonLocal('ar-verbs', 88); // a real, actual completion at week 5
+    const ctx = buildTutorContext();
+
+    expect(ctx.focus).toBe('The -AR Verb Machine');
+  });
+
+  it('a complete beginner (no placement) is completely unaffected', () => {
+    const ctx = buildTutorContext();
+    expect(ctx.weekReached).toBe(1);
+    expect(ctx.level).toBe('beginner');
   });
 });
 

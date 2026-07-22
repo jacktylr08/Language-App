@@ -45,6 +45,20 @@ export interface LessonRecord {
   bestAccuracy: number; // 0-100
   timesCompleted: number;
   lastCompleted?: string;
+  /**
+   * True if this lesson was placed-out-of at onboarding (the learner said
+   * they already knew this material) rather than actually completed in the
+   * app. Distinct from `completed` on purpose: it still counts for unlocking
+   * later lessons and for the tutor's sense of level/known vocab, but it
+   * must NEVER be confused with a real completion — no stars, no accuracy,
+   * no fake word-strength history. See placeLearnerAtWeek.
+   */
+  skipped?: boolean;
+}
+
+/** True if a lesson is behind the learner — really completed, or placed out of at onboarding. */
+export function isLessonDone(rec?: LessonRecord): boolean {
+  return !!(rec?.completed || rec?.skipped);
 }
 
 export interface ProgressState {
@@ -58,6 +72,7 @@ export interface ProgressState {
 
 import { PROGRESS_KEY } from './keys';
 import { scheduleSync } from './sync';
+import { curriculum } from './curriculum';
 
 const KEY = PROGRESS_KEY;
 
@@ -241,6 +256,30 @@ export function completeLessonLocal(slug: string, accuracy: number): ProgressSta
   state.lessons[slug] = rec;
   save(state);
   return state;
+}
+
+/**
+ * Called once, at onboarding, when a learner self-reports being past
+ * complete-beginner level. Marks every lesson strictly before `startWeek` as
+ * `skipped` — never `completed` — so the lesson list stays honest about what
+ * was actually done in the app, while unlocking, weekReached, and the
+ * tutor's known-vocab all treat them as being genuinely at that point in the
+ * course. A no-op for startWeek <= 1 (nothing to skip for a complete
+ * beginner). Safe to call on an existing account: never overwrites a lesson
+ * that's already really completed.
+ */
+export function placeLearnerAtWeek(startWeek: number): void {
+  if (startWeek <= 1) return;
+  const state = loadProgress();
+  for (const lesson of curriculum) {
+    if (lesson.week >= startWeek) continue;
+    const existing = state.lessons[lesson.slug];
+    if (existing?.completed) continue;
+    state.lessons[lesson.slug] = existing
+      ? { ...existing, skipped: true }
+      : { completed: false, bestAccuracy: 0, timesCompleted: 0, skipped: true };
+  }
+  save(state);
 }
 
 /** Words due for review (or the weakest known words if nothing is due). */

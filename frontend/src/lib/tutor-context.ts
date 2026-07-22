@@ -82,38 +82,57 @@ const orderedCurriculum = [...curriculum].sort(
 
 /**
  * The lesson the tutor should anchor on: the learner's MOST RECENT completed
- * lesson — so it consolidates what they've actually learned rather than teaching
- * ahead into material they haven't studied yet. If they've completed nothing,
- * anchor on the very first lesson (what they're just starting).
+ * lesson — so it consolidates what they've actually learned rather than
+ * teaching ahead into material they haven't studied yet. A learner placed
+ * ahead by onboarding (earlier lessons `skipped`, not `completed`) has no
+ * real completions yet, so falls through to the first lesson they haven't
+ * done — their actual first real lesson, wherever the course placed them —
+ * rather than "the last thing they were placed past", which they never
+ * actually studied.
  */
-function anchorLesson(completed: Set<string>): CurriculumLesson {
+function anchorLesson(reallyCompleted: Set<string>, doneOrPlaced: Set<string>): CurriculumLesson {
   let last: CurriculumLesson | undefined;
   for (const l of orderedCurriculum) {
-    if (completed.has(l.slug)) last = l;
+    if (reallyCompleted.has(l.slug)) last = l;
   }
-  return last ?? orderedCurriculum[0];
+  if (last) return last;
+  for (const l of orderedCurriculum) {
+    if (!doneOrPlaced.has(l.slug)) return l;
+  }
+  return orderedCurriculum[0];
 }
 
 export function buildTutorContext(focusSlug?: string): TutorContext {
   const progress = loadProgress();
 
-  const completed = new Set(
+  // Lessons genuinely completed in the app vs. lessons placed-out-of at
+  // onboarding (`skipped`) — the level ceiling and known vocab treat both as
+  // "behind the learner" (doneOrPlaced), but anchoring on a specific lesson
+  // to build the session plan around only ever uses a REAL completion.
+  const reallyCompleted = new Set(
     Object.entries(progress.lessons)
       .filter(([, r]) => r.completed)
       .map(([slug]) => slug)
   );
+  const doneOrPlaced = new Set(
+    Object.entries(progress.lessons)
+      .filter(([, r]) => r.completed || r.skipped)
+      .map(([slug]) => slug)
+  );
 
-  // Reached week = highest week with a completed lesson (default: week 1).
+  // Reached week = highest week done or placed-out-of (default: week 1).
   let weekReached = 1;
   for (const lesson of curriculum) {
-    if (completed.has(lesson.slug)) weekReached = Math.max(weekReached, lesson.week);
+    if (doneOrPlaced.has(lesson.slug)) weekReached = Math.max(weekReached, lesson.week);
   }
 
-  // Known vocab: everything from completed lessons + any word they've been
-  // tested on. Deduped and capped so the prompt stays lean.
+  // Known vocab: everything from lessons done or placed-out-of (a learner
+  // placed ahead at onboarding said they already know this — Profe should
+  // use it freely) + any word they've been tested on. Deduped and capped so
+  // the prompt stays lean.
   const known = new Set<string>();
   for (const lesson of curriculum) {
-    if (completed.has(lesson.slug)) {
+    if (doneOrPlaced.has(lesson.slug)) {
       for (const v of lesson.vocab) known.add(v.es);
     }
   }
@@ -167,7 +186,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   // and never drifts into lessons they haven't done.
   const lesson =
     (focusSlug ? curriculum.find((l) => l.slug === focusSlug) : undefined) ??
-    anchorLesson(completed);
+    anchorLesson(reallyCompleted, doneOrPlaced);
 
   const targetWords = lesson.vocab
     .slice(0, 8)

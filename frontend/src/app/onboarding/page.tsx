@@ -5,14 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { markOnboardingComplete } from '@/lib/sync';
 import { saveLearnerGoal, GOAL_LABELS, type LearnerGoal } from '@/lib/learner-goal';
+import { LEVEL_OPTIONS, startWeekForLevel, type LearnerLevel } from '@/lib/placement';
+import { placeLearnerAtWeek } from '@/lib/progress';
+import { phaseForWeek } from '@/lib/curriculum';
 
 const GOAL_OPTIONS = Object.entries(GOAL_LABELS) as Array<[LearnerGoal, string]>;
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireAuth();
   const [step, setStep] = useState(0);
+  const [level, setLevel] = useState<LearnerLevel | null>(null);
   const [goal, setGoal] = useState<LearnerGoal | null>(null);
 
   if (isLoading) {
@@ -34,6 +38,12 @@ export default function OnboardingPage() {
       // (see lib/learner-goal.ts) — and remember onboarding is done so it
       // never re-asks. Both are synced to the account.
       if (goal) saveLearnerGoal(goal);
+      // A learner who isn't a complete beginner gets placed further into the
+      // course — but their earlier lessons are marked `skipped`, never
+      // faked as `completed`: they still unlock everything and set the
+      // tutor's level ceiling, but the lesson list stays honest that this
+      // material was never actually done in the app.
+      if (level) placeLearnerAtWeek(startWeekForLevel(level));
       markOnboardingComplete();
       router.push('/lessons');
     }
@@ -85,6 +95,48 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div>
               <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-2">
+                What's your Spanish level?
+              </h2>
+              <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
+                Be honest — this decides where you actually start. Say too much and you'll skip
+                past things you needed; say too little and you'll be bored redoing what you
+                already know.
+              </p>
+              <div className="space-y-3">
+                {LEVEL_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      level === opt.value
+                        ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/10'
+                        : 'border-stone-200 dark:border-stone-600 hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="level"
+                      value={opt.value}
+                      checked={level === opt.value}
+                      onChange={() => setLevel(opt.value)}
+                      className="w-4 h-4 accent-brand-600 mt-1"
+                    />
+                    <span>
+                      <span className="block text-stone-700 dark:text-stone-300 font-bold">
+                        {opt.label}
+                      </span>
+                      <span className="block text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+                        {opt.description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-2">
                 What's your goal?
               </h2>
               <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
@@ -117,27 +169,33 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {step === 2 && (
-            <div className="text-center">
-              <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-6">
-                You're ready to start!
-              </h2>
-              <div className="rounded-2xl bg-brand-500/10 border border-brand-500/20 p-6 mb-6">
-                <p className="text-brand-700 dark:text-brand-200 font-bold">
-                  ✓ Your learning space is set up
-                </p>
-                <p className="text-brand-700/80 dark:text-brand-200/80 text-sm mt-2">
-                  You'll start with our Foundation phase, learning through listening and
-                  comprehension.
-                </p>
+          {step === 3 && (() => {
+            const startWeek = level ? startWeekForLevel(level) : 1;
+            const phase = phaseForWeek(startWeek);
+            const isPlaced = startWeek > 1;
+            return (
+              <div className="text-center">
+                <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-6">
+                  You're ready to start!
+                </h2>
+                <div className="rounded-2xl bg-brand-500/10 border border-brand-500/20 p-6 mb-6">
+                  <p className="text-brand-700 dark:text-brand-200 font-bold">
+                    ✓ Your learning space is set up
+                  </p>
+                  <p className="text-brand-700/80 dark:text-brand-200/80 text-sm mt-2">
+                    {isPlaced
+                      ? `You'll start at Phase ${phase.number}: ${phase.title} (${phase.subtitle.toLowerCase()}) — everything earlier is marked as placed out of, not completed, so you can always go back and brush up if something feels shaky.`
+                      : "You'll start with our Foundation phase, learning through listening and comprehension."}
+                  </p>
+                </div>
+                <div className="text-stone-600 dark:text-stone-400 text-sm space-y-2">
+                  <p>• Lessons designed to build comprehension</p>
+                  <p>• Vocabulary automatically added to your spaced repetition</p>
+                  <p>• A live tutor who remembers you and adapts to your goal and level</p>
+                </div>
               </div>
-              <div className="text-stone-600 dark:text-stone-400 text-sm space-y-2">
-                <p>• Lessons designed to build comprehension</p>
-                <p>• Vocabulary automatically added to your spaced repetition</p>
-                <p>• A live tutor who remembers you and adapts to your goal</p>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Navigation */}
@@ -151,7 +209,7 @@ export default function OnboardingPage() {
           </button>
           <button
             onClick={handleNext}
-            disabled={step === 1 && !goal}
+            disabled={(step === 1 && !level) || (step === 2 && !goal)}
             className="flex-1 btn-primary py-3 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {step === TOTAL_STEPS - 1 ? 'Start Learning' : 'Next'}

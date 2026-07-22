@@ -11,6 +11,7 @@ import {
   knownWordCount,
   lessonStars,
   recentActivity,
+  isLessonDone,
   ProgressState,
 } from '@/lib/progress';
 import { combinedMistakeCount } from '@/lib/learner-insights';
@@ -59,17 +60,24 @@ export default function LessonsPage() {
   const streak = currentStreak(progress);
   const wordsKnown = knownWordCount(progress);
   const mistakes = combinedMistakeCount();
+  // "Done" (real completions) stays separate from "placed out of at
+  // onboarding" (skipped) — the journey stat below should be honest about
+  // which is which, even though both count toward being unlocked/reached.
   const lessonsDone = curriculum.filter((l) => progress.lessons[l.slug]?.completed).length;
-  const coursePct = Math.round((lessonsDone / curriculum.length) * 100);
+  const lessonsSkipped = curriculum.filter(
+    (l) => progress.lessons[l.slug]?.skipped && !progress.lessons[l.slug]?.completed
+  ).length;
+  const coursePct = Math.round(((lessonsDone + lessonsSkipped) / curriculum.length) * 100);
   const activity = recentActivity(progress, 14);
 
-  // A lesson unlocks when the previous one is completed
+  // A lesson unlocks once the previous one is behind the learner — really
+  // completed, or placed-out-of at onboarding.
   const isUnlocked = (index: number): boolean => {
     if (index === 0) return true;
-    return !!progress.lessons[curriculum[index - 1].slug]?.completed;
+    return isLessonDone(progress.lessons[curriculum[index - 1].slug]);
   };
   const currentIndex = curriculum.findIndex(
-    (l, i) => isUnlocked(i) && !progress.lessons[l.slug]?.completed
+    (l, i) => isUnlocked(i) && !isLessonDone(progress.lessons[l.slug])
   );
   const nextLesson = currentIndex >= 0 ? curriculum[currentIndex] : null;
 
@@ -87,13 +95,18 @@ export default function LessonsPage() {
             {coursePct}%
           </span>
         </div>
-        <div className="h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-4">
+        <div className="h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-1.5">
           <div
             className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
             style={{ width: `${Math.max(coursePct, 2)}%` }}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        {lessonsSkipped > 0 && (
+          <p className="text-[11px] text-ink-soft/70 dark:text-stone-500 mb-4">
+            {lessonsSkipped} lesson{lessonsSkipped === 1 ? '' : 's'} placed out of at signup
+          </p>
+        )}
+        <div className={`grid grid-cols-2 gap-3 ${lessonsSkipped > 0 ? '' : 'mt-4'} mb-4`}>
           <div>
             <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
               {wordsKnown}
@@ -331,6 +344,7 @@ export default function LessonsPage() {
                         const record = progress.lessons[lesson.slug];
                         const unlocked = isUnlocked(index);
                         const isCurrent = index === currentIndex;
+                        const isSkipped = !!record?.skipped && !record?.completed;
                         const stars = lessonStars(record);
                         const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
 
@@ -341,7 +355,9 @@ export default function LessonsPage() {
                                 ? 'bg-paper-soft dark:bg-paper-dark-soft/60 border border-stone-200/60 dark:border-stone-800/60 opacity-55 saturate-50'
                                 : isCurrent
                                   ? 'bg-white dark:bg-paper-dark-soft border-2 border-brand-400 dark:border-brand-500 shadow-card animate-glow-pulse'
-                                  : 'surface hover:shadow-card-hover hover:-translate-y-0.5 active:translate-y-0 active:shadow-card'
+                                  : isSkipped
+                                    ? 'surface border border-dashed border-stone-300 dark:border-stone-700 opacity-80 hover:opacity-100 hover:shadow-card-hover'
+                                    : 'surface hover:shadow-card-hover hover:-translate-y-0.5 active:translate-y-0 active:shadow-card'
                             }`}
                           >
                             <div className="flex items-center gap-4">
@@ -361,7 +377,7 @@ export default function LessonsPage() {
                                 <p className="text-sm text-ink-soft dark:text-stone-400 truncate mt-0.5">
                                   {lesson.subtitle}
                                 </p>
-                                {record?.completed && (
+                                {record?.completed ? (
                                   <p className="text-saffron-500 text-[13px] mt-1 tracking-wide" aria-label={`${stars} stars`}>
                                     {'★'.repeat(stars)}
                                     <span className="text-stone-300 dark:text-stone-600">
@@ -371,7 +387,11 @@ export default function LessonsPage() {
                                       best {record.bestAccuracy}%
                                     </span>
                                   </p>
-                                )}
+                                ) : isSkipped ? (
+                                  <p className="text-[12px] text-ink-soft/70 dark:text-stone-500 mt-1 italic">
+                                    Placed out at signup — not actually done
+                                  </p>
+                                ) : null}
                               </div>
                               {unlocked && (
                                 <span
@@ -381,7 +401,7 @@ export default function LessonsPage() {
                                       : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300'
                                   }`}
                                 >
-                                  {isCurrent ? 'START' : record?.completed ? 'REDO' : 'START'}
+                                  {isCurrent ? 'START' : record?.completed ? 'REDO' : isSkipped ? 'REVIEW' : 'START'}
                                 </span>
                               )}
                             </div>

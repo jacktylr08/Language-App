@@ -1,4 +1,14 @@
-import { touchStreak, currentStreak, recordWordResult, getMistakeWordIds, loadProgress, recentActivity } from '../progress';
+import {
+  touchStreak,
+  currentStreak,
+  recordWordResult,
+  getMistakeWordIds,
+  loadProgress,
+  recentActivity,
+  placeLearnerAtWeek,
+  isLessonDone,
+  completeLessonLocal,
+} from '../progress';
 import type { ProgressState } from '../progress';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -167,5 +177,40 @@ describe('recentActivity', () => {
 
   it('reports all-inactive for a brand-new learner with no activity yet', () => {
     expect(recentActivity(state([]), 7)).toEqual(new Array(7).fill(false));
+  });
+});
+
+describe('placeLearnerAtWeek', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('does nothing for a complete beginner (week 1 — nothing to skip)', () => {
+    placeLearnerAtWeek(1);
+    const state = loadProgress();
+    expect(state.lessons['greetings-essentials']).toBeUndefined();
+  });
+
+  it('marks every lesson before the starting week as skipped, never completed', () => {
+    placeLearnerAtWeek(5); // "beginner" level — skip Phase 1 (weeks 1-4)
+
+    const state = loadProgress();
+    // Week 1-4 lessons: skipped, not completed.
+    expect(isLessonDone(state.lessons['greetings-essentials'])).toBe(true);
+    expect(state.lessons['greetings-essentials'].completed).toBe(false);
+    expect(state.lessons['greetings-essentials'].skipped).toBe(true);
+    expect(state.lessons['week-review'].skipped).toBe(true);
+
+    // Week 5+ lessons: untouched — still locked/undone, not skipped ahead too.
+    expect(state.lessons['ar-verbs']).toBeUndefined();
+  });
+
+  it('never overwrites a lesson the learner actually completed for real', () => {
+    completeLessonLocal('greetings-essentials', 92);
+    placeLearnerAtWeek(5);
+
+    const state = loadProgress();
+    expect(state.lessons['greetings-essentials'].completed).toBe(true);
+    expect(state.lessons['greetings-essentials'].bestAccuracy).toBe(92);
+    // Real completion — never relabeled as a placement skip.
+    expect(state.lessons['greetings-essentials'].skipped).toBeUndefined();
   });
 });
