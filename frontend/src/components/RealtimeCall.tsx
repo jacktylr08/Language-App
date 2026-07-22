@@ -37,6 +37,16 @@ const QUIET_HINT_MS = 12000;
 // thing they just said.
 const END_CALL_GRACE_MS = 1200;
 
+// Live voice minutes are genuinely expensive (real-time audio is billed per
+// token in BOTH directions, and every second Profe is talking costs several
+// times what a second of listening does) — a call accidentally left open
+// (locked phone, backgrounded tab) could otherwise run up real cost with
+// nothing to stop it. A 20-minute cap is already longer than a focused
+// tutoring session needs, with a warning before it wraps up so it never
+// feels like a sudden disconnect.
+const MAX_CALL_MS = 20 * 60 * 1000;
+const WRAP_UP_WARNING_MS = 18 * 60 * 1000;
+
 export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [state, setState] = useState<RealtimeState>('connecting');
   const [assistantLine, setAssistantLine] = useState('');
@@ -47,6 +57,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [started, setStarted] = useState(false);
   const [quietHint, setQuietHint] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [wrapUpWarning, setWrapUpWarning] = useState(false);
 
   const sessionRef = useRef<RealtimeSession | null>(null);
   const endedRef = useRef(false);
@@ -82,6 +93,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     setStarted(true);
     setError('');
     setQuietHint(false);
+    setWrapUpWarning(false);
     setUserLine('');
     setAssistantLine('');
 
@@ -156,6 +168,20 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     const t = setTimeout(() => setQuietHint(true), QUIET_HINT_MS);
     return () => clearTimeout(t);
   }, [state, userLine]);
+
+  // Cap call length — a warning a couple of minutes out, then a graceful
+  // wrap-up, so a call can't be left running (and racking up real cost)
+  // indefinitely by accident.
+  useEffect(() => {
+    if (!started) return;
+    const warn = setTimeout(() => setWrapUpWarning(true), WRAP_UP_WARNING_MS);
+    const stop = setTimeout(() => end.current(), MAX_CALL_MS);
+    return () => {
+      clearTimeout(warn);
+      clearTimeout(stop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started]);
 
   const toggleMute = () => {
     setMuted((m) => {
@@ -292,6 +318,12 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
             {quietHint && !hasError && state === 'listening' && (
               <p className="mt-2 text-sm text-saffron-600 dark:text-saffron-400">
                 Not hearing you — check your mic isn’t muted, or that this site has mic permission.
+              </p>
+            )}
+
+            {wrapUpWarning && !hasError && (
+              <p className="mt-2 text-sm text-saffron-600 dark:text-saffron-400">
+                Wrapping up in a couple of minutes — that's a solid length for a session.
               </p>
             )}
 

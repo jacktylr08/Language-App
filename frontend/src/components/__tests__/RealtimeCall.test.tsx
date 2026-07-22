@@ -79,3 +79,48 @@ describe('RealtimeCall — end-call grace period', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('RealtimeCall — call duration cap', () => {
+  it('warns a couple of minutes before the cap, so wrap-up never feels sudden', async () => {
+    await startCall();
+    expect(screen.queryByText(/Wrapping up/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      jest.advanceTimersByTime(18 * 60 * 1000);
+    });
+
+    expect(screen.getByText(/Wrapping up/)).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('ends the call automatically at the cap, so a forgotten call cannot run away on cost', async () => {
+    await startCall();
+
+    await act(async () => {
+      jest.advanceTimersByTime(20 * 60 * 1000);
+    });
+    // The grace period after auto-end still applies.
+    await act(async () => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(mockClose).toHaveBeenCalled();
+  });
+
+  it('does not fire the cap timers at all for a call that ends well within the limit', async () => {
+    await startCall();
+    fireEvent.click(screen.getByText('End call'));
+
+    await act(async () => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // Advancing well past the cap afterwards must not trigger a second close.
+    await act(async () => {
+      jest.advanceTimersByTime(25 * 60 * 1000);
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
