@@ -1,9 +1,11 @@
 import { Router, Response } from 'express';
+import express from 'express';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
-import { tutorRealtimeLimiter, tutorSpeakLimiter, tutorWritingLimiter } from '@/middleware/rate-limit';
+import { tutorRealtimeLimiter, tutorSpeakLimiter, tutorWritingLimiter, pronunciationLimiter } from '@/middleware/rate-limit';
 import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
 import { createRealtimeClientSecret, REALTIME_VOICES } from '@/services/openai-service';
+import { assessPronunciation } from '@/services/pronunciation-service';
 import { logger } from '@/utils/logger';
 
 const router = Router();
@@ -267,5 +269,60 @@ router.post('/grade-writing', verifyToken, tutorWritingLimiter, async (req: Auth
     res.status(500).json({ error: message });
   }
 });
+
+// Guard against a runaway client uploading a huge recording. Callers should
+// only ever send a single word/short phrase (a few seconds), never a full
+// call — Azure's own pronunciation-assessment endpoint caps at ~30s anyway.
+const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Phoneme-level pronunciation scoring (Azure Speech Pronunciation
+ * Assessment). Real speaking-exercise grading, distinct from the existing
+ * client-side Web Speech transcript match — this scores HOW it was said
+ * (accuracy/fluency per word/phoneme), not just whether the words matched.
+ *
+ * POST /api/v1/tutor/pronunciation?referenceText=...&language=Spanish
+ * Body: raw WAV audio (16kHz 16-bit mono PCM), Content-Type: audio/wav
+ *
+ * 503 (pronunciation_not_configured) if AZURE_SPEECH_KEY/AZURE_SPEECH_REGION
+ * aren't set — the client should fall back to its existing transcript-match
+ * check, which needs no server config at all.
+ */
+router.post(
+  '/pronunciation',
+  verifyToken,
+  pronunciationLimiter,
+  express.raw({ type: 'audio/wav', limit: MAX_AUDIO_BYTES }),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const referenceText = typeof req.query.referenceText === 'string' ? req.query.referenceText.trim() : '';
+      const language = typeof req.query.language === 'string' ? req.query.language.trim().slice(0, 40) : undefined;
+
+      if (!referenceText) {
+        res.status(400).json({ error: 'referenceText is required' });
+        return;
+      }
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        res.status(400).json({ error: 'A WAV audio recording is required' });
+        return;
+      }
+
+      const result = await assessPronunciation(req.body, referenceText.slice(0, 200), language);
+      res.json(result);
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : 'Failed to assess pronunciation';
+      if (err?.code === 'pronunciation_not_configured') {
+        res.status(503).json({ error: message, code: 'pronunciation_not_configured' });
+        return;
+      }
+      logger.error(
+        'Pronunciation assessment error:',
+        err?.response?.status ?? '',
+        JSON.stringify(err?.response?.data ?? message)
+      );
+      res.status(502).json({ error: 'Could not assess pronunciation.' });
+    }
+  }
+);
 
 export default router;

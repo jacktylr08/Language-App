@@ -72,6 +72,17 @@ export const tutorWritingLimiter = rateLimit({
   message: tutorMessage,
 });
 
+// Called once per "speak" exercise attempt — similar cadence to TTS, so
+// similar headroom.
+export const pronunciationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  message: tutorMessage,
+});
+
 // Subscribing/unsubscribing a device for push reminders happens once per
 // device, rarely — generous headroom just to stop a retry loop.
 export const pushLimiter = rateLimit({

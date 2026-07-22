@@ -15,6 +15,7 @@ import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, Match
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
 import { buildTutorContext } from '@/lib/tutor-context';
+import { startRecording, assessPronunciationFromBlob, type PronunciationResult } from '@/lib/pronunciation';
 import { api } from '@/lib/api';
 
 type Feedback =
@@ -57,6 +58,11 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const [typed, setTyped] = useState('');
   const [listening, setListening] = useState(false);
   const [spokenText, setSpokenText] = useState('');
+  // Best-effort phoneme-level score (Azure Speech) — an extra readout on top
+  // of the existing transcript-match grading, never a replacement for it.
+  // null whenever it's not (yet, or ever) available; the exercise is graded
+  // exactly as before regardless of whether this ever resolves.
+  const [pronScore, setPronScore] = useState<PronunciationResult | null>(null);
   const [matchedPairs, setMatchedPairs] = useState<Set<string>>(new Set());
   const [pairSelection, setPairSelection] = useState<{ side: 'es' | 'en'; value: string } | null>(null);
   const [pairShake, setPairShake] = useState<string | null>(null);
@@ -254,19 +260,41 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     if (feedback || !current || listening) return;
     setListening(true);
     setSpokenText('');
+    setPronScore(null);
+    const word = current.word;
+
+    // Start recording the SAME utterance concurrently with the browser's
+    // own speech recognition below — starting this after listenOnce()
+    // resolves would just capture silence, since the learner has already
+    // finished speaking by then. Resolves null instantly if unsupported.
+    const recordingPromise = startRecording();
+
     const result = await listenOnce();
     setListening(false);
     if (result.error === 'unsupported') {
+      void recordingPromise.then((rec) => rec?.stop());
       handleSkipSpeaking();
       return;
     }
     if (!result.transcript) {
       setSpokenText('__none__');
+      void recordingPromise.then((rec) => rec?.stop());
       return;
     }
     setSpokenText(result.transcript.split('|')[0].trim());
-    const ok = matchSpoken(result.transcript, current.word.es);
-    grade(ok, current.word.es);
+    const ok = matchSpoken(result.transcript, word.es);
+    grade(ok, word.es);
+
+    // Best-effort phoneme-level score, entirely in the background — never
+    // awaited, never blocks grading, and silently does nothing if Azure
+    // Speech isn't configured server-side or the browser can't record.
+    const languageName = buildTutorContext().languageName;
+    void recordingPromise.then(async (rec) => {
+      const clip = await rec?.stop();
+      if (!clip) return;
+      const score = await assessPronunciationFromBlob(clip, word.es, languageName);
+      if (score) setPronScore(score);
+    });
   };
 
   const handleSkipSpeaking = () => {
@@ -759,6 +787,11 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             {spokenText && spokenText !== '__none__' && (
               <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
                 Heard: <span className="font-bold">&ldquo;{spokenText}&rdquo;</span>
+              </p>
+            )}
+            {pronScore && (
+              <p className="mt-2 text-sm text-brand-600 dark:text-brand-400 font-semibold">
+                Pronunciation: {Math.round(pronScore.accuracyScore)}%
               </p>
             )}
             {!feedback && (
