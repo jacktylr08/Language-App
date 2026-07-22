@@ -71,3 +71,14 @@ export const tutorWritingLimiter = rateLimit({
   keyGenerator: userKey,
   message: tutorMessage,
 });
+
+// Subscribing/unsubscribing a device for push reminders happens once per
+// device, rarely — generous headroom just to stop a retry loop.
+export const pushLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  message: tutorMessage,
+});

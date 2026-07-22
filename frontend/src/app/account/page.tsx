@@ -16,6 +16,7 @@ import {
   ProgressState,
 } from '@/lib/progress';
 import { curriculum } from '@/lib/curriculum';
+import { pushSupported, getExistingSubscription, enablePushReminders, disablePushReminders } from '@/lib/push';
 
 interface Profile {
   email: string;
@@ -38,8 +39,21 @@ export default function AccountPage() {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
 
+  // Practice reminders (push notifications)
+  const [remindersOn, setRemindersOn] = useState(false);
+  const [remindersBusy, setRemindersBusy] = useState(false);
+  const [remindersError, setRemindersError] = useState('');
+  const [remindersChecked, setRemindersChecked] = useState(false);
+
   useEffect(() => {
     setProgress(loadProgress());
+    if (pushSupported()) {
+      getExistingSubscription()
+        .then((sub) => setRemindersOn(!!sub))
+        .finally(() => setRemindersChecked(true));
+    } else {
+      setRemindersChecked(true);
+    }
     // Seed from the locally stored session immediately…
     const stored = getAuth();
     if (stored?.user?.email) {
@@ -89,6 +103,28 @@ export default function AccountPage() {
   const handleSignOut = () => {
     clearAuth();
     router.push('/login');
+  };
+
+  const handleToggleReminders = async () => {
+    setRemindersError('');
+    setRemindersBusy(true);
+    try {
+      if (remindersOn) {
+        await disablePushReminders();
+        setRemindersOn(false);
+      } else {
+        await enablePushReminders();
+        setRemindersOn(true);
+      }
+    } catch (err: any) {
+      setRemindersError(
+        err?.response?.data?.code === 'push_not_configured'
+          ? "Reminders aren't switched on for this app yet."
+          : err?.message || 'Could not update your reminder setting.'
+      );
+    } finally {
+      setRemindersBusy(false);
+    }
   };
 
   if (authLoading) {
@@ -196,6 +232,38 @@ export default function AccountPage() {
 
         {/* What Profe knows about this learner — the personalisation, made visible */}
         <TutorProfilePanel />
+
+        {/* Practice reminders */}
+        {remindersChecked && pushSupported() && (
+          <section className="surface p-6 mb-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="font-extrabold text-ink dark:text-white">🔔 Practice reminders</h2>
+                <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5">
+                  A gentle nudge if you're about to lose your streak.
+                </p>
+              </div>
+              <button
+                onClick={handleToggleReminders}
+                disabled={remindersBusy}
+                role="switch"
+                aria-checked={remindersOn}
+                className={`shrink-0 w-14 h-8 rounded-full relative transition-colors ${
+                  remindersOn ? 'bg-brand-600' : 'bg-stone-300 dark:bg-stone-700'
+                } ${remindersBusy ? 'opacity-60' : ''}`}
+              >
+                <span
+                  className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                    remindersOn ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {remindersError && (
+              <p className="text-sm text-terra-600 dark:text-terra-300 mt-3">{remindersError}</p>
+            )}
+          </section>
+        )}
 
         {/* Change password */}
         <section className="surface p-6 mb-6">

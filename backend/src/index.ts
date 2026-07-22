@@ -9,6 +9,8 @@ import { errorHandler } from '@/middleware/auth';
 import authRoutes from '@/routes/auth';
 import tutorRoutes from '@/routes/tutor';
 import stateRoutes from '@/routes/state';
+import pushRoutes from '@/routes/push';
+import { startReminderScheduler } from '@/services/reminder-scheduler';
 
 dotenv.config();
 
@@ -50,6 +52,7 @@ app.get('/api/v1/status', (_req: Request, res: Response) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/tutor', tutorRoutes);
 app.use('/api/v1/state', stateRoutes);
+app.use('/api/v1/push', pushRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
@@ -100,6 +103,8 @@ const start = async (): Promise<void> => {
     } else {
       logger.info('Database schema up to date');
     }
+
+    startReminderScheduler();
   } catch (error) {
     logger.error(
       `Database setup failed — API will not work until this is fixed: ${
