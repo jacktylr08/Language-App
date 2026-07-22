@@ -1,5 +1,8 @@
-import { reconcileReviews, dueWeaknessesFirst, isEvaluationDue, trimTranscript } from '../tutor-memory';
+jest.mock('../api', () => ({ api: { post: jest.fn() } }));
+
+import { reconcileReviews, dueWeaknessesFirst, isEvaluationDue, trimTranscript, reflectAndSave } from '../tutor-memory';
 import type { LearnerProfile } from '../tutor-memory';
+import { api } from '../api';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -98,5 +101,43 @@ describe('trimTranscript', () => {
     const trimmed = trimTranscript([{ role: 'user', content: longTurn }]);
     expect(trimmed[0].content.length).toBeLessThan(400);
     expect(trimmed[0].content.endsWith('…')).toBe(true);
+  });
+});
+
+describe('reflectAndSave', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  it('skips the round-trip only for a true hello-and-goodbye with no user turn at all', async () => {
+    await reflectAndSave([{ role: 'assistant', content: 'Hola! ¿Cómo estás?' }]);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('regression: reflects on a short call with just one thing the learner said', async () => {
+    // Reported bug: a learner said one real thing ("when I wake up I get a
+    // coffee") then ended the call, and it was never remembered — traced to
+    // this requiring at least TWO user turns before bothering to reflect.
+    (api.post as jest.Mock).mockResolvedValue({
+      data: {
+        profile: {
+          summary: 'Has a morning coffee routine.',
+          strengths: [],
+          weaknesses: [],
+          mistakes: [],
+          sessionNote: 'Learnt they have coffee every morning.',
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    const result = await reflectAndSave([
+      { role: 'assistant', content: 'Hola! ¿Qué haces por la mañana?' },
+      { role: 'user', content: 'when I wake up I get a coffee' },
+    ]);
+
+    expect(api.post).toHaveBeenCalledWith('/tutor/reflect', expect.objectContaining({ profile: null }));
+    expect(result?.summary).toBe('Has a morning coffee routine.');
   });
 });

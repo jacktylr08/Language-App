@@ -184,8 +184,11 @@ export async function reflectAndSave(
 ): Promise<LearnerProfile | null> {
   const prev = loadProfile();
 
-  // Not worth a round-trip for a hello-and-goodbye.
-  if (messages.filter((m) => m.role === 'user').length < 2) return prev;
+  // Skip only a true hello-and-goodbye (no user turn at all) — even a single
+  // thing the learner said is worth remembering. A stricter cutoff here
+  // previously meant a short call with one real exchange (say something,
+  // then hang up) silently never got reflected on at all.
+  if (messages.filter((m) => m.role === 'user').length < 1) return prev;
 
   try {
     const res = await api.post('/tutor/reflect', {

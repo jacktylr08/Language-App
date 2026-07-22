@@ -29,6 +29,14 @@ const STATE_LABEL: Record<RealtimeState, string> = {
 // instead of leaving the learner staring at a silent orb.
 const QUIET_HINT_MS = 12000;
 
+// Grace period between "End call" and actually hanging up. OpenAI transcribes
+// speech asynchronously — the input_audio_transcription.completed event for
+// whatever was just said can still be in flight when the learner hits End.
+// Closing immediately drops that line from the transcript before it ever
+// arrives, so the tutor's memory of the call ends up missing exactly the
+// thing they just said.
+const END_CALL_GRACE_MS = 1200;
+
 export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [state, setState] = useState<RealtimeState>('connecting');
   const [assistantLine, setAssistantLine] = useState('');
@@ -38,18 +46,29 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [muted, setMuted] = useState(false);
   const [started, setStarted] = useState(false);
   const [quietHint, setQuietHint] = useState(false);
+  const [ending, setEnding] = useState(false);
 
   const sessionRef = useRef<RealtimeSession | null>(null);
   const endedRef = useRef(false);
 
-  // End the call and hand the transcript back for memory.
+  // End the call and hand the transcript back for memory. Waits a beat first
+  // so a transcription still in flight for whatever was just said has a
+  // chance to land before the connection actually closes.
   const end = useRef((forceEmpty = false) => {
     if (endedRef.current) return;
     endedRef.current = true;
-    const transcript = forceEmpty ? [] : sessionRef.current?.getTranscript() ?? [];
-    sessionRef.current?.close();
-    sessionRef.current = null;
-    onClose(transcript);
+    const finish = () => {
+      const transcript = forceEmpty ? [] : sessionRef.current?.getTranscript() ?? [];
+      sessionRef.current?.close();
+      sessionRef.current = null;
+      onClose(transcript);
+    };
+    if (forceEmpty) {
+      finish();
+    } else {
+      setEnding(true);
+      setTimeout(finish, END_CALL_GRACE_MS);
+    }
   });
 
   // (Re)connect the call. Always closes any previous session first, so a
@@ -110,14 +129,20 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     });
   }, [context]);
 
-  // Clean up on unmount if the call never got an explicit End.
+  // Clean up on unmount if the call never got an explicit End (navigated away
+  // mid-call). Same grace period as an explicit End — the session object
+  // itself doesn't depend on the component staying mounted, so it's safe to
+  // finish capturing the transcript and close it a beat later.
   useEffect(() => {
     return () => {
       if (!endedRef.current) {
         endedRef.current = true;
-        const transcript = sessionRef.current?.getTranscript() ?? [];
-        sessionRef.current?.close();
-        onClose(transcript);
+        const session = sessionRef.current;
+        setTimeout(() => {
+          const transcript = session?.getTranscript() ?? [];
+          session?.close();
+          onClose(transcript);
+        }, END_CALL_GRACE_MS);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,6 +167,17 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const active = state === 'user_speaking' || state === 'listening';
   const speaking = state === 'assistant_speaking';
   const hasError = !!error && error !== 'unsupported';
+
+  // Brief transitional screen while we give a final transcription a moment
+  // to land before actually hanging up (see END_CALL_GRACE_MS).
+  if (ending) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-paper to-brand-50/40 dark:from-paper-dark dark:to-stone-950">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-500" />
+        <p className="text-ink-soft dark:text-stone-400 font-medium">Saving your progress…</p>
+      </div>
+    );
+  }
 
   // Ready screen: one tap starts the conversation (and grants mic + audio).
   if (!started) {
