@@ -27,9 +27,9 @@ export type ExerciseType =
   | 'build_sentence' // assemble a sentence from word tiles
   | 'mcq_es_en' // see Spanish, pick English
   | 'mcq_en_es' // see English, pick Spanish
-  | 'listen_mcq' // hear Spanish, pick what you heard
   | 'listen_meaning' // hear Spanish, pick the meaning
   | 'type_es' // see English, type the Spanish
+  | 'type_en' // see Spanish, type the English — true recall, the other direction
   | 'fill_blank' // complete the sentence
   | 'match_pairs' // match Spanish to English
   | 'speak' // say the Spanish out loud
@@ -105,11 +105,6 @@ function mcqEnEs(word: VocabItem, pool: VocabItem[]): Exercise {
   return { type: 'mcq_en_es', word, options: shuffle([word.es, ...distractors]) };
 }
 
-function listenMcq(word: VocabItem, pool: VocabItem[]): Exercise {
-  const distractors = pickDistractors(word, pool, 3).map((w) => w.es);
-  return { type: 'listen_mcq', word, options: shuffle([word.es, ...distractors]) };
-}
-
 function listenMeaning(word: VocabItem, pool: VocabItem[]): Exercise {
   const distractors = pickDistractors(word, pool, 3).map((w) => w.en);
   return { type: 'listen_meaning', word, options: shuffle([word.en, ...distractors]) };
@@ -117,6 +112,10 @@ function listenMeaning(word: VocabItem, pool: VocabItem[]): Exercise {
 
 function typeEs(word: VocabItem): Exercise {
   return { type: 'type_es', word };
+}
+
+function typeEn(word: VocabItem): Exercise {
+  return { type: 'type_en', word };
 }
 
 function speak(word: VocabItem): Exercise {
@@ -247,13 +246,22 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
 
   chunks.forEach((chunk) => {
     chunk.forEach((w) => queue.push({ type: 'teach', word: w }));
-    shuffle(chunk).forEach((w) => queue.push(mcqEsEn(w, pool)));
+    // One easy recognition check for half the chunk, right off the
+    // introduction — a brand-new word deserves a gentle first touch before
+    // real recall is fair.
     shuffle(chunk)
-      .slice(0, 2)
-      .forEach((w, i) => {
-        if (i % 2 === 0) queue.push(listenMeaning(w, pool));
-        else queue.push(mcqEnEs(w, pool));
-      });
+      .slice(0, Math.ceil(chunk.length / 2))
+      .forEach((w) => queue.push(mcqEsEn(w, pool)));
+    // Real recall for every word — English shown, produce the Spanish.
+    // Deliberately the main event: producing the target language from memory
+    // reinforces more than recognising it, and more than recalling the
+    // English meaning does going the other way round.
+    shuffle(chunk).forEach((w) => queue.push(typeEs(w)));
+    // Meaning-recall the other direction too, for about half the chunk —
+    // still worth practising, just secondary to producing Spanish.
+    shuffle(chunk)
+      .slice(0, Math.ceil(chunk.length / 2))
+      .forEach((w) => queue.push(typeEn(w)));
     if (chunk.length >= 4) queue.push(matchPairs(chunk));
   });
 
@@ -281,12 +289,16 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
   // scaffolding. One per lesson, as the capstone before the challenge round.
   if (vocab.length >= 3) queue.push(writeAnswer(lesson));
 
-  // 6. Challenge round: harder production on a sample of the vocab
+  // 6. Challenge round: harder production on a sample of the vocab — all
+  // recall, no recognition, weighted toward producing Spanish over recalling
+  // English (the direction that reinforces most), with speaking mixed in.
   const challenge = shuffle(vocab).slice(0, 6);
+  const challengeAngles: Array<'es' | 'en' | 'speak'> = ['es', 'es', 'en', 'es', 'en', 'speak'];
   challenge.forEach((w, i) => {
-    if (speechRecognitionAvailable && i % 3 === 2) queue.push(speak(w));
-    else if (i % 2 === 0) queue.push(typeEs(w));
-    else queue.push(listenMcq(w, pool));
+    const angle = challengeAngles[i % challengeAngles.length];
+    if (angle === 'speak' && speechRecognitionAvailable) queue.push(speak(w));
+    else if (angle === 'en') queue.push(typeEn(w));
+    else queue.push(typeEs(w));
   });
 
   // 7. Sentence fill-ins
@@ -296,9 +308,6 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
       const ex = fillBlank(s, vocab, pool);
       if (ex) queue.push(ex);
     });
-
-  // Final matching send-off
-  if (vocab.length >= 5) queue.push(matchPairs(vocab));
 
   return queue;
 }
@@ -326,22 +335,25 @@ export function buildReviewSession(
   const pool = all;
   const queue: Exercise[] = [];
   shuffle(words).forEach((w, i) => {
+    // Mostly recall (type it from memory, both directions) with just one
+    // recognition touch in the cycle — recognising an answer among options
+    // is a much weaker memory test than producing it unprompted.
+    // Weighted toward producing Spanish (typeEs) over recalling English
+    // (typeEn), with one recognition touch and a speaking rep in the cycle.
     switch (i % 5) {
       case 0:
-        queue.push(mcqEsEn(w, pool));
-        break;
       case 1:
-        queue.push(listenMeaning(w, pool));
-        break;
-      case 2:
         queue.push(typeEs(w));
         break;
+      case 2:
+        queue.push(mcqEsEn(w, pool));
+        break;
       case 3:
-        queue.push(mcqEnEs(w, pool));
+        queue.push(typeEn(w));
         break;
       default:
         if (speechRecognitionAvailable) queue.push(speak(w));
-        else queue.push(listenMcq(w, pool));
+        else queue.push(typeEs(w));
     }
   });
 
@@ -374,22 +386,25 @@ export function buildMistakesSession(
   const pool = getAllVocab();
   const queue: Exercise[] = [];
   shuffle(words).forEach((w, i) => {
+    // Mostly recall (type it from memory, both directions) with just one
+    // recognition touch in the cycle — recognising an answer among options
+    // is a much weaker memory test than producing it unprompted.
+    // Weighted toward producing Spanish (typeEs) over recalling English
+    // (typeEn), with one recognition touch and a speaking rep in the cycle.
     switch (i % 5) {
       case 0:
-        queue.push(mcqEsEn(w, pool));
-        break;
       case 1:
-        queue.push(listenMeaning(w, pool));
-        break;
-      case 2:
         queue.push(typeEs(w));
         break;
+      case 2:
+        queue.push(mcqEsEn(w, pool));
+        break;
       case 3:
-        queue.push(mcqEnEs(w, pool));
+        queue.push(typeEn(w));
         break;
       default:
         if (speechRecognitionAvailable) queue.push(speak(w));
-        else queue.push(listenMcq(w, pool));
+        else queue.push(typeEs(w));
     }
   });
   if (words.length >= 5) queue.push(matchPairs(words));
@@ -416,7 +431,9 @@ export function buildRetry(missed: Exercise, pool: VocabItem[]): Exercise {
     case 'speak':
       retry = mcqEnEs(w, pool);
       break;
-    case 'listen_mcq':
+    case 'type_en':
+      retry = mcqEsEn(w, pool);
+      break;
     case 'listen_meaning':
       retry = mcqEsEn(w, pool);
       break;

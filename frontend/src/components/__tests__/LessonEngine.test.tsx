@@ -72,6 +72,51 @@ describe('LessonEngine — mcq flow', () => {
   });
 });
 
+describe('LessonEngine — type_es and type_en recall', () => {
+  it('marks a correctly typed Spanish answer correct (type_es)', async () => {
+    setQueue([{ type: 'type_es', word: vocab('v1', 'después', 'after / then') }]);
+    await start();
+
+    fireEvent.change(screen.getByPlaceholderText('Escribe en español…'), { target: { value: 'después' } });
+    fireEvent.click(screen.getByText('CHECK'));
+
+    expect(await screen.findByText('¡Correcto!')).toBeInTheDocument();
+  });
+
+  it('marks a correctly typed English meaning correct (type_en)', async () => {
+    setQueue([{ type: 'type_en', word: vocab('v1', 'hola', 'hello') }]);
+    await start();
+
+    fireEvent.change(screen.getByPlaceholderText('Type it in English…'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByText('CHECK'));
+
+    expect(await screen.findByText('¡Correcto!')).toBeInTheDocument();
+  });
+
+  it('accepts a listed alternative English answer (type_en with enAlt)', async () => {
+    setQueue([
+      { type: 'type_en', word: { ...vocab('v1', 'después', 'after / then'), enAlt: ['afterwards', 'then', 'after that'] } },
+    ]);
+    await start();
+
+    fireEvent.change(screen.getByPlaceholderText('Type it in English…'), { target: { value: 'afterwards' } });
+    fireEvent.click(screen.getByText('CHECK'));
+
+    expect(await screen.findByText('¡Correcto!')).toBeInTheDocument();
+  });
+
+  it('marks a wrong English guess wrong and shows the real meaning (type_en)', async () => {
+    setQueue([{ type: 'type_en', word: vocab('v1', 'hola', 'hello') }]);
+    await start();
+
+    fireEvent.change(screen.getByPlaceholderText('Type it in English…'), { target: { value: 'goodbye' } });
+    fireEvent.click(screen.getByText('CHECK'));
+
+    expect(await screen.findByText('Not quite')).toBeInTheDocument();
+    expect(screen.getByText('hello')).toBeInTheDocument();
+  });
+});
+
 describe('LessonEngine — free-composition writing exercise', () => {
   const writingExercise: Exercise = {
     type: 'write_answer',

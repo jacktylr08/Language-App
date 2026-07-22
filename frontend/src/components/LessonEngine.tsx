@@ -99,9 +99,9 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     if (!current || !started) return;
     if (current.type === 'teach') {
       speak(current.word.es);
-    } else if (current.type === 'listen_mcq' || current.type === 'listen_meaning') {
+    } else if (current.type === 'listen_meaning') {
       speak(current.word.es);
-    } else if (current.type === 'type_es') {
+    } else if (current.type === 'type_es' || current.type === 'type_en') {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
     return () => stopSpeaking();
@@ -176,7 +176,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     if (current.type === 'mcq_es_en' || current.type === 'listen_meaning') {
       correct = option === current.word.en;
       correctAnswer = current.word.en;
-    } else if (current.type === 'mcq_en_es' || current.type === 'listen_mcq') {
+    } else if (current.type === 'mcq_en_es') {
       correct = option === current.word.es;
       correctAnswer = current.word.es;
     } else if (current.type === 'fill_blank' && current.sentence) {
@@ -218,6 +218,17 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     else if (quality === 'accents') grade(true, current.word.es, `Watch the accents: ${current.word.es}`);
     else if (quality === 'close') grade(true, current.word.es, `Almost — it's spelled: ${current.word.es}`);
     else grade(false, current.word.es);
+  };
+
+  const submitTypedEn = () => {
+    if (feedback || !current || !typed.trim()) return;
+    const accepted = [current.word.en, ...(current.word.enAlt ?? [])];
+    // Accept "eat" for "to eat" too — natural typing for verb infinitives
+    const stripped = accepted.filter((a) => /^to\s+/i.test(a)).map((a) => a.replace(/^to\s+/i, ''));
+    const quality: MatchQuality = matchAnswer(typed, [...accepted, ...stripped]);
+    if (quality === 'exact' || quality === 'accents') grade(true, current.word.en);
+    else if (quality === 'close') grade(true, current.word.en, `Almost — it's: ${current.word.en}`);
+    else grade(false, current.word.en);
   };
 
   const submitWriting = async () => {
@@ -597,15 +608,13 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           />
         )}
 
-        {(current.type === 'listen_mcq' || current.type === 'listen_meaning') && (
+        {current.type === 'listen_meaning' && (
           <ListeningExercise
-            instruction={
-              current.type === 'listen_mcq' ? 'What did you hear?' : 'What does it mean?'
-            }
+            instruction="What does it mean?"
             options={current.options!}
             selected={selected}
             feedback={feedback}
-            correctAnswer={current.type === 'listen_mcq' ? current.word.es : current.word.en}
+            correctAnswer={current.word.en}
             onSelect={submitChoice}
             onPlay={(rate) => speak(current.word.es, rate)}
           />
@@ -650,6 +659,42 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             {!feedback && (
               <button
                 onClick={submitTyped}
+                disabled={!typed.trim()}
+                className="mt-6 btn-primary w-full py-4"
+              >
+                CHECK
+              </button>
+            )}
+          </div>
+        )}
+
+        {current.type === 'type_en' && (
+          <div className="flex-1 flex flex-col justify-center">
+            <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
+              What does this mean?
+            </p>
+            <button onClick={() => speak(current.word.es)} className="text-center mb-1 group mx-auto">
+              <p className="font-display text-4xl font-black text-ink dark:text-white group-hover:text-brand-500 transition-colors">
+                🔊 {current.word.es}
+              </p>
+            </button>
+            <p className="text-center text-stone-500 dark:text-stone-400 italic mb-8">{current.word.pron}</p>
+            <input
+              ref={inputRef}
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitTypedEn()}
+              disabled={!!feedback}
+              placeholder="Type it in English…"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full text-xl px-5 py-4 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark-soft text-ink dark:text-white shadow-card dark:shadow-card-dark focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
+            />
+            {!feedback && (
+              <button
+                onClick={submitTypedEn}
                 disabled={!typed.trim()}
                 className="mt-6 btn-primary w-full py-4"
               >

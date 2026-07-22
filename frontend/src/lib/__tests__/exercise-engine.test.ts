@@ -56,6 +56,43 @@ describe('buildLessonSession — general structure', () => {
   });
 });
 
+describe('buildLessonSession — recall over recognition', () => {
+  const lesson = curriculum.find((l) => l.slug === 'ser-identity')!;
+  const queue = buildLessonSession(lesson, false);
+  const counts = (type: string) => queue.filter((e) => e.type === type).length;
+
+  it('drills every word by typing the Spanish from memory (the primary recall direction)', () => {
+    for (const w of lesson.vocab) {
+      expect(queue.some((e) => e.type === 'type_es' && e.word.id === w.id)).toBe(true);
+    }
+  });
+
+  it('never produces the old pure-recognition listening-choice exercise', () => {
+    expect(queue.some((e) => (e.type as string) === 'listen_mcq')).toBe(false);
+  });
+
+  it('uses recall (typing) far more than multiple-choice recognition', () => {
+    const recall = counts('type_es') + counts('type_en');
+    const recognition = counts('mcq_es_en') + counts('mcq_en_es') + counts('listen_meaning');
+    expect(recall).toBeGreaterThan(recognition);
+  });
+
+  it('drills English→Spanish (type_es) at least as often as Spanish→English (type_en)', () => {
+    expect(counts('type_es')).toBeGreaterThanOrEqual(counts('type_en'));
+  });
+});
+
+describe('buildRetry — type_en', () => {
+  it('steps down to a Spanish-shown recognition check, matching the original direction', () => {
+    const pool = getAllVocab();
+    const word = pool[0];
+    const retry = buildRetry({ type: 'type_en', word }, pool);
+    expect(retry.type).toBe('mcq_es_en');
+    expect(retry.isRetry).toBe(true);
+    expect(retry.options).toContain(word.en);
+  });
+});
+
 describe('buildReviewSession', () => {
   beforeEach(() => localStorage.clear());
 
