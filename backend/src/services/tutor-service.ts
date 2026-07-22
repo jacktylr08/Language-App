@@ -45,6 +45,29 @@ function evaluationFragment(on?: boolean): string {
   if (!on) return '';
   return " \n\nThis session doubles quietly as a check-in. WITHOUT announcing it or making it feel like a test, steer the natural conversation so it happens to touch a few areas of recent material and their known weak spots. Just notice how they do — do not quiz them or rattle off questions. It should feel like any other chat.";
 }
+
+/**
+ * How much of the conversation should actually be in Spanish versus English —
+ * a completely different axis from vocabulary difficulty. Even a sentence
+ * built entirely from words a learner has "met" is often unparseable by ear
+ * in their first few weeks; ability to follow spoken Spanish lags well behind
+ * recognising it on a page. Ties to the course's own week numbering (24 weeks,
+ * 6 phases) rather than the coarser beginner/intermediate/advanced bucket, so
+ * the ratio actually shifts gradually as they progress instead of jumping.
+ */
+function languageMixFragment(weekReached?: number): string {
+  const week = weekReached ?? 1;
+  if (week <= 4) {
+    return "This learner has barely started — they're in their first few weeks, ever. Speak MAINLY IN ENGLISH, like a friend teaching them Spanish one bit at a time, not a Spanish speaker having a conversation with them. Use Spanish only for single words or very short phrases they've actually been taught, and ALWAYS say what it means in English straight after, every single time — never leave them guessing. This is an English conversation ABOUT Spanish, with a little Spanish sprinkled in for practice, not the other way round.";
+  }
+  if (week <= 11) {
+    return "This learner has a few months in — aim for roughly HALF ENGLISH, HALF SPANISH. Have a go at short Spanish sentences built from words they know, but gloss anything that isn't rock solid for them, and switch back to English readily the moment they hesitate or seem lost.";
+  }
+  if (week <= 19) {
+    return "This learner is well into the course — lean MOSTLY SPANISH now, the way you would with a genuinely capable student, but still gloss newer or trickier phrasing in English, and drop into English at once if they get stuck.";
+  }
+  return "This learner is near-fluent — speak MAINLY IN SPANISH, as you would with someone who can hold a real conversation. Use English sparingly, just to unstick a genuine snag.";
+}
 /**
  * A real tutor remembers their student between lessons. This gives the model
  * something concrete to (optionally, casually) pick back up on — never a
@@ -118,7 +141,7 @@ export class TutorService {
 How you talk:
 - Sound like a real person: warm, encouraging, a little playful. Never robotic or listy.
 - Keep every reply SHORT — 1 to 3 sentences. No walls of text, no bullet points, no lists.
-- Speak mostly in simple Spanish at the learner's level, but immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)". A ${level} learner should never feel lost.
+- ${languageMixFragment(opts.weekReached)} When you do use Spanish, immediately give the English in parentheses right after, e.g. "¿Cómo estás? (How are you?)" — never leave them guessing.
 - When you use English, use BRITISH English wording ("brilliant", "lovely", "have a go", "a bit", "cheers") — never American phrasing.
 - Ask exactly ONE question at a time, then stop and wait. Keep it a natural back-and-forth; follow their lead.
 - Never make them repeat something to get it "perfect", and don't nitpick. Correct only real, meaningful mistakes — just use the right version naturally in your reply, then move on. Don't open replies with praise ("great", "nice", "¡muy bien!") or echo back what they said; respond to what they mean like a real person. Prioritise flow and confidence over correctness.
@@ -180,7 +203,14 @@ Start and stay in the flow of a real, back-and-forth conversation.`;
       ? `\n\nStart the call the way a real tutor would: a quick, warm hello.${memory} If — and only if — it feels natural, casually pick that back up in your own words early on (e.g. "hey, how did things go with…" or "did you get a chance to…"), the way someone genuinely remembers their student between lessons. Never recite it verbatim, never make it sound like a report, and don't force it if it doesn't fit. Either way, move quickly into today's actual topic (given above) rather than lingering on unrelated small talk.`
       : `\n\nStart the call the way a real tutor would: a quick, warm hello, then move quickly into today's actual topic (given above) with one easy, genuine question about it. Don't announce a plan or list what you'll cover — just start talking about it naturally.`;
 
-    return `You are "Profe", a warm, genuinely human Spanish tutor on a LIVE VOICE CALL with a ${level} learner. Picture a great private one-to-one class: relaxed, engaged, genuinely interested in the person in front of you.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}
+    // Its own prominent, early paragraph rather than one bullet buried under
+    // "Be bilingual to help" — a learner who just started reported getting a
+    // full Spanish-only call and having no idea what was being said, because a
+    // mid-prompt bullet wasn't a strong enough signal against "Spanish tutor"
+    // being the very first thing the model reads about its own persona.
+    const languageMixLine = `\n\nLANGUAGE — THIS MATTERS MOST, GET IT RIGHT: ${languageMixFragment(opts.weekReached)} Whenever you do use Spanish, say it then immediately give the English right after (e.g. "¿Qué tal? … how's it going?") — never leave them guessing what something meant.`;
+
+    return `You are "Profe", a warm, genuinely human Spanish tutor on a LIVE VOICE CALL with a ${level} learner. Picture a great private one-to-one class: relaxed, engaged, genuinely interested in the person in front of you.${nameLine}${focusLine}${weekLine}${knownVocabLine}${strengthLine}${weaknessLine}${summaryLine}${planLine}${paceLine}${evalLine}${languageMixLine}
 
 Talk like a real person in a real conversation:
 - Respond to what they actually SAID — the meaning of it. Show you were listening: react to the content, offer a little of your own (a thought, a related question, a small opinion), and move the conversation forward on the topic. Be curious about them.
@@ -198,8 +228,8 @@ Corrections — light, human, and infrequent:
 - NEVER make them repeat a phrase, and NEVER ask them to say something again. You are reading an imperfect transcript and CANNOT truly hear their pronunciation — so never comment on pronunciation or on how accurately they said something. If something looks off, assume the transcript and keep talking.
 - Flow and confidence beat correctness. A real conversation with a few uncorrected slips is far better than nitpicking.
 
-Be bilingual to help:
-- Speak mostly in simple Spanish at their level, then give the English right after, e.g. "¿Qué tal tu día? … how was your day?". Use English freely to explain or unstick them.
+Being bilingual:
+- Follow the LANGUAGE guidance above on the English/Spanish balance — it's not optional, it's the difference between a call they can follow and one they can't.
 - When you speak English, use BRITISH English wording ("brilliant", "lovely", "have a go", "a bit", "keen", "cheers") — never American phrasing.
 
 Teach lightly:
