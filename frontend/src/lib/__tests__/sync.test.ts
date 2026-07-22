@@ -59,6 +59,27 @@ describe('mergeProgress', () => {
     });
   });
 
+  it('keeps the FSRS scheduling state from whichever side has more review history, not just whichever is listed first', () => {
+    const fsrsCard = (reps: number) => ({
+      due: '2026-02-01T00:00:00.000Z',
+      stability: 5,
+      difficulty: 5,
+      elapsed_days: 0,
+      scheduled_days: 3,
+      learning_steps: 0,
+      reps,
+      lapses: 0,
+      state: 2,
+    });
+    const a = progress({ words: { hola: { strength: 3, correct: 3, wrong: 0, lastSeen: '', nextReview: '', fsrs: fsrsCard(2) } } });
+    const b = progress({ words: { hola: { strength: 3, correct: 3, wrong: 0, lastSeen: '', nextReview: '', fsrs: fsrsCard(5) } } });
+
+    // b has more actual reviews behind it — losing that on merge would reset
+    // the word's difficulty/stability model as if it were brand new.
+    expect(mergeProgress(a, b)!.words.hola.fsrs?.reps).toBe(5);
+    expect(mergeProgress(b, a)!.words.hola.fsrs?.reps).toBe(5);
+  });
+
   it('unions active days from both devices instead of picking one side', () => {
     const a = progress({ activeDays: ['2026-01-01', '2026-01-03'] });
     const b = progress({ activeDays: ['2026-01-02', '2026-01-03'] });

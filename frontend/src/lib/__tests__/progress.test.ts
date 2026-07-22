@@ -1,6 +1,8 @@
 import { touchStreak, currentStreak, recordWordResult, getMistakeWordIds, loadProgress, recentActivity } from '../progress';
 import type { ProgressState } from '../progress';
 
+const DAY = 24 * 60 * 60 * 1000;
+
 function setNow(iso: string) {
   jest.setSystemTime(new Date(iso));
 }
@@ -73,6 +75,49 @@ describe('recordWordResult', () => {
     const state = loadProgress();
     expect(state.words.hola.strength).toBe(0);
     expect(state.words.hola.wrong).toBe(1);
+  });
+
+  it('schedules a real FSRS card, not a fixed lookup table', () => {
+    recordWordResult('hola', true);
+    const { fsrs, nextReview } = loadProgress().words.hola;
+    expect(fsrs).toBeDefined();
+    expect(fsrs!.reps).toBe(1);
+    expect(new Date(nextReview).getTime()).toBeGreaterThan(Date.now() - DAY);
+  });
+
+  it('schedules a wrong answer sooner than a correct one, all else equal', () => {
+    recordWordResult('correcto', true);
+    recordWordResult('incorrecto', false);
+    const state = loadProgress();
+    const correctDue = new Date(state.words.correcto.nextReview).getTime();
+    const wrongDue = new Date(state.words.incorrecto.nextReview).getTime();
+    expect(wrongDue).toBeLessThanOrEqual(correctDue);
+  });
+
+  it('extends the interval further after consecutive correct reviews (real difficulty/stability modelling)', () => {
+    recordWordResult('constante', true);
+    const afterFirst = loadProgress().words.constante.fsrs!.stability;
+
+    // Jump forward so the second review actually lands after the first is due,
+    // matching how FSRS is meant to be driven (reviewing "on time").
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(Date.now() + 2 * DAY));
+    recordWordResult('constante', true);
+    jest.useRealTimers();
+
+    const afterSecond = loadProgress().words.constante.fsrs!.stability;
+    expect(afterSecond).toBeGreaterThan(afterFirst);
+  });
+
+  it('keeps a lower-quality retry recall (firstTry=false) from scheduling as far out as a clean first-try', () => {
+    recordWordResult('facil', true, true);
+    const cleanDue = new Date(loadProgress().words.facil.nextReview).getTime();
+
+    localStorage.clear();
+    recordWordResult('dificil', true, false);
+    const retryDue = new Date(loadProgress().words.dificil.nextReview).getTime();
+
+    expect(retryDue).toBeLessThanOrEqual(cleanDue);
   });
 });
 

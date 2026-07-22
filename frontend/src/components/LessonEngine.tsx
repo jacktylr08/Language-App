@@ -116,7 +116,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       if (!current) return;
       const firstTry = !current.isRetry;
       if (!current.noWordTracking) {
-        recordWordResult(current.word.id, correct);
+        recordWordResult(current.word.id, correct, firstTry);
         // Speaking exercises also feed the pronunciation signal the tutor uses.
         if (current.type === 'speak') recordPronunciationResult(current.word.id, correct);
       }

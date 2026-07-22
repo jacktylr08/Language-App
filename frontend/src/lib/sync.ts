@@ -127,6 +127,10 @@ export function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressSta
           wrong: Math.max(wa.wrong, wb.wrong),
           lastSeen: later(wa.lastSeen, wb.lastSeen),
           nextReview: later(wa.nextReview, wb.nextReview),
+          // Whichever side has more actual FSRS review history is the more
+          // trustworthy scheduling state — losing it on merge would reset the
+          // word to "brand new" on its next review.
+          fsrs: (wb.fsrs?.reps ?? -1) > (wa.fsrs?.reps ?? -1) ? wb.fsrs : wa.fsrs,
         }
       : wb;
   }

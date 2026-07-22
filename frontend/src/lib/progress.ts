@@ -1,8 +1,30 @@
 /**
  * Learner progress store — persisted in localStorage.
- * Tracks daily streak, lesson completion, and per-word memory strength
- * (a lightweight SM-2 spaced-repetition model) so the app adapts to the learner.
+ * Tracks daily streak, lesson completion, and per-word memory strength so
+ * the app adapts to the learner. Review scheduling (nextReview) runs on
+ * FSRS — a modern, per-word difficulty/stability model that needs ~20-30%
+ * fewer reviews than a fixed SM-2-style interval table for the same
+ * retention (benchmarked across 500M+ real reviews). `strength` itself
+ * stays a simple 0-5 indicator driving unrelated UI (known/mastered counts,
+ * weakest-first sorting) — only the interval math changed.
  */
+import { fsrs, createEmptyCard, Rating, type Card, type CardInput } from 'ts-fsrs';
+
+const scheduler = fsrs();
+
+/** Serializable subset of an FSRS Card — Dates stored as ISO strings for localStorage/JSON. */
+export interface FsrsCardState {
+  due: string;
+  stability: number;
+  difficulty: number;
+  elapsed_days: number;
+  scheduled_days: number;
+  learning_steps: number;
+  reps: number;
+  lapses: number;
+  state: number;
+  last_review?: string;
+}
 
 export interface WordState {
   /** 0 = new, 5 = mastered */
@@ -10,7 +32,9 @@ export interface WordState {
   correct: number;
   wrong: number;
   lastSeen: string; // ISO date
-  nextReview: string; // ISO date
+  nextReview: string; // ISO date — FSRS-scheduled
+  /** FSRS scheduling state. Absent until the word's first recorded result. */
+  fsrs?: FsrsCardState;
   /** Speaking-exercise attempts — the pronunciation signal. */
   pronCorrect?: number;
   pronWrong?: number;
@@ -133,10 +157,13 @@ export function touchStreak(): ProgressState {
   return state;
 }
 
-/** SM-2-lite intervals (days) by strength level */
-const INTERVALS = [0, 1, 3, 7, 14, 30];
-
-export function recordWordResult(wordId: string, correct: boolean): void {
+/**
+ * Record the outcome of a vocab exercise and reschedule its next review via
+ * FSRS. `firstTry` softens the rating for a word that was only got right on
+ * a retry (still progress, just not as solid as a clean first-time recall) —
+ * defaults to true so callers that don't track retries behave sensibly.
+ */
+export function recordWordResult(wordId: string, correct: boolean, firstTry = true): void {
   const state = loadProgress();
   const w: WordState = state.words[wordId] || {
     strength: 0,
@@ -153,9 +180,28 @@ export function recordWordResult(wordId: string, correct: boolean): void {
     w.wrong += 1;
   }
   w.lastSeen = today();
-  const next = new Date();
-  next.setDate(next.getDate() + INTERVALS[w.strength]);
-  w.nextReview = next.toISOString().slice(0, 10);
+
+  const now = new Date();
+  const card: Card | CardInput = w.fsrs
+    ? { ...w.fsrs, last_review: w.fsrs.last_review }
+    : createEmptyCard(now);
+  const rating = correct ? (firstTry ? Rating.Good : Rating.Hard) : Rating.Again;
+  const { card: next } = scheduler.next(card, now, rating);
+
+  w.fsrs = {
+    due: next.due.toISOString(),
+    stability: next.stability,
+    difficulty: next.difficulty,
+    elapsed_days: next.elapsed_days,
+    scheduled_days: next.scheduled_days,
+    learning_steps: next.learning_steps,
+    reps: next.reps,
+    lapses: next.lapses,
+    state: next.state,
+    last_review: next.last_review?.toISOString(),
+  };
+  w.nextReview = next.due.toISOString().slice(0, 10);
+
   state.words[wordId] = w;
   save(state);
 }
