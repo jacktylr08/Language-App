@@ -4,15 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { markOnboardingComplete } from '@/lib/sync';
+import { saveLearnerGoal, GOAL_LABELS, type LearnerGoal } from '@/lib/learner-goal';
+
+const GOAL_OPTIONS = Object.entries(GOAL_LABELS) as Array<[LearnerGoal, string]>;
+const TOTAL_STEPS = 3;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireAuth();
   const [step, setStep] = useState(0);
-  const [preferences, setPreferences] = useState({
-    targetReviewsPerDay: 20,
-    audioPlaybackSpeed: 1.0,
-  });
+  const [goal, setGoal] = useState<LearnerGoal | null>(null);
 
   if (isLoading) {
     return (
@@ -26,10 +27,13 @@ export default function OnboardingPage() {
   }
 
   const handleNext = () => {
-    if (step < 3) {
+    if (step < TOTAL_STEPS - 1) {
       setStep(step + 1);
     } else {
-      // Remember onboarding is done so it never re-asks (synced to the account).
+      // Persist what they told us — Profe uses this to shape the conversation
+      // (see lib/learner-goal.ts) — and remember onboarding is done so it
+      // never re-asks. Both are synced to the account.
+      if (goal) saveLearnerGoal(goal);
       markOnboardingComplete();
       router.push('/lessons');
     }
@@ -48,13 +52,13 @@ export default function OnboardingPage() {
         <div className="mb-8">
           <div className="flex justify-between mb-2">
             <span className="text-sm font-medium text-stone-600 dark:text-stone-400">
-              Step {step + 1} of 4
+              Step {step + 1} of {TOTAL_STEPS}
             </span>
           </div>
           <div className="w-full bg-stone-200 dark:bg-stone-700 rounded-full h-2">
             <div
               className="progress-shimmer h-2 rounded-full transition-all duration-300"
-              style={{ width: `${((step + 1) / 4) * 100}%` }}
+              style={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
             ></div>
           </div>
         </div>
@@ -72,7 +76,7 @@ export default function OnboardingPage() {
               <div className="rounded-2xl bg-brand-500/10 border border-brand-500/20 p-6">
                 <p className="text-stone-700 dark:text-stone-300">
                   This app teaches you Spanish through comprehensible input, spaced repetition, and
-                  real conversation. No gamification, just genuine learning.
+                  real conversation with a personal AI tutor. No gamification, just genuine learning.
                 </p>
               </div>
             </div>
@@ -80,25 +84,32 @@ export default function OnboardingPage() {
 
           {step === 1 && (
             <div>
-              <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-6">
+              <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-2">
                 What's your goal?
               </h2>
+              <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
+                Profe, your tutor, shapes every conversation around this.
+              </p>
               <div className="space-y-3">
-                {[
-                  { value: 'conversation', label: 'Have conversations in Spanish' },
-                  { value: 'travel', label: 'Prepare for travel' },
-                  { value: 'culture', label: 'Understand Spanish culture' },
-                  { value: 'general', label: 'General learning' },
-                ].map((option) => (
-                  <label key={option.value} className="flex items-center p-4 border-2 border-stone-200 dark:border-stone-600 rounded-lg cursor-pointer hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-stone-800 transition-colors">
+                {GOAL_OPTIONS.map(([value, label]) => (
+                  <label
+                    key={value}
+                    className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      goal === value
+                        ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/10'
+                        : 'border-stone-200 dark:border-stone-600 hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-stone-800'
+                    }`}
+                  >
                     <input
                       type="radio"
                       name="goal"
-                      value={option.value}
+                      value={value}
+                      checked={goal === value}
+                      onChange={() => setGoal(value)}
                       className="w-4 h-4 accent-brand-600"
                     />
                     <span className="ml-3 text-stone-700 dark:text-stone-300 font-medium">
-                      {option.label}
+                      {label}
                     </span>
                   </label>
                 ))}
@@ -107,57 +118,6 @@ export default function OnboardingPage() {
           )}
 
           {step === 2 && (
-            <div>
-              <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-6">
-                Your learning preferences
-              </h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
-                    Target daily reviews: {preferences.targetReviewsPerDay}
-                  </label>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    value={preferences.targetReviewsPerDay}
-                    onChange={(e) =>
-                      setPreferences({
-                        ...preferences,
-                        targetReviewsPerDay: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full"
-                  />
-                  <p className="text-xs text-stone-500 mt-2">
-                    How many vocabulary words to review each day
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
-                    Audio playback speed: {preferences.audioPlaybackSpeed}x
-                  </label>
-                  <select
-                    value={preferences.audioPlaybackSpeed}
-                    onChange={(e) =>
-                      setPreferences({
-                        ...preferences,
-                        audioPlaybackSpeed: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700"
-                  >
-                    <option value={0.75}>0.75x (Slower)</option>
-                    <option value={1.0}>1.0x (Normal)</option>
-                    <option value={1.25}>1.25x (Faster)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
             <div className="text-center">
               <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-6">
                 You're ready to start!
@@ -174,7 +134,7 @@ export default function OnboardingPage() {
               <div className="text-stone-600 dark:text-stone-400 text-sm space-y-2">
                 <p>• Lessons designed to build comprehension</p>
                 <p>• Vocabulary automatically added to your spaced repetition</p>
-                <p>• Progress tracked based on real learning</p>
+                <p>• A live tutor who remembers you and adapts to your goal</p>
               </div>
             </div>
           )}
@@ -191,9 +151,10 @@ export default function OnboardingPage() {
           </button>
           <button
             onClick={handleNext}
-            className="flex-1 btn-primary py-3"
+            disabled={step === 1 && !goal}
+            className="flex-1 btn-primary py-3 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {step === 3 ? 'Start Learning' : 'Next'}
+            {step === TOTAL_STEPS - 1 ? 'Start Learning' : 'Next'}
           </button>
         </div>
       </div>

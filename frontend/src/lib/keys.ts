@@ -6,3 +6,4 @@
 export const PROGRESS_KEY = 'aprende-progress-v1';
 export const TUTOR_PROFILE_KEY = 'aprende-tutor-profile-v1';
 export const ONBOARDING_KEY = 'aprende-onboarding-v1';
+export const LEARNER_GOAL_KEY = 'aprende-learner-goal-v1';

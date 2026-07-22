@@ -1,6 +1,7 @@
 import { buildTutorContext } from '../tutor-context';
 import { completeLessonLocal } from '../progress';
 import { curriculum } from '../curriculum';
+import { saveLearnerGoal } from '../learner-goal';
 
 describe('buildTutorContext', () => {
   beforeEach(() => {
@@ -60,5 +61,18 @@ describe('buildTutorContext', () => {
 
     expect(ctx.plan).toContain('Introduce yourself and describe people');
     expect(ctx.plan).not.toMatch(/day to day/i);
+  });
+
+  it('feeds the learner-stated goal from onboarding into the session plan', () => {
+    saveLearnerGoal('travel');
+    const ctx = buildTutorContext();
+    expect(ctx.learnerGoal).toBe('travel');
+    expect(ctx.plan).toContain('Prepare for travel');
+  });
+
+  it('omits the goal line entirely when no goal was ever set', () => {
+    const ctx = buildTutorContext();
+    expect(ctx.learnerGoal).toBeNull();
+    expect(ctx.plan).not.toMatch(/stated goal/i);
   });
 });

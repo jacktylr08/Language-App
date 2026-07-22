@@ -12,14 +12,16 @@
  */
 import { api } from './api';
 import { isAuthenticated } from './auth';
-import { PROGRESS_KEY, TUTOR_PROFILE_KEY, ONBOARDING_KEY } from './keys';
+import { PROGRESS_KEY, TUTOR_PROFILE_KEY, ONBOARDING_KEY, LEARNER_GOAL_KEY } from './keys';
 import type { ProgressState } from './progress';
 import type { LearnerProfile } from './tutor-memory';
+import type { LearnerGoal } from './learner-goal';
 
 interface SyncBlob {
   progress?: ProgressState;
   tutorProfile?: LearnerProfile | null;
   onboardingComplete?: boolean;
+  learnerGoal?: LearnerGoal | null;
 }
 
 // ---------- localStorage helpers (read/write raw, no cross-imports) ----------
@@ -61,11 +63,33 @@ function writeOnboarding(done: boolean): void {
   }
 }
 
+function readGoal(): LearnerGoal | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(LEARNER_GOAL_KEY);
+    return raw === 'conversation' || raw === 'travel' || raw === 'culture' || raw === 'general'
+      ? raw
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeGoal(goal: LearnerGoal): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LEARNER_GOAL_KEY, goal);
+  } catch {
+    /* ignore */
+  }
+}
+
 function localBlob(): SyncBlob {
   return {
     progress: readJSON<ProgressState>(PROGRESS_KEY) ?? undefined,
     tutorProfile: readJSON<LearnerProfile>(TUTOR_PROFILE_KEY),
     onboardingComplete: readOnboarding(),
+    learnerGoal: readGoal(),
   };
 }
 
@@ -162,6 +186,8 @@ function mergeBlob(a: SyncBlob, b: SyncBlob): SyncBlob {
     progress: mergeProgress(a.progress, b.progress),
     tutorProfile: mergeProfile(a.tutorProfile, b.tutorProfile),
     onboardingComplete: !!(a.onboardingComplete || b.onboardingComplete),
+    // Set once at onboarding and rarely revisited — first non-empty value wins.
+    learnerGoal: a.learnerGoal ?? b.learnerGoal ?? null,
   };
 }
 
@@ -169,6 +195,7 @@ function applyBlob(blob: SyncBlob): void {
   if (blob.progress) writeJSON(PROGRESS_KEY, blob.progress);
   if (blob.tutorProfile) writeJSON(TUTOR_PROFILE_KEY, blob.tutorProfile);
   if (blob.onboardingComplete) writeOnboarding(true);
+  if (blob.learnerGoal) writeGoal(blob.learnerGoal);
 }
 
 // ---------- push / pull ----------

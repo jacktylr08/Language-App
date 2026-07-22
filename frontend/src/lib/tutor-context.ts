@@ -12,6 +12,7 @@ import { curriculum, type CurriculumLesson } from './curriculum';
 import { loadProgress } from './progress';
 import { loadProfile, isEvaluationDue, dueWeaknessesFirst } from './tutor-memory';
 import { buildLessonInsights } from './learner-insights';
+import { loadLearnerGoal, GOAL_LABELS, type LearnerGoal } from './learner-goal';
 
 export interface TutorContext {
   level: 'beginner' | 'intermediate' | 'advanced';
@@ -39,6 +40,8 @@ export interface TutorContext {
   lastSessionNote?: string;
   /** Days since that last session (0 = today). */
   daysSinceLastSession?: number;
+  /** What the learner said they're here for, at onboarding. */
+  learnerGoal?: LearnerGoal | null;
 }
 
 // vocab id -> Spanish, built once.
@@ -174,6 +177,11 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     ? `Recently they've covered: ${insights.coveredRecently.join(', ')}. `
     : '';
 
+  const learnerGoal = loadLearnerGoal();
+  const goalLine = learnerGoal
+    ? `Their stated goal for learning Spanish: "${GOAL_LABELS[learnerGoal]}" — let that colour the kind of topics and vocabulary you lean toward over time. `
+    : '';
+
   // Use the lesson's own hand-written description as the topic — not a
   // coarse per-theme bucket. Themes like "verbs" cover both "ser-identity"
   // (introduce yourself) AND "daily-verbs" (your daily routine): collapsing
@@ -185,6 +193,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     } — ${lesson.description} ` +
     coveredLine +
     (targetWords ? `Words from it to naturally reuse: ${targetWords}. ` : '') +
+    goalLine +
     `Practise and build confidence with what the learner has ALREADY learned — everything up to week ${weekReached}, and NOTHING beyond it. ` +
     `Keep it a flowing conversation, not a checklist — but steer it toward this actual topic rather than defaulting to "how's your day".`;
 
@@ -199,6 +208,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
     evaluation,
     weaknesses,
     strengths,
+    learnerGoal,
     profileSummary: profile?.summary,
     lastSessionNote: lastSession?.note,
     daysSinceLastSession,
