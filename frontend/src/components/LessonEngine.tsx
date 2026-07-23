@@ -16,6 +16,7 @@ import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
 import { buildTutorContext } from '@/lib/tutor-context';
 import { startRecording, assessPronunciationFromBlob, type PronunciationResult } from '@/lib/pronunciation';
+import { PronunciationScoreCard } from '@/components/PronunciationScoreCard';
 import { api } from '@/lib/api';
 
 type Feedback =
@@ -789,11 +790,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                 Heard: <span className="font-bold">&ldquo;{spokenText}&rdquo;</span>
               </p>
             )}
-            {pronScore && (
-              <p className="mt-2 text-sm text-brand-600 dark:text-brand-400 font-semibold">
-                Pronunciation: {Math.round(pronScore.accuracyScore)}%
-              </p>
-            )}
+            {pronScore && <PronunciationScoreCard result={pronScore} />}
             {!feedback && (
               <button
                 onClick={handleSkipSpeaking}
