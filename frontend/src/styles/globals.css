@@ -41,6 +41,24 @@ body {
   @apply bg-stone-400 dark:bg-stone-600;
 }
 
+/* ---------- Focus visibility ----------
+ * The tactile 3D buttons/tiles below (and a few icon-only controls) have no
+ * deliberate focus state, so keyboard focus fell back to whatever the
+ * browser default happened to be — invisible entirely on some of them,
+ * since several sit inside overflow-hidden containers that can clip a
+ * default outline. One clear, consistent ring for every keyboard-focused
+ * interactive element, only when actually navigating by keyboard.
+ */
+:focus-visible {
+  /* Saffron rather than brand green specifically so the ring reads clearly
+     against the brand-green buttons/tiles it most often has to outline —
+     a same-hue ring on a same-hue element is exactly the low-contrast
+     case this exists to avoid. */
+  outline: 2px solid theme('colors.saffron.500');
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* ---------- Tactile 3D buttons ---------- */
 
 @layer components {
@@ -308,4 +326,21 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* ---------- Reduced motion ----------
+ * None of the animate-* classes above (used in 27+ places app-wide) checked
+ * this at all. Collapse every animation/transition to effectively instant
+ * for anyone who's told their OS they don't want motion, while still
+ * landing in the same end state (so nothing looks stuck mid-animation).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

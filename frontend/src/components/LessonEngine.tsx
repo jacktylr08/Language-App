@@ -773,7 +773,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   ? 'bg-terra-500 text-white animate-pulse-ring'
                   : 'bg-gradient-to-br from-sky-400 to-blue-600 hover:brightness-105 text-white shadow-[0_4px_0_0_#1D4ED8,0_16px_32px_-8px_rgba(37,99,235,0.5)] active:translate-y-1 active:shadow-[0_1px_0_0_#1D4ED8]'
               }`}
-              aria-label="Hold to speak"
+              aria-label={listening ? 'Listening — tap to stop' : 'Tap to speak'}
             >
               🎤
             </button>
@@ -859,6 +859,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       {/* Feedback sheet */}
       {feedback && (
         <div
+          role="status"
+          aria-live="assertive"
           className={`fixed bottom-0 left-0 right-0 animate-slide-up rounded-t-[28px] shadow-[0_-12px_40px_-12px_rgba(33,29,25,0.25)] ${
             feedback.kind === 'correct'
               ? 'bg-brand-50 dark:bg-brand-900 border-t border-brand-200 dark:border-brand-700'

@@ -108,8 +108,17 @@ export function ReadingPassage({ passage, onClose }: ReadingPassageProps) {
                 return (
                   <span
                     key={ti}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${tok.raw}: show meaning`}
                     onClick={() => handleTapWord(tok.raw, wordLookup)}
-                    className={`cursor-pointer rounded px-0.5 transition-colors ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleTapWord(tok.raw, wordLookup);
+                      }
+                    }}
+                    className={`cursor-pointer rounded px-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
                       tapped
                         ? 'bg-terra-100 dark:bg-terra-900/40 underline decoration-terra-400 decoration-2 underline-offset-2'
                         : 'hover:bg-brand-100 dark:hover:bg-brand-900/30'
@@ -129,12 +138,20 @@ export function ReadingPassage({ passage, onClose }: ReadingPassageProps) {
       </div>
 
       {gloss && (
-        <div className="fixed bottom-0 inset-x-0 z-20 bg-ink dark:bg-stone-800 text-white px-6 py-4 shadow-glow">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-0 inset-x-0 z-20 bg-ink dark:bg-stone-800 text-white px-6 py-4 shadow-glow"
+        >
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
             <p className="font-bold">
               {gloss.word} <span className="font-normal opacity-80">— {gloss.en}</span>
             </p>
-            <button onClick={() => setGloss(null)} className="opacity-70 hover:opacity-100 text-xl">
+            <button
+              onClick={() => setGloss(null)}
+              aria-label="Dismiss translation"
+              className="opacity-70 hover:opacity-100 text-xl"
+            >
               ✕
             </button>
           </div>

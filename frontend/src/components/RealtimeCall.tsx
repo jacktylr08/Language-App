@@ -52,6 +52,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
   const [state, setState] = useState<RealtimeState>('connecting');
   const [assistantLine, setAssistantLine] = useState('');
   const [userLine, setUserLine] = useState('');
+  const [announcedAssistant, setAnnouncedAssistant] = useState('');
   const [error, setError] = useState('');
   const [notConfigured, setNotConfigured] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -107,7 +108,12 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
       onStateChange: (s) => setState(s),
       onUserTranscript: (t) => setUserLine(t),
       onAssistantDelta: (t) => setAssistantLine(t),
-      onAssistantDone: (t) => setAssistantLine(t),
+      onAssistantDone: (t) => {
+        setAssistantLine(t);
+        // Announce only the finished line — announcing every streaming
+        // delta would spam a screen reader with partial fragments.
+        setAnnouncedAssistant(t);
+      },
       onError: (m) => setError(m),
     });
     sessionRef.current = session;
@@ -306,21 +312,28 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
               </div>
             </div>
 
-            <p className="text-sm font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400 mb-3">
+            <p role="status" aria-live="polite" className="text-sm font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400 mb-3">
               {hasError ? 'Connection trouble' : STATE_LABEL[state]}
             </p>
 
-            {/* Live captions */}
+            {/* Live captions — the visible text streams token-by-token, which
+                would spam a screen reader if announced live; a separate
+                visually-hidden region announces only each finished reply. */}
             <div className="min-h-[4.5rem] max-w-lg">
               {assistantLine && (
-                <p className="text-lg leading-relaxed text-ink dark:text-white font-medium">
+                <p aria-hidden className="text-lg leading-relaxed text-ink dark:text-white font-medium">
                   {assistantLine}
                 </p>
               )}
               {userLine && (
-                <p className="text-sm text-ink-soft dark:text-stone-400 mt-3 italic">“{userLine}”</p>
+                <p role="status" aria-live="polite" className="text-sm text-ink-soft dark:text-stone-400 mt-3 italic">
+                  “{userLine}”
+                </p>
               )}
             </div>
+            <p role="status" aria-live="polite" className="sr-only">
+              {announcedAssistant}
+            </p>
 
             {quietHint && !hasError && state === 'listening' && (
               <p className="mt-2 text-sm text-saffron-600 dark:text-saffron-400">
@@ -355,6 +368,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           <button
             onClick={toggleMute}
             title={muted ? 'Unmute your mic' : 'Mute your mic'}
+            aria-label={muted ? 'Unmute your mic' : 'Mute your mic'}
             className={`w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-card transition-colors ${
               muted
                 ? 'bg-stone-200 dark:bg-stone-700 text-stone-500'

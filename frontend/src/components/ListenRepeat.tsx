@@ -266,12 +266,16 @@ export function ListenRepeat({ words, onClose }: ListenRepeatProps) {
           </div>
         </div>
 
-        <p className="text-sm font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400 mb-3">
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-sm font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400 mb-3"
+        >
           {paused ? 'Paused' : PHASE_LABEL[phase]}
         </p>
 
         {current && (
-          <div className="max-w-lg">
+          <div className="max-w-lg" aria-live="polite">
             <p className="text-2xl leading-relaxed text-ink dark:text-white font-bold">
               {current.es}
             </p>
@@ -285,6 +289,7 @@ export function ListenRepeat({ words, onClose }: ListenRepeatProps) {
       <div className="shrink-0 px-6 pb-10 pt-4 flex items-center justify-center gap-6">
         <button
           onClick={handleTogglePause}
+          aria-label={paused ? 'Resume' : 'Pause'}
           className="w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-card bg-white dark:bg-stone-800 text-ink dark:text-white"
         >
           {paused ? '▶' : '⏸'}
