@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcryptjs from 'bcryptjs';
+import crypto from 'crypto';
 import { User } from '@/models/User';
+import { knexInstance } from '@/config/database';
 import { logger } from '@/utils/logger';
 
 const FALLBACK_JWT_SECRET = 'dev-secret-key-change-in-production';
@@ -18,6 +20,11 @@ const JWT_SECRET = process.env.JWT_SECRET || FALLBACK_JWT_SECRET;
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '30d';
 
+// Fallback lifetime used only if a freshly-signed refresh JWT's `exp` claim
+// can't be read back out (should never happen) — keeps the DB record's
+// expiry roughly in step with the token's actual expiry either way.
+const DEFAULT_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -27,6 +34,31 @@ export interface TokenPayload {
   userId: string;
   email: string;
   type: 'access' | 'refresh';
+  tokenVersion: number;
+}
+
+/**
+ * Emails are matched case-insensitively everywhere (registration, login, the
+ * admin reset-password script) by normalizing to lowercase at the one point
+ * they enter the system — otherwise "User@x.com" and "user@x.com" would
+ * silently become two different accounts.
+ */
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/** Never log a raw email address — mask everything but a short prefix. */
+function maskEmail(email: string): string {
+  const at = email.indexOf('@');
+  if (at <= 0) return '***';
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${'*'.repeat(Math.max(local.length - visible.length, 1))}@${domain}`;
+}
+
+function hashRefreshToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 export const auth = {
@@ -39,15 +71,15 @@ export const auth = {
     return bcryptjs.compare(password, hash);
   },
 
-  generateTokens(userId: string, email: string): AuthTokens {
+  generateTokens(userId: string, email: string, tokenVersion = 0): AuthTokens {
     const accessToken = jwt.sign(
-      { userId, email, type: 'access' },
+      { userId, email, type: 'access', tokenVersion },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRY }
     );
 
     const refreshToken = jwt.sign(
-      { userId, email, type: 'refresh' },
+      { userId, email, type: 'refresh', tokenVersion },
       JWT_SECRET,
       { expiresIn: JWT_REFRESH_EXPIRY }
     );
@@ -65,11 +97,41 @@ export const auth = {
     }
   },
 
+  /**
+   * Signs a fresh access+refresh pair and records the refresh token (hashed)
+   * in `refresh_tokens` so it can later be looked up, rotated, or revoked.
+   * The single path used by register/login/refresh so every issued refresh
+   * token is always tracked.
+   */
+  async issueTokens(userId: string, email: string, tokenVersion: number): Promise<AuthTokens> {
+    const tokens = this.generateTokens(userId, email, tokenVersion);
+
+    const decoded = jwt.decode(tokens.refreshToken) as { exp?: number } | null;
+    const expiresAt = decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : new Date(Date.now() + DEFAULT_REFRESH_TTL_MS);
+
+    await knexInstance('refresh_tokens').insert({
+      user_id: userId,
+      token_hash: hashRefreshToken(tokens.refreshToken),
+      expires_at: expiresAt.toISOString(),
+    });
+
+    return tokens;
+  },
+
   async register(email: string, password: string): Promise<User> {
+    const normalizedEmail = normalizeEmail(email);
+
     // Check if user exists
-    const existing = await User.query().findOne('email', email);
+    const existing = await User.query().findOne('email', normalizedEmail);
     if (existing) {
-      throw new Error('Email already registered');
+      // Tagged so the route can respond with a generic message — surfacing
+      // "email already registered" as a distinct error from every other
+      // failure lets an attacker enumerate which addresses have accounts.
+      const err = new Error('Email already registered');
+      (err as Error & { code?: string }).code = 'email_taken';
+      throw err;
     }
 
     // Hash password
@@ -77,10 +139,11 @@ export const auth = {
 
     // Create user
     const user = await User.query().insert({
-      email,
+      email: normalizedEmail,
       password_hash: passwordHash,
       current_level: 0,
       locale: 'es-MX',
+      token_version: 0,
       preferences: {
         target_reviews_per_day: 20,
         review_time_distribution: 'distributed',
@@ -89,12 +152,13 @@ export const auth = {
       },
     });
 
-    logger.info(`User registered: ${email}`);
+    logger.info(`User registered: ${maskEmail(user.email)}`);
     return user;
   },
 
   async login(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }> {
-    const user = await User.query().findOne('email', email);
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.query().findOne('email', normalizedEmail);
     if (!user) {
       throw new Error('Invalid email or password');
     }
@@ -107,25 +171,54 @@ export const auth = {
     // Update last active
     await user.$query().patch({ last_active_at: new Date().toISOString() });
 
-    const tokens = this.generateTokens(user.id, user.email);
-    logger.info(`User logged in: ${email}`);
+    const tokens = await this.issueTokens(user.id, user.email, user.token_version ?? 0);
+    logger.info(`User logged in: ${maskEmail(user.email)}`);
 
     return { user, tokens };
   },
 
-  async refreshAccessToken(refreshToken: string): Promise<string> {
+  /**
+   * Refresh token rotation: the incoming refresh token must be a valid,
+   * unexpired, unrevoked JWT with a live DB record and a token_version that
+   * still matches the user's current one. On success the old record is
+   * revoked and a brand-new access+refresh pair (with a new DB record) is
+   * issued — reusing the old refresh token afterwards fails.
+   */
+  async rotateRefreshToken(refreshToken: string): Promise<{ user: User; tokens: AuthTokens }> {
     const payload = this.verifyToken(refreshToken);
     if (!payload || payload.type !== 'refresh') {
       throw new Error('Invalid refresh token');
     }
 
-    const user = await User.query().findById(payload.userId);
-    if (!user) {
-      throw new Error('User not found');
+    const tokenHash = hashRefreshToken(refreshToken);
+    const record = await knexInstance('refresh_tokens').where({ token_hash: tokenHash }).first();
+
+    if (!record || record.revoked_at || new Date(record.expires_at).getTime() < Date.now()) {
+      throw new Error('Refresh token has been revoked or expired');
     }
 
-    const { accessToken } = this.generateTokens(user.id, user.email);
-    return accessToken;
+    const user = await User.query().findById(payload.userId).where('deleted_at', null);
+    if (!user || (user.token_version ?? 0) !== payload.tokenVersion) {
+      throw new Error('Invalid refresh token');
+    }
+
+    // Rotate: kill the used token before minting the replacement so a
+    // concurrent replay of the same old token can't also succeed.
+    await knexInstance('refresh_tokens')
+      .where({ id: record.id })
+      .update({ revoked_at: new Date().toISOString() });
+
+    const tokens = await this.issueTokens(user.id, user.email, user.token_version ?? 0);
+    return { user, tokens };
+  },
+
+  /** Revokes a specific refresh token's DB record (used by /logout). Safe to call with an already-revoked or unknown token — always a no-op success. */
+  async revokeRefreshToken(refreshToken: string): Promise<void> {
+    const tokenHash = hashRefreshToken(refreshToken);
+    await knexInstance('refresh_tokens')
+      .where({ token_hash: tokenHash })
+      .whereNull('revoked_at')
+      .update({ revoked_at: new Date().toISOString() });
   },
 
   async getUserById(userId: string): Promise<User | undefined> {
@@ -168,9 +261,13 @@ export const auth = {
     const passwordHash = await this.hashPassword(newPassword);
     await user.$query().patch({
       password_hash: passwordHash,
+      // Bumping token_version invalidates every access/refresh token issued
+      // before this point — a stolen token stops working the instant the
+      // password changes, instead of surviving until it naturally expires.
+      token_version: (user.token_version ?? 0) + 1,
       updated_at: new Date().toISOString(),
     });
 
-    logger.info(`Password changed for user: ${user.email}`);
+    logger.info(`Password changed for user: ${maskEmail(user.email)}`);
   },
 };

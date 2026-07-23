@@ -34,6 +34,21 @@ describe('Authentication Service', () => {
       expect(tokens.refreshToken).toBeDefined();
       expect(tokens.accessToken).not.toBe(tokens.refreshToken);
     });
+
+    it('embeds tokenVersion in both tokens so a password change can revoke them', () => {
+      const tokens = auth.generateTokens('test-user-id', 'test@example.com', 4);
+
+      const access = auth.verifyToken(tokens.accessToken);
+      const refresh = auth.verifyToken(tokens.refreshToken);
+
+      expect(access?.tokenVersion).toBe(4);
+      expect(refresh?.tokenVersion).toBe(4);
+    });
+
+    it('defaults tokenVersion to 0 when not supplied', () => {
+      const tokens = auth.generateTokens('test-user-id', 'test@example.com');
+      expect(auth.verifyToken(tokens.accessToken)?.tokenVersion).toBe(0);
+    });
   });
 
   describe('Token Verification', () => {
