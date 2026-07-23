@@ -39,10 +39,29 @@ const themeAccents: Record<string, string> = {
   conversation: 'from-pink-400 to-rose-500',
 };
 
+const practiceLinks = [
+  {
+    href: '/practice/listen',
+    emoji: '🎧',
+    label: 'Listen & Repeat',
+    description: 'Hands-free vocab review, eyes off the screen.',
+  },
+  {
+    href: '/read',
+    emoji: '📖',
+    label: 'Read in Spanish',
+    description: 'Short passages — tap any word instead of a full translation.',
+  },
+] as const;
+
 export default function LessonsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [tutorCtx, setTutorCtx] = useState<ReturnType<typeof buildTutorContext> | null>(null);
+  // null = no manual override yet — phases fall back to the sensible default
+  // (only the phase with the learner's next lesson starts open) computed
+  // once progress has loaded, below.
+  const [expandedOverride, setExpandedOverride] = useState<Record<number, boolean> | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
@@ -83,6 +102,44 @@ export default function LessonsPage() {
   const nextLesson = currentIndex >= 0 ? curriculum[currentIndex] : null;
 
   const weeks = Array.from(new Set(curriculum.map((l) => l.week))).sort((a, b) => a - b);
+
+  // Group weeks into their phase, and work out each phase's own completion —
+  // this is what lets the page collapse everything down to "the one phase
+  // you're actually in" by default instead of one long 50+ card scroll.
+  interface PhaseGroup {
+    number: number;
+    title: string;
+    subtitle: string;
+    weeks: number[];
+    lessons: (typeof curriculum)[number][];
+  }
+  const phaseGroups: PhaseGroup[] = [];
+  for (const week of weeks) {
+    const phase = phaseForWeek(week);
+    let group = phaseGroups.find((g) => g.number === phase.number);
+    if (!group) {
+      group = { number: phase.number, title: phase.title, subtitle: phase.subtitle, weeks: [], lessons: [] };
+      phaseGroups.push(group);
+    }
+    group.weeks.push(week);
+  }
+  for (const lesson of curriculum) {
+    phaseGroups.find((g) => g.number === phaseForWeek(lesson.week).number)!.lessons.push(lesson);
+  }
+
+  const currentPhaseNumber = nextLesson
+    ? phaseForWeek(nextLesson.week).number
+    : phaseGroups[phaseGroups.length - 1]?.number ?? 1;
+
+  const isPhaseExpanded = (phaseNumber: number): boolean =>
+    expandedOverride ? !!expandedOverride[phaseNumber] : phaseNumber === currentPhaseNumber;
+
+  const togglePhase = (phaseNumber: number): void => {
+    setExpandedOverride((prev) => {
+      const base = prev ?? { [currentPhaseNumber]: true };
+      return { ...base, [phaseNumber]: !(base[phaseNumber] ?? phaseNumber === currentPhaseNumber) };
+    });
+  };
 
   const sidebar = (
     <div className="space-y-4">
@@ -205,9 +262,52 @@ export default function LessonsPage() {
         </span>
       </Link>
 
-      {/* Practice a specific real-world scenario with the tutor */}
+      {/* Every other way to practice, gathered in one compact card instead
+          of a stack of full-size hero banners — the same features, just not
+          five screens' worth of space to get to the lesson list below. */}
       <div className="surface p-5">
         <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft dark:text-stone-400 mb-3">
+          More practice
+        </p>
+        <div className="space-y-1">
+          {mistakes > 0 && (
+            <Link
+              href="/practice?mode=mistakes"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-3 bg-terra-500/10 hover:bg-terra-500/15 transition-colors"
+            >
+              <span className="text-xl shrink-0" aria-hidden>🩹</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-bold text-terra-600 dark:text-terra-400">
+                  Fix your mistakes
+                </span>
+                <span className="block text-xs text-ink-soft dark:text-stone-400">
+                  {mistakes} {mistakes === 1 ? 'word' : 'words'} to nail
+                </span>
+              </span>
+              <span className="text-terra-500 shrink-0" aria-hidden>→</span>
+            </Link>
+          )}
+          {practiceLinks.map((p) => (
+            <Link
+              key={p.href}
+              href={p.href}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-3 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors"
+            >
+              <span className="text-xl shrink-0" aria-hidden>{p.emoji}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-bold text-ink dark:text-stone-200">
+                  {p.label}
+                </span>
+                <span className="block text-xs text-ink-soft dark:text-stone-400 truncate">
+                  {p.description}
+                </span>
+              </span>
+              <span className="text-stone-300 dark:text-stone-600 shrink-0" aria-hidden>→</span>
+            </Link>
+          ))}
+        </div>
+
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft dark:text-stone-400 mt-5 mb-3">
           Practice a scenario
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -226,62 +326,6 @@ export default function LessonsPage() {
           ))}
         </div>
       </div>
-
-      {/* Audio-only eyes-free review — hear it, say it back, no screen needed */}
-      <Link
-        href="/practice/listen"
-        className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-sky-500 via-sky-400 to-blue-500 p-5 shadow-glow transition-transform active:scale-[0.99]"
-      >
-        <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
-          🎧
-        </div>
-        <p className="font-extrabold text-white text-lg">Listen &amp; Repeat</p>
-        <p className="text-white/90 text-sm mt-1 leading-snug">
-          Hands-free vocab review — hear it, say it back, eyes off the screen.
-        </p>
-        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
-          Start listening
-          <span className="transition-transform group-hover:translate-x-1">→</span>
-        </span>
-      </Link>
-
-      {/* Extensive reading — real Spanish text, tap to translate */}
-      <Link
-        href="/read"
-        className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-violet-500 via-violet-400 to-purple-500 p-5 shadow-glow transition-transform active:scale-[0.99]"
-      >
-        <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
-          📖
-        </div>
-        <p className="font-extrabold text-white text-lg">Read in Spanish</p>
-        <p className="text-white/90 text-sm mt-1 leading-snug">
-          Short passages at your level — tap any word instead of a full translation.
-        </p>
-        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
-          Start reading
-          <span className="transition-transform group-hover:translate-x-1">→</span>
-        </span>
-      </Link>
-
-      {/* Review your mistakes — built from what you've got wrong */}
-      {mistakes > 0 && (
-        <Link
-          href="/practice?mode=mistakes"
-          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 via-rose-400 to-terra-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
-        >
-          <div className="absolute -right-6 -top-8 text-[96px] opacity-15 rotate-12 select-none" aria-hidden>
-            🩹
-          </div>
-          <p className="font-extrabold text-white text-lg">Fix your mistakes</p>
-          <p className="text-white/90 text-sm mt-1 leading-snug">
-            {mistakes} {mistakes === 1 ? 'word' : 'words'} you’ve slipped up on — let’s nail them.
-          </p>
-          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
-            Review now
-            <span className="transition-transform group-hover:translate-x-1">→</span>
-          </span>
-        </Link>
-      )}
     </div>
   );
 
@@ -341,128 +385,182 @@ export default function LessonsPage() {
           {/* Mobile stats */}
           <div className="lg:hidden mb-8">{sidebar}</div>
 
-          {/* Learning path */}
+          {/* Learning path — collapsed to phase summaries by default (only
+              the phase with your next lesson opens automatically) so this
+              is a handful of rows to scan, not 50+ lesson cards in one
+              scroll. Nothing is removed — every phase expands to the exact
+              same cards it always showed, on demand. */}
           <div>
-            {weeks.map((week, wi) => {
-              const phase = phaseForWeek(week);
-              const prevPhase = wi > 0 ? phaseForWeek(weeks[wi - 1]) : null;
-              const isNewPhase = !prevPhase || prevPhase.number !== phase.number;
+            {phaseGroups.map((group, gi) => {
+              const doneCount = group.lessons.filter((l) => isLessonDone(progress.lessons[l.slug])).length;
+              const totalCount = group.lessons.length;
+              const isComplete = doneCount === totalCount;
+              const isCurrentPhase = group.number === currentPhaseNumber;
+              const firstIndex = curriculum.findIndex((l) => l.slug === group.lessons[0].slug);
+              const isLocked = !isUnlocked(firstIndex);
+              const expanded = isPhaseExpanded(group.number);
+              const phasePct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
               return (
-                <section key={week} className="mb-8">
-                  {isNewPhase && (
-                    <div className={`${wi === 0 ? 'mb-6' : 'mt-14 mb-6'}`}>
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1 h-px bg-gradient-to-r from-transparent to-stone-300 dark:to-stone-700" />
-                        <p className="text-[11px] font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-[0.25em]">
-                          Phase {phase.number}
-                        </p>
-                        <div className="flex-1 h-px bg-gradient-to-l from-transparent to-stone-300 dark:to-stone-700" />
-                      </div>
-                      <h2 className="font-display text-3xl font-black text-ink dark:text-white text-center mt-2">
-                        {phase.title}
-                      </h2>
-                      <p className="text-sm text-ink-soft dark:text-stone-400 text-center mt-1">
-                        {phase.subtitle}
+                <section key={group.number} className={gi === 0 ? 'mb-4' : 'mt-4 mb-4'}>
+                  <button
+                    type="button"
+                    onClick={() => togglePhase(group.number)}
+                    aria-expanded={expanded}
+                    className="w-full flex items-center gap-4 surface p-4 text-left transition-shadow hover:shadow-card-hover"
+                  >
+                    <div
+                      className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black ${
+                        isComplete
+                          ? 'bg-brand-500 text-white'
+                          : isCurrentPhase
+                            ? 'bg-brand-500/15 text-brand-600 dark:text-brand-400 ring-2 ring-brand-400 dark:ring-brand-500'
+                            : isLocked
+                              ? 'bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-500'
+                              : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300'
+                      }`}
+                    >
+                      {isComplete ? '✓' : isLocked ? '🔒' : group.number}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-brand-600 dark:text-brand-400">
+                        Phase {group.number}
                       </p>
+                      <p className="font-display text-xl font-black text-ink dark:text-white leading-tight truncate">
+                        {group.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="h-1 flex-1 max-w-[140px] rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${isComplete ? 'bg-brand-500' : 'bg-brand-400'}`}
+                            style={{ width: `${Math.max(phasePct, doneCount > 0 ? 4 : 0)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-ink-soft dark:text-stone-400 shrink-0">
+                          {doneCount}/{totalCount} lessons
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 text-stone-400 dark:text-stone-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                      aria-hidden
+                    >
+                      ▾
+                    </span>
+                  </button>
+
+                  {expanded && (
+                    <div className="mt-5 pl-1">
+                      <p className="text-sm text-ink-soft dark:text-stone-400 mb-5 px-1">{group.subtitle}</p>
+                      {group.weeks.map((week) => (
+                        <div key={week} className="mb-8 last:mb-0">
+                          <div className="flex items-center gap-3 mb-4">
+                            <h3 className="text-[11px] font-extrabold text-stone-400 dark:text-stone-500 uppercase tracking-[0.2em]">
+                              Week {week}
+                            </h3>
+                            <div className="flex-1 h-px bg-stone-200/80 dark:bg-stone-800" />
+                          </div>
+
+                          <div className="space-y-3.5">
+                            {curriculum
+                              .filter((l) => l.week === week)
+                              .map((lesson) => {
+                                const index = curriculum.findIndex((c) => c.slug === lesson.slug);
+                                const record = progress.lessons[lesson.slug];
+                                const unlocked = isUnlocked(index);
+                                const isCurrent = index === currentIndex;
+                                const isSkipped = !!record?.skipped && !record?.completed;
+                                const stars = lessonStars(record);
+                                const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
+
+                                const card = (
+                                  <div
+                                    className={`relative rounded-3xl p-5 transition-all duration-200 ${
+                                      !unlocked
+                                        ? 'bg-paper-soft dark:bg-paper-dark-soft/60 border border-stone-200/60 dark:border-stone-800/60 opacity-55 saturate-50'
+                                        : isCurrent
+                                          ? 'bg-white dark:bg-paper-dark-soft border-2 border-brand-400 dark:border-brand-500 shadow-card animate-glow-pulse'
+                                          : isSkipped
+                                            ? 'surface border border-dashed border-stone-300 dark:border-stone-700 opacity-80 hover:opacity-100 hover:shadow-card-hover'
+                                            : 'surface hover:shadow-card-hover hover:-translate-y-0.5 active:translate-y-0 active:shadow-card'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div
+                                        className={`relative w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-[28px] bg-gradient-to-br ${
+                                          unlocked
+                                            ? accent
+                                            : 'from-stone-300 to-stone-400 dark:from-stone-700 dark:to-stone-800'
+                                        } shadow-inner ring-1 ring-black/5`}
+                                      >
+                                        <span className="drop-shadow-sm">{unlocked ? lesson.emoji : '🔒'}</span>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-extrabold text-ink dark:text-white truncate text-[15px]">
+                                          {lesson.title}
+                                        </p>
+                                        <p className="text-sm text-ink-soft dark:text-stone-400 truncate mt-0.5">
+                                          {lesson.subtitle}
+                                        </p>
+                                        {record?.completed ? (
+                                          <p className="text-saffron-500 text-[13px] mt-1 tracking-wide" aria-label={`${stars} stars`}>
+                                            {'★'.repeat(stars)}
+                                            <span className="text-stone-300 dark:text-stone-600">
+                                              {'★'.repeat(3 - stars)}
+                                            </span>
+                                            <span className="text-xs text-stone-400 dark:text-stone-500 ml-2 font-semibold">
+                                              best {record.bestAccuracy}%
+                                            </span>
+                                          </p>
+                                        ) : isSkipped ? (
+                                          <p className="text-[12px] text-ink-soft/70 dark:text-stone-500 mt-1 italic">
+                                            Placed out at signup — not actually done
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                      {unlocked && (
+                                        <span
+                                          className={`shrink-0 px-4 py-2 rounded-xl text-[13px] font-extrabold tracking-wide ${
+                                            isCurrent
+                                              ? 'btn-primary px-5'
+                                              : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300'
+                                          }`}
+                                        >
+                                          {isCurrent ? 'START' : record?.completed ? 'REDO' : isSkipped ? 'REVIEW' : 'START'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+
+                                return unlocked ? (
+                                  <Link key={lesson.slug} href={`/lessons/${lesson.slug}`} className="block">
+                                    {card}
+                                  </Link>
+                                ) : (
+                                  <div key={lesson.slug} title="Complete the previous lesson to unlock">
+                                    {card}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
-                  <div className="flex items-center gap-3 mb-4">
-                    <h3 className="text-[11px] font-extrabold text-stone-400 dark:text-stone-500 uppercase tracking-[0.2em]">
-                      Week {week}
-                    </h3>
-                    <div className="flex-1 h-px bg-stone-200/80 dark:bg-stone-800" />
-                  </div>
-
-                  <div className="space-y-3.5">
-                    {curriculum
-                      .filter((l) => l.week === week)
-                      .map((lesson) => {
-                        const index = curriculum.findIndex((c) => c.slug === lesson.slug);
-                        const record = progress.lessons[lesson.slug];
-                        const unlocked = isUnlocked(index);
-                        const isCurrent = index === currentIndex;
-                        const isSkipped = !!record?.skipped && !record?.completed;
-                        const stars = lessonStars(record);
-                        const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
-
-                        const card = (
-                          <div
-                            className={`relative rounded-3xl p-5 transition-all duration-200 ${
-                              !unlocked
-                                ? 'bg-paper-soft dark:bg-paper-dark-soft/60 border border-stone-200/60 dark:border-stone-800/60 opacity-55 saturate-50'
-                                : isCurrent
-                                  ? 'bg-white dark:bg-paper-dark-soft border-2 border-brand-400 dark:border-brand-500 shadow-card animate-glow-pulse'
-                                  : isSkipped
-                                    ? 'surface border border-dashed border-stone-300 dark:border-stone-700 opacity-80 hover:opacity-100 hover:shadow-card-hover'
-                                    : 'surface hover:shadow-card-hover hover:-translate-y-0.5 active:translate-y-0 active:shadow-card'
-                            }`}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`relative w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-[28px] bg-gradient-to-br ${
-                                  unlocked
-                                    ? accent
-                                    : 'from-stone-300 to-stone-400 dark:from-stone-700 dark:to-stone-800'
-                                } shadow-inner ring-1 ring-black/5`}
-                              >
-                                <span className="drop-shadow-sm">{unlocked ? lesson.emoji : '🔒'}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-extrabold text-ink dark:text-white truncate text-[15px]">
-                                  {lesson.title}
-                                </p>
-                                <p className="text-sm text-ink-soft dark:text-stone-400 truncate mt-0.5">
-                                  {lesson.subtitle}
-                                </p>
-                                {record?.completed ? (
-                                  <p className="text-saffron-500 text-[13px] mt-1 tracking-wide" aria-label={`${stars} stars`}>
-                                    {'★'.repeat(stars)}
-                                    <span className="text-stone-300 dark:text-stone-600">
-                                      {'★'.repeat(3 - stars)}
-                                    </span>
-                                    <span className="text-xs text-stone-400 dark:text-stone-500 ml-2 font-semibold">
-                                      best {record.bestAccuracy}%
-                                    </span>
-                                  </p>
-                                ) : isSkipped ? (
-                                  <p className="text-[12px] text-ink-soft/70 dark:text-stone-500 mt-1 italic">
-                                    Placed out at signup — not actually done
-                                  </p>
-                                ) : null}
-                              </div>
-                              {unlocked && (
-                                <span
-                                  className={`shrink-0 px-4 py-2 rounded-xl text-[13px] font-extrabold tracking-wide ${
-                                    isCurrent
-                                      ? 'btn-primary px-5'
-                                      : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300'
-                                  }`}
-                                >
-                                  {isCurrent ? 'START' : record?.completed ? 'REDO' : isSkipped ? 'REVIEW' : 'START'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-
-                        return unlocked ? (
-                          <Link key={lesson.slug} href={`/lessons/${lesson.slug}`} className="block">
-                            {card}
-                          </Link>
-                        ) : (
-                          <div key={lesson.slug} title="Complete the previous lesson to unlock">
-                            {card}
-                          </div>
-                        );
-                      })}
-                  </div>
                 </section>
               );
             })}
 
-            <p className="text-center text-xs text-stone-400 dark:text-stone-600 mt-12 font-medium">
-              24 weeks · 6 phases · from first words to real conversations&nbsp;🇪🇸
-            </p>
+            <div className="surface p-6 mt-8 text-center">
+              <p className="text-2xl mb-1" aria-hidden>🏁</p>
+              <p className="font-extrabold text-ink dark:text-white">
+                {lessonsDone + lessonsSkipped} of {curriculum.length} lessons behind you
+              </p>
+              <p className="text-xs text-stone-400 dark:text-stone-600 mt-1 font-medium">
+                24 weeks · 6 phases · from first words to real conversations&nbsp;🇪🇸
+              </p>
+            </div>
           </div>
 
           {/* Desktop sidebar — pinned below the nav, scrolls on its own until
