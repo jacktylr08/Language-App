@@ -19,6 +19,7 @@ import {
 import { curriculum } from '@/lib/curriculum';
 import { pushSupported, getExistingSubscription, enablePushReminders, disablePushReminders } from '@/lib/push';
 import { TUTOR_VOICES, loadTutorVoice, saveTutorVoice } from '@/lib/tutor-voice';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface Profile {
   email: string;
@@ -303,6 +304,19 @@ export default function AccountPage() {
             )}
           </section>
         )}
+
+        {/* Theme */}
+        <section className="surface p-6 mb-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <h2 className="font-extrabold text-ink dark:text-white">🎨 Appearance</h2>
+              <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5">
+                Auto follows your device's setting.
+              </p>
+            </div>
+            <ThemeToggle />
+          </div>
+        </section>
 
         {/* Change password */}
         <section className="surface p-6 mb-6">
