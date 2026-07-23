@@ -5,30 +5,35 @@
  * Teaches vocabulary in small chunks, drills it from multiple angles
  * (recognition, listening, typing, matching, speaking), gives instant
  * feedback, and re-queues anything the learner misses.
+ *
+ * This component owns the exercise-type-specific UI (rendering + local
+ * input state for whichever exercise is currently showing); the session's
+ * own progress — the queue, score, grading, and advancing — lives in
+ * useLessonSession, and each exercise-type's presentation lives in its own
+ * file under ./lesson-engine.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CurriculumLesson, VocabItem, GrammarSlide, DialogueTurn, getAllVocab } from '@/lib/curriculum';
-import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry, recallKindFor } from '@/lib/exercise-engine';
+import { getAllVocab } from '@/lib/curriculum';
 import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
-import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
+import { loadProgress, currentStreak } from '@/lib/progress';
 import { buildTutorContext } from '@/lib/tutor-context';
 import { startRecording, assessPronunciationFromBlob, type PronunciationResult } from '@/lib/pronunciation';
-import { PronunciationScoreCard } from '@/components/PronunciationScoreCard';
 import { api } from '@/lib/api';
-
-type Feedback =
-  | { kind: 'correct'; note?: string }
-  | { kind: 'wrong'; correctAnswer: string; note?: string }
-  | null;
-
-interface SessionStats {
-  answered: number;
-  firstTryCorrect: number;
-  bestCombo: number;
-}
+import { PronunciationScoreCard } from '@/components/PronunciationScoreCard';
+import { useLessonSession } from './lesson-engine/useLessonSession';
+import { TopExitBar } from './lesson-engine/TopExitBar';
+import { StatCard } from './lesson-engine/StatCard';
+import { TeachCard } from './lesson-engine/TeachCard';
+import { GrammarSlideCard } from './lesson-engine/GrammarSlideCard';
+import { DialogueCard } from './lesson-engine/DialogueCard';
+import { ChoiceExercise } from './lesson-engine/ChoiceExercise';
+import { ListeningExercise } from './lesson-engine/ListeningExercise';
+import { FillBlankExercise } from './lesson-engine/FillBlankExercise';
+import { MatchPairsExercise } from './lesson-engine/MatchPairsExercise';
+import type { CurriculumLesson } from '@/lib/curriculum';
 
 interface LessonEngineProps {
   lesson: CurriculumLesson | null;
@@ -46,14 +51,24 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const srAvailable = useMemo(() => speechRecognitionSupported(), []);
   const allVocab = useMemo(() => getAllVocab(), []);
 
-  const [queue, setQueue] = useState<Exercise[]>([]);
-  const [built, setBuilt] = useState(false);
-  const [index, setIndex] = useState(0);
-  const [started, setStarted] = useState(false);
-  const [feedback, setFeedback] = useState<Feedback>(null);
-  const [combo, setCombo] = useState(0);
-  const [stats, setStats] = useState<SessionStats>({ answered: 0, firstTryCorrect: 0, bestCombo: 0 });
-  const [finished, setFinished] = useState(false);
+  const {
+    queue,
+    setQueue,
+    built,
+    index,
+    current,
+    total,
+    started,
+    setStarted,
+    feedback,
+    setFeedback,
+    combo,
+    stats,
+    finished,
+    grade,
+    handleContinue,
+  } = useLessonSession({ lesson, mode, srAvailable, allVocab });
+
   // Per-exercise UI state
   const [selected, setSelected] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
@@ -73,21 +88,6 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const [gradingWriting, setGradingWriting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
-
-  const current = queue[index];
-  const total = queue.length;
-
-  // Build the session
-  useEffect(() => {
-    if (mode === 'mistakes') {
-      setQueue(buildMistakesSession(srAvailable));
-    } else if (mode === 'practice') {
-      setQueue(buildReviewSession(null, srAvailable));
-    } else if (lesson) {
-      setQueue(buildLessonSession(lesson, srAvailable));
-    }
-    setBuilt(true);
-  }, [lesson, mode, srAvailable]);
 
   // Reset per-exercise state and auto-play audio for listening/teach exercises
   useEffect(() => {
@@ -111,62 +111,13 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
     return () => stopSpeaking();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, current, started]);
 
   // Focus the continue button when feedback shows (Enter to continue)
   useEffect(() => {
     if (feedback) setTimeout(() => continueRef.current?.focus(), 50);
   }, [feedback]);
-
-  const grade = useCallback(
-    (correct: boolean, correctAnswer: string, note?: string) => {
-      if (!current) return;
-      const firstTry = !current.isRetry;
-      if (!current.noWordTracking) {
-        recordWordResult(current.word.id, correct, firstTry, recallKindFor(current.type));
-        // Speaking exercises also feed the pronunciation signal the tutor uses.
-        if (current.type === 'speak') recordPronunciationResult(current.word.id, correct);
-      }
-
-      if (correct) {
-        const comboNext = combo + 1;
-        touchStreak();
-        setCombo(comboNext);
-        setStats((s) => ({
-          answered: s.answered + 1,
-          firstTryCorrect: s.firstTryCorrect + (firstTry ? 1 : 0),
-          bestCombo: Math.max(s.bestCombo, comboNext),
-        }));
-        setFeedback({ kind: 'correct', note });
-        // Replay the word being drilled (skip for synthetic/sentence anchors)
-        if (!current.noWordTracking) speak(current.word.es, 1);
-      } else {
-        setCombo(0);
-        setStats((s) => ({ ...s, answered: s.answered + 1 }));
-        setFeedback({ kind: 'wrong', correctAnswer, note });
-        // Re-queue this word a few exercises later, from an easier angle
-        setQueue((q) => {
-          const retry = buildRetry(current, allVocab);
-          const insertAt = Math.min(q.length, index + 3);
-          return [...q.slice(0, insertAt), retry, ...q.slice(insertAt)];
-        });
-      }
-    },
-    [current, combo, index, allVocab]
-  );
-
-  const handleContinue = useCallback(() => {
-    stopSpeaking();
-    if (index + 1 >= total) {
-      // Session complete
-      const accuracy = stats.answered > 0 ? Math.round((stats.firstTryCorrect / stats.answered) * 100) : 100;
-      if (mode === 'lesson' && lesson) completeLessonLocal(lesson.slug, accuracy);
-      else touchStreak(); // practice/mistakes: touch streak even if all skipped
-      setFinished(true);
-    } else {
-      setIndex((i) => i + 1);
-    }
-  }, [index, total, stats, lesson, mode]);
 
   // ---- Answer handlers per exercise type ----
 
@@ -925,404 +876,6 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ---------- Sub-components ----------
-
-function TopExitBar({ onExit }: { onExit: () => void }) {
-  return (
-    <div className="px-4 pt-4 max-w-2xl mx-auto w-full">
-      <button
-        onClick={onExit}
-        className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-2xl leading-none p-1"
-        aria-label="Back"
-      >
-        ✕
-      </button>
-    </div>
-  );
-}
-
-function StatCard({ label, value, color, delay }: { label: string; value: string; color: string; delay: string }) {
-  return (
-    <div
-      className="bg-white dark:bg-stone-800 rounded-2xl p-4 border border-stone-200 dark:border-stone-700 animate-pop"
-      style={{ animationDelay: delay, animationFillMode: 'backwards' }}
-    >
-      <p className={`font-display text-3xl font-black ${color}`}>{value}</p>
-      <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">{label}</p>
-    </div>
-  );
-}
-
-function TeachCard({ word }: { word: VocabItem }) {
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-4">
-        ✨ New word
-      </p>
-      <div className="surface p-8 text-center">
-        <button onClick={() => speak(word.es)} className="group">
-          <p className="font-display text-5xl font-black text-ink dark:text-white group-hover:text-brand-500 transition-colors leading-tight">
-            🔊 {word.es}
-          </p>
-        </button>
-        <p className="text-stone-500 dark:text-stone-400 italic mt-2">{word.pron}</p>
-        <p className="text-2xl font-extrabold text-brand-600 dark:text-brand-400 mt-4">{word.en}</p>
-        <div className="mt-6 pt-6 border-t border-stone-200 dark:border-stone-700">
-          <button onClick={() => speak(word.exampleEs)} className="group text-left w-full">
-            <p className="text-lg text-stone-800 dark:text-stone-200 group-hover:text-brand-500 transition-colors">
-              🔉 {word.exampleEs}
-            </p>
-          </button>
-          <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{word.exampleEn}</p>
-        </div>
-      </div>
-      <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-4">
-        Tap anything with a speaker to hear it again
-      </p>
-    </div>
-  );
-}
-
-function GrammarSlideCard({ slide }: { slide: GrammarSlide }) {
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-4">
-        📖 Grammar — read this like your teacher explaining
-      </p>
-      <div className="surface !border-indigo-200/70 dark:!border-indigo-900/60 p-6 md:p-7">
-        <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-4">{slide.title}</h2>
-        <div className="space-y-3 mb-5">
-          {slide.body.split('\n\n').map((para, i) => (
-            <p key={i} className="text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-line">
-              {para}
-            </p>
-          ))}
-        </div>
-        <div className="border-t border-stone-200 dark:border-stone-700 pt-4 space-y-2">
-          {slide.examples.map((ex, i) => (
-            <button
-              key={i}
-              onClick={() => speak(ex.es)}
-              className="w-full text-left group flex items-baseline gap-3 rounded-xl px-3 py-2 hover:bg-indigo-50 dark:hover:bg-stone-700/50 transition-colors"
-            >
-              <span className="font-bold text-stone-900 dark:text-white group-hover:text-indigo-500 transition-colors">
-                🔉 {ex.es}
-              </span>
-              <span className="text-sm text-stone-500 dark:text-stone-400">{ex.en}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-4">
-        Tap any example to hear it — questions on this are coming next
-      </p>
-    </div>
-  );
-}
-
-function DialogueCard({ dialogue }: { dialogue: DialogueTurn[] }) {
-  const [playing, setPlaying] = useState(false);
-
-  const playAll = async () => {
-    if (playing) {
-      stopSpeaking();
-      setPlaying(false);
-      return;
-    }
-    setPlaying(true);
-    for (const turn of dialogue) {
-      await speak(turn.es, 0.85);
-    }
-    setPlaying(false);
-  };
-
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-pink-600 dark:text-pink-400 uppercase tracking-wide mb-4">
-        💬 Real conversation — listen and follow
-      </p>
-      <div className="surface !border-pink-200/70 dark:!border-pink-900/60 p-5 space-y-3">
-        <button
-          onClick={playAll}
-          className="btn-3d w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-[0_3px_0_0_#BE185D] active:shadow-none"
-        >
-          {playing ? '⏸ Stop' : '▶ Play the whole conversation'}
-        </button>
-        {dialogue.map((turn, i) => {
-          const isYou = turn.speaker === 'Tú';
-          return (
-            <button
-              key={i}
-              onClick={() => speak(turn.es, 0.85)}
-              className={`block w-full text-left rounded-2xl px-4 py-3 transition-colors ${
-                isYou
-                  ? 'bg-brand-50 dark:bg-brand-900/20 ml-6 hover:bg-brand-100 dark:hover:bg-brand-900/40'
-                  : 'bg-stone-50 dark:bg-stone-700/40 mr-6 hover:bg-stone-100 dark:hover:bg-stone-700/70'
-              }`}
-            >
-              <span className={`text-xs font-bold uppercase tracking-wide ${isYou ? 'text-brand-600 dark:text-brand-400' : 'text-stone-400'}`}>
-                {isYou ? 'You' : turn.speaker}
-              </span>
-              <span className="block font-semibold text-stone-900 dark:text-white mt-0.5">
-                {turn.es}
-              </span>
-              <span className="block text-sm text-stone-500 dark:text-stone-400">{turn.en}</span>
-            </button>
-          );
-        })}
-      </div>
-      <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-4">
-        Tap any line to hear it — your lines are highlighted in green
-      </p>
-    </div>
-  );
-}
-
-function optionClasses(option: string, selected: string | null, feedback: Feedback, correctAnswer: string): string {
-  const base = 'w-full px-5 py-4 text-left text-lg font-semibold ';
-  if (!feedback) {
-    return base + 'option-tile';
-  }
-  if (option === correctAnswer) {
-    return base + 'option-tile option-tile-correct';
-  }
-  if (option === selected) {
-    return base + 'option-tile option-tile-wrong animate-shake';
-  }
-  return base + 'option-tile option-tile-faded';
-}
-
-function ChoiceExercise({
-  prompt,
-  promptLang,
-  instruction,
-  options,
-  selected,
-  feedback,
-  correctAnswer,
-  onSelect,
-  onSpeak,
-  smallPrompt,
-}: {
-  prompt: string;
-  promptLang: 'es' | 'en';
-  instruction: string;
-  options: string[];
-  selected: string | null;
-  feedback: Feedback;
-  correctAnswer: string;
-  onSelect: (o: string) => void;
-  onSpeak?: () => void;
-  smallPrompt?: boolean;
-}) {
-  const promptSize = smallPrompt
-    ? 'text-xl leading-snug'
-    : 'font-display text-4xl font-black leading-tight';
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
-        {instruction}
-      </p>
-      {onSpeak ? (
-        <button onClick={onSpeak} className="group mb-8">
-          <p className={`text-center ${promptSize} font-extrabold text-ink dark:text-white group-hover:text-brand-500 transition-colors`}>
-            🔊 {prompt}
-          </p>
-        </button>
-      ) : (
-        <p className={`text-center ${promptSize} font-extrabold text-ink dark:text-white mb-8 ${promptLang === 'en' ? '' : ''}`}>
-          {prompt}
-        </p>
-      )}
-      <div className="grid gap-3">
-        {options.map((option, i) => (
-          <button key={option} onClick={() => onSelect(option)} disabled={!!feedback} className={optionClasses(option, selected, feedback, correctAnswer)}>
-            <span className="inline-flex w-6 h-6 mr-3 rounded-lg bg-black/5 dark:bg-white/10 text-xs font-bold items-center justify-center opacity-70">
-              {i + 1}
-            </span>
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ListeningExercise({
-  instruction,
-  options,
-  selected,
-  feedback,
-  correctAnswer,
-  onSelect,
-  onPlay,
-}: {
-  instruction: string;
-  options: string[];
-  selected: string | null;
-  feedback: Feedback;
-  correctAnswer: string;
-  onSelect: (o: string) => void;
-  onPlay: (rate?: number) => void;
-}) {
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-6">
-        🎧 {instruction}
-      </p>
-      <div className="flex items-center justify-center gap-4 mb-8">
-        <button
-          onClick={() => onPlay()}
-          className="btn-3d w-20 h-20 rounded-[26px] bg-gradient-to-br from-sky-400 to-blue-600 text-white text-3xl flex items-center justify-center shadow-[0_4px_0_0_#1D4ED8,0_16px_32px_-10px_rgba(37,99,235,0.5)] active:shadow-[0_1px_0_0_#1D4ED8]"
-          aria-label="Play audio"
-        >
-          🔊
-        </button>
-        <button
-          onClick={() => onPlay(0.6)}
-          className="btn-3d w-14 h-14 rounded-2xl bg-white dark:bg-paper-dark-soft border-2 border-stone-200 dark:border-stone-700 text-2xl flex items-center justify-center shadow-[0_3px_0_0_#E7E5E4] dark:shadow-[0_3px_0_0_#44403C] hover:border-sky-400 active:shadow-none"
-          aria-label="Play slowly"
-          title="Play slowly"
-        >
-          🐢
-        </button>
-      </div>
-      <div className="grid gap-3">
-        {options.map((option, i) => (
-          <button key={option} onClick={() => onSelect(option)} disabled={!!feedback} className={optionClasses(option, selected, feedback, correctAnswer)}>
-            <span className="inline-flex w-6 h-6 mr-3 rounded-lg bg-black/5 dark:bg-white/10 text-xs font-bold items-center justify-center opacity-70">
-              {i + 1}
-            </span>
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FillBlankExercise({
-  sentence,
-  options,
-  selected,
-  feedback,
-  onSelect,
-}: {
-  sentence: { es: string; en: string; blank: string };
-  options: string[];
-  selected: string | null;
-  feedback: Feedback;
-  onSelect: (o: string) => void;
-}) {
-  const parts = sentence.es.split(sentence.blank);
-  const shown = feedback || selected ? selected ?? '' : '_____';
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-6">
-        Complete the sentence
-      </p>
-      <div className="surface p-6 mb-2 text-center">
-        <p className="font-display text-3xl font-black text-ink dark:text-white leading-relaxed">
-          {parts[0]}
-          <span
-            className={`inline-block min-w-[80px] border-b-4 mx-1 px-1 ${
-              feedback
-                ? feedback.kind === 'correct'
-                  ? 'border-brand-500 text-brand-600 dark:text-brand-400'
-                  : 'border-terra-400 text-terra-500'
-                : 'border-stone-300 dark:border-stone-600 text-stone-400'
-            }`}
-          >
-            {shown}
-          </span>
-          {parts[1]}
-        </p>
-      </div>
-      <p className="text-center text-sm text-stone-500 dark:text-stone-400 mb-6 italic">
-        &ldquo;{sentence.en}&rdquo;
-      </p>
-      <div className="grid grid-cols-2 gap-3">
-        {options.map((option) => (
-          <button
-            key={option}
-            onClick={() => onSelect(option)}
-            disabled={!!feedback}
-            className={optionClasses(option, selected, feedback, sentence.blank)}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MatchPairsExercise({
-  pairs,
-  matched,
-  selection,
-  shake,
-  onTap,
-}: {
-  pairs: Array<{ es: string; en: string }>;
-  matched: Set<string>;
-  selection: { side: 'es' | 'en'; value: string } | null;
-  shake: string | null;
-  onTap: (side: 'es' | 'en', value: string, pairKey: string) => void;
-}) {
-  // Spanish column keeps generation order; English column alphabetical so
-  // the two sides never line up.
-  const esCol = useMemo(() => [...pairs], [pairs]);
-  const enCol = useMemo(
-    () => [...pairs].map((p) => p.en).sort((a, b) => a.localeCompare(b)),
-    [pairs]
-  );
-
-  const btnClass = (side: 'es' | 'en', value: string, pairKey: string) => {
-    const base = 'w-full px-3 py-4 font-semibold text-center ';
-    if (matched.has(pairKey)) {
-      return base + 'option-tile option-tile-correct pointer-events-none opacity-50';
-    }
-    if (shake === value) {
-      return base + 'option-tile option-tile-wrong animate-shake';
-    }
-    if (selection && selection.side === side && selection.value === value) {
-      return (
-        base +
-        'option-tile !border-sky-400 !bg-sky-50 dark:!bg-sky-900/30 !text-sky-700 dark:!text-sky-300'
-      );
-    }
-    return base + 'option-tile';
-  };
-
-  return (
-    <div className="flex-1 flex flex-col justify-center">
-      <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-6">
-        Match the pairs
-      </p>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="grid gap-3 content-start">
-          {esCol.map((p) => (
-            <button key={p.es} onClick={() => onTap('es', p.es, p.es)} className={btnClass('es', p.es, p.es)}>
-              {p.es}
-            </button>
-          ))}
-        </div>
-        <div className="grid gap-3 content-start">
-          {enCol.map((en) => {
-            const pair = pairs.find((p) => p.en === en)!;
-            return (
-              <button key={en} onClick={() => onTap('en', en, pair.es)} className={btnClass('en', en, pair.es)}>
-                {en}
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
