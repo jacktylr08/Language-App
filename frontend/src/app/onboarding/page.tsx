@@ -1,11 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { markOnboardingComplete } from '@/lib/sync';
 import { saveLearnerGoal, GOAL_LABELS, type LearnerGoal } from '@/lib/learner-goal';
-import { LEVEL_OPTIONS, startWeekForLevel, type LearnerLevel } from '@/lib/placement';
+import {
+  LEVEL_OPTIONS,
+  startWeekForLevel,
+  PLACEMENT_QUIZ_LENGTH,
+  buildPlacementQuestionPool,
+  initialPlacementProgress,
+  pickNextPlacementQuestion,
+  recordPlacementAnswer,
+  isPlacementQuizComplete,
+  startWeekForPlacement,
+  type LearnerLevel,
+  type PlacementQuestion,
+  type PlacementProgress,
+} from '@/lib/placement';
 import { placeLearnerAtWeek } from '@/lib/progress';
 import { phaseForWeek } from '@/lib/curriculum';
 
@@ -19,6 +32,20 @@ export default function OnboardingPage() {
   const [level, setLevel] = useState<LearnerLevel | null>(null);
   const [goal, setGoal] = useState<LearnerGoal | null>(null);
 
+  // The placement diagnostic — only entered if the learner says they've
+  // studied some Spanish already. A true complete beginner skips it entirely
+  // and starts at week 1, since a 10-question quiz would just be friction
+  // before their first real lesson.
+  const questionPool = useMemo(() => buildPlacementQuestionPool(), []);
+  const [quizProgress, setQuizProgress] = useState<PlacementProgress | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<PlacementQuestion | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [revealResult, setRevealResult] = useState<boolean | null>(null);
+  // The actual, decided starting week — either from the quiz result or the
+  // complete-beginner fast path. This (not the raw self-report) is what
+  // actually gets used to place the learner.
+  const [startWeek, setStartWeek] = useState<number | null>(null);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -30,6 +57,52 @@ export default function OnboardingPage() {
     );
   }
 
+  const beginQuiz = () => {
+    const progress = initialPlacementProgress();
+    setQuizProgress(progress);
+    setCurrentQuestion(pickNextPlacementQuestion(questionPool, progress));
+    setSelectedOption(null);
+    setRevealResult(null);
+  };
+
+  const chooseLevel = (value: LearnerLevel) => {
+    setLevel(value);
+    if (value === 'new') {
+      setStartWeek(startWeekForLevel('new'));
+      setQuizProgress(null);
+      setCurrentQuestion(null);
+    } else {
+      setStartWeek(null);
+      beginQuiz();
+    }
+  };
+
+  const answerQuizQuestion = (option: string) => {
+    if (!quizProgress || !currentQuestion || selectedOption) return;
+    const wasCorrect = option === currentQuestion.correctAnswer;
+    setSelectedOption(option);
+    setRevealResult(wasCorrect);
+
+    const nextProgress = recordPlacementAnswer(quizProgress, currentQuestion, wasCorrect);
+    setQuizProgress(nextProgress);
+
+    // Brief pause so the learner sees whether they got it right before the
+    // next question appears — same "graded, then move on" rhythm as a lesson.
+    setTimeout(() => {
+      if (isPlacementQuizComplete(nextProgress)) {
+        setStartWeek(startWeekForPlacement(nextProgress));
+        setCurrentQuestion(null);
+      } else {
+        setCurrentQuestion(pickNextPlacementQuestion(questionPool, nextProgress));
+      }
+      setSelectedOption(null);
+      setRevealResult(null);
+    }, 700);
+  };
+
+  const quizInProgress = quizProgress !== null && !isPlacementQuizComplete(quizProgress);
+  const readyToAdvancePastLevel = startWeek !== null && !quizInProgress;
+
   const handleNext = () => {
     if (step < TOTAL_STEPS - 1) {
       setStep(step + 1);
@@ -38,12 +111,13 @@ export default function OnboardingPage() {
       // (see lib/learner-goal.ts) — and remember onboarding is done so it
       // never re-asks. Both are synced to the account.
       if (goal) saveLearnerGoal(goal);
-      // A learner who isn't a complete beginner gets placed further into the
-      // course — but their earlier lessons are marked `skipped`, never
-      // faked as `completed`: they still unlock everything and set the
-      // tutor's level ceiling, but the lesson list stays honest that this
-      // material was never actually done in the app.
-      if (level) placeLearnerAtWeek(startWeekForLevel(level));
+      // The learner's ACTUAL demonstrated starting week — from the adaptive
+      // quiz when they took one, or the complete-beginner fast path
+      // otherwise. Earlier lessons are marked `skipped`, never faked as
+      // `completed`: they still unlock everything and set the tutor's level
+      // ceiling, but the lesson list stays honest that this material was
+      // never actually done in the app.
+      if (startWeek) placeLearnerAtWeek(startWeek);
       markOnboardingComplete();
       router.push('/lessons');
     }
@@ -92,15 +166,14 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {step === 1 && (
+          {step === 1 && !quizProgress && (
             <div>
               <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-2">
                 What's your Spanish level?
               </h2>
               <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
-                Be honest — this decides where you actually start. Say too much and you'll skip
-                past things you needed; say too little and you'll be bored redoing what you
-                already know.
+                If you've studied before, we'll follow up with a quick 10-question check — not an
+                exam, just enough to place you accurately instead of guessing.
               </p>
               <div className="space-y-3">
                 {LEVEL_OPTIONS.map((opt) => (
@@ -117,7 +190,7 @@ export default function OnboardingPage() {
                       name="level"
                       value={opt.value}
                       checked={level === opt.value}
-                      onChange={() => setLevel(opt.value)}
+                      onChange={() => chooseLevel(opt.value)}
                       className="w-4 h-4 accent-brand-600 mt-1"
                     />
                     <span>
@@ -131,6 +204,68 @@ export default function OnboardingPage() {
                   </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {step === 1 && quizProgress && quizInProgress && currentQuestion && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-display text-2xl font-black text-ink dark:text-white">
+                  Quick placement check
+                </h2>
+                <span className="text-sm font-medium text-stone-500 dark:text-stone-400">
+                  {quizProgress.history.length + 1} / {PLACEMENT_QUIZ_LENGTH}
+                </span>
+              </div>
+              <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
+                Answer as best you can — questions get harder or easier depending on how you do, so
+                don't worry about missing one.
+              </p>
+              <p className="text-lg font-bold text-stone-700 dark:text-stone-200 mb-4">
+                {currentQuestion.prompt}
+              </p>
+              <div className="space-y-3">
+                {currentQuestion.options.map((opt) => {
+                  const isSelected = selectedOption === opt;
+                  const isCorrectOption = opt === currentQuestion.correctAnswer;
+                  const showState = selectedOption !== null;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => answerQuizQuestion(opt)}
+                      disabled={selectedOption !== null}
+                      className={`w-full text-left p-4 border-2 rounded-lg transition-colors ${
+                        showState && isCorrectOption
+                          ? 'border-green-500 bg-green-50/60 dark:bg-green-500/10'
+                          : showState && isSelected && !isCorrectOption
+                            ? 'border-red-500 bg-red-50/60 dark:bg-red-500/10'
+                            : 'border-stone-200 dark:border-stone-600 hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-stone-800'
+                      }`}
+                    >
+                      <span className="text-stone-700 dark:text-stone-300 font-medium">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {revealResult !== null && (
+                <p
+                  className={`mt-4 text-sm font-bold ${revealResult ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                >
+                  {revealResult ? 'Correct!' : `Not quite — "${currentQuestion.correctAnswer}"`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {step === 1 && quizProgress && !quizInProgress && startWeek !== null && (
+            <div className="text-center">
+              <h2 className="font-display text-2xl font-black text-ink dark:text-white mb-4">
+                Quick check complete!
+              </h2>
+              <p className="text-stone-600 dark:text-stone-400">
+                Based on your answers, we've found the right starting point for you.
+              </p>
             </div>
           )}
 
@@ -170,9 +305,9 @@ export default function OnboardingPage() {
           )}
 
           {step === 3 && (() => {
-            const startWeek = level ? startWeekForLevel(level) : 1;
-            const phase = phaseForWeek(startWeek);
-            const isPlaced = startWeek > 1;
+            const week = startWeek ?? 1;
+            const phase = phaseForWeek(week);
+            const isPlaced = week > 1;
             return (
               <div className="text-center">
                 <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-6">
@@ -209,7 +344,7 @@ export default function OnboardingPage() {
           </button>
           <button
             onClick={handleNext}
-            disabled={(step === 1 && !level) || (step === 2 && !goal)}
+            disabled={(step === 1 && !readyToAdvancePastLevel) || (step === 2 && !goal)}
             className="flex-1 btn-primary py-3 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {step === TOTAL_STEPS - 1 ? 'Start Learning' : 'Next'}
