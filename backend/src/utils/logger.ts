@@ -18,11 +18,30 @@ const colors = {
 
 winston.addColors(colors);
 
+// Verbose debug logging is fine (and useful) for local development, but
+// left unset it used to default to 'debug' in every environment, including
+// production — quietly logging far more than intended (and at real cost,
+// since every log line ships to disk/stdout). Only actual development gets
+// 'debug' by default now; everything else defaults to 'info'. LOG_LEVEL
+// still overrides this explicitly wherever it's set.
+const defaultLevel = process.env.NODE_ENV === 'development' ? 'debug' : 'info';
+
 const format = winston.format.combine(
+  // Lets logger.error(err) (or logger.error('msg:', err)) surface a real
+  // stack trace instead of just err.message — critical for debugging
+  // production issues after the fact.
+  winston.format.errors({ stack: true }),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`
-  )
+  winston.format.printf((info) => {
+    // format.errors only rewrites `info` when the *first* logged argument is
+    // itself an Error. Most call sites in this codebase log an Error as a
+    // second/extra argument instead (e.g. logger.error('X failed:', err)) —
+    // catch that case here too so its stack still gets captured.
+    const splat = (info[Symbol.for('splat') as unknown as string] as unknown[]) || [];
+    const splatError = splat.find((a): a is Error => a instanceof Error);
+    const stack = (info.stack as string | undefined) || splatError?.stack;
+    return `${info.timestamp} ${info.level}: ${info.message}${stack ? `\n${stack}` : ''}`;
+  })
 );
 
 const transports = [
@@ -37,7 +56,7 @@ const transports = [
 ];
 
 export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'debug',
+  level: process.env.LOG_LEVEL || defaultLevel,
   levels,
   format,
   transports,
