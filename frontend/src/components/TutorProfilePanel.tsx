@@ -133,6 +133,18 @@ export function TutorProfilePanel() {
                             </span>
                           )}
                           {h.note}
+                          {h.mistakes && h.mistakes.length > 0 && (
+                            <ul className="mt-1 space-y-0.5">
+                              {h.mistakes.map((m, mi) => (
+                                <li key={mi} className="text-[13px] text-terra-600 dark:text-terra-400 flex gap-1.5">
+                                  <span className="shrink-0" aria-hidden>
+                                    ◐
+                                  </span>
+                                  {m}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {h.transcript && h.transcript.length > 0 && (
                             <button
                               onClick={() => setOpenTranscript(isOpen ? null : h.date)}
