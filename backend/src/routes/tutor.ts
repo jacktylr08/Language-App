@@ -199,21 +199,21 @@ router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequ
  * MP3 audio (OpenAI voices).
  *
  * POST /api/v1/tutor/speak
- * Body: { text: string }
+ * Body: { text: string, language?: string }
  *
  * Returns audio/mpeg on success. If voice isn't configured (no OPENAI_API_KEY)
  * we answer 503 so the client can fall back to the free browser voice.
  */
 router.post('/speak', verifyToken, tutorSpeakLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { text } = req.body ?? {};
+    const { text, language } = req.body ?? {};
     if (typeof text !== 'string' || !text.trim()) {
       res.status(400).json({ error: 'text is required' });
       return;
     }
 
     // Cap length so a runaway request can't rack up cost or latency.
-    const audio = await synthesizeSpeech(text.trim().slice(0, 800));
+    const audio = await synthesizeSpeech(text.trim().slice(0, 800), langOf(language));
 
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');

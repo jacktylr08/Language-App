@@ -11,6 +11,7 @@
  */
 import { api } from './api';
 import { speak as browserSpeak, stopSpeaking as browserStop, ttsSupported } from './speech';
+import { getActiveLanguage } from './languages';
 
 let currentAudio: HTMLAudioElement | null = null;
 // Once we learn the server voice isn't configured (503), stop asking and go
@@ -57,12 +58,14 @@ export interface SpeakOptions {
 
 /** Fetch (or reuse) the neural MP3 for `text` and return an object URL. */
 async function neuralUrl(text: string): Promise<string> {
-  const cached = cacheGet(text);
+  const language = getActiveLanguage().name;
+  const cacheKey = `${language}:${text}`;
+  const cached = cacheGet(cacheKey);
   if (cached) return cached;
-  const res = await api.post('/tutor/speak', { text }, { responseType: 'arraybuffer' });
+  const res = await api.post('/tutor/speak', { text, language }, { responseType: 'arraybuffer' });
   const blob = new Blob([res.data], { type: 'audio/mpeg' });
   const url = URL.createObjectURL(blob);
-  cachePut(text, url);
+  cachePut(cacheKey, url);
   return url;
 }
 
