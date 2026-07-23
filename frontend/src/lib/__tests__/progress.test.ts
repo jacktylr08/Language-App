@@ -8,6 +8,8 @@ import {
   placeLearnerAtWeek,
   isLessonDone,
   completeLessonLocal,
+  knownWordCount,
+  masteredWordCount,
 } from '../progress';
 import type { ProgressState } from '../progress';
 
@@ -128,6 +130,52 @@ describe('recordWordResult', () => {
     const retryDue = new Date(loadProgress().words.dificil.nextReview).getTime();
 
     expect(retryDue).toBeLessThanOrEqual(cleanDue);
+  });
+
+  it('rates a clean first-try free recall as Easy, scheduling further out than the same result on a recognition exercise', () => {
+    recordWordResult('recordado', true, true, 'recall');
+    const recallDue = new Date(loadProgress().words.recordado.nextReview).getTime();
+
+    localStorage.clear();
+    recordWordResult('reconocido', true, true, 'recognition');
+    const recognitionDue = new Date(loadProgress().words.reconocido.nextReview).getTime();
+
+    expect(recallDue).toBeGreaterThan(recognitionDue);
+  });
+
+  it('defaults to the more conservative recognition rating when kind is unspecified', () => {
+    recordWordResult('por-defecto', true, true);
+    const defaultDue = new Date(loadProgress().words['por-defecto'].nextReview).getTime();
+
+    localStorage.clear();
+    recordWordResult('explicito', true, true, 'recognition');
+    const explicitDue = new Date(loadProgress().words.explicito.nextReview).getTime();
+
+    expect(defaultDue).toBe(explicitDue);
+  });
+});
+
+describe('knownWordCount / masteredWordCount (real FSRS state, not the separate strength counter)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('does not count a brand-new word as known even though strength can be nonzero', () => {
+    recordWordResult('nuevo', true); // strength 1, FSRS state still New after one rep
+    const state = loadProgress();
+    expect(knownWordCount(state)).toBe(0);
+  });
+
+  it('counts a word as known once FSRS has graduated it into a real review cycle', () => {
+    recordWordResult('graduado', true, true, 'recall'); // Easy can graduate straight to Review
+    const state = loadProgress();
+    expect(knownWordCount(state)).toBe(1);
+  });
+
+  it('does not count a known word as mastered until FSRS stability clears the long-retention bar', () => {
+    recordWordResult('conocido', true, true, 'recall');
+    const state = loadProgress();
+    // Freshly graduated: known, but nowhere near the 21-day mastery bar yet.
+    expect(knownWordCount(state)).toBe(1);
+    expect(masteredWordCount(state)).toBe(0);
   });
 });
 

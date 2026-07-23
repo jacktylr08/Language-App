@@ -377,7 +377,9 @@ export function reconcileReadingProgress(
     if (!tracked) continue;
     seen.add(key);
     const knewIt = !tappedVocabIds.has(tracked.id);
-    recordWordResult(tracked.id, knewIt, true);
+    // Not tapping for a translation is a self-report of already knowing the
+    // word, not a production/recall test — recognition-tier, same as MCQ.
+    recordWordResult(tracked.id, knewIt, true, 'recognition');
     if (knewIt) recognized += 1;
     else reviewed += 1;
   }

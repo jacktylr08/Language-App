@@ -35,6 +35,19 @@ export type ExerciseType =
   | 'speak' // say the Spanish out loud
   | 'write_answer'; // free composition, graded by the tutor
 
+/**
+ * Which FSRS rating tier a correct-on-first-try answer deserves (see
+ * RecallKind in progress.ts). Typing, writing, and speaking require
+ * producing the word from memory with nothing shown — free recall.
+ * Everything else here is picking the right answer out of a lineup —
+ * recognition, a meaningfully weaker signal even when it's correct.
+ */
+const RECALL_TYPES: ReadonlySet<ExerciseType> = new Set(['type_es', 'type_en', 'write_answer', 'speak']);
+
+export function recallKindFor(type: ExerciseType): 'recognition' | 'recall' {
+  return RECALL_TYPES.has(type) ? 'recall' : 'recognition';
+}
+
 export interface Exercise {
   type: ExerciseType;
   word: VocabItem;

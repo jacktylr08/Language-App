@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CurriculumLesson, VocabItem, GrammarSlide, DialogueTurn, getAllVocab } from '@/lib/curriculum';
-import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry } from '@/lib/exercise-engine';
+import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry, recallKindFor } from '@/lib/exercise-engine';
 import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult, loadProgress, currentStreak } from '@/lib/progress';
@@ -122,7 +122,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
       if (!current) return;
       const firstTry = !current.isRetry;
       if (!current.noWordTracking) {
-        recordWordResult(current.word.id, correct, firstTry);
+        recordWordResult(current.word.id, correct, firstTry, recallKindFor(current.type));
         // Speaking exercises also feed the pronunciation signal the tutor uses.
         if (current.type === 'speak') recordPronunciationResult(current.word.id, correct);
       }

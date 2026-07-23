@@ -8,7 +8,7 @@
  * stays a simple 0-5 indicator driving unrelated UI (known/mastered counts,
  * weakest-first sorting) — only the interval math changed.
  */
-import { fsrs, createEmptyCard, Rating, type Card, type CardInput } from 'ts-fsrs';
+import { fsrs, createEmptyCard, Rating, State, type Card, type CardInput } from 'ts-fsrs';
 
 const scheduler = fsrs();
 
@@ -191,12 +191,32 @@ export function touchStreak(): ProgressState {
 }
 
 /**
+ * Recognition exercises (multiple choice, fill-in-from-options, tile
+ * selection, tap-to-translate self-report) are ~25%-guessable and test
+ * whether the learner can pick the right answer out of a lineup. Recall
+ * exercises (typing, writing, speaking) require producing the word from
+ * memory with no options shown — a strictly stronger memory signal per the
+ * testing-effect/levels-of-processing literature (Craik & Tulving; Roediger
+ * & Karpicke), so the two must not feed FSRS the same rating on a correct
+ * first try.
+ */
+export type RecallKind = 'recognition' | 'recall';
+
+/**
  * Record the outcome of a vocab exercise and reschedule its next review via
  * FSRS. `firstTry` softens the rating for a word that was only got right on
  * a retry (still progress, just not as solid as a clean first-time recall) —
  * defaults to true so callers that don't track retries behave sensibly.
+ * `kind` distinguishes recognition from free recall (see RecallKind) —
+ * defaults to 'recognition', the more conservative rating, for callers that
+ * don't specify it.
  */
-export function recordWordResult(wordId: string, correct: boolean, firstTry = true): void {
+export function recordWordResult(
+  wordId: string,
+  correct: boolean,
+  firstTry = true,
+  kind: RecallKind = 'recognition'
+): void {
   const state = loadProgress();
   const w: WordState = state.words[wordId] || {
     strength: 0,
@@ -218,7 +238,19 @@ export function recordWordResult(wordId: string, correct: boolean, firstTry = tr
   const card: Card | CardInput = w.fsrs
     ? { ...w.fsrs, last_review: w.fsrs.last_review }
     : createEmptyCard(now);
-  const rating = correct ? (firstTry ? Rating.Good : Rating.Hard) : Rating.Again;
+  // A clean first-try free recall is the strongest possible signal FSRS can
+  // get — it earns Easy (and the long-interval benefit that comes with it).
+  // A clean first-try recognition answer is real progress but a weaker
+  // signal (right could mean "knew it" or "guessed among 4"), so it's capped
+  // at Good. A retry-within-session or a recognition answer both land on
+  // Hard/Good the same as before; wrong is always Again.
+  const rating = !correct
+    ? Rating.Again
+    : !firstTry
+      ? Rating.Hard
+      : kind === 'recall'
+        ? Rating.Easy
+        : Rating.Good;
   const { card: next } = scheduler.next(card, now, rating);
 
   w.fsrs = {
@@ -328,12 +360,28 @@ export function getMistakeWordIds(limit = 40): string[] {
     .slice(0, limit);
 }
 
+/**
+ * "Known"/"mastered" used to be read off `strength` — a separate, cruder
+ * 0-5 counter that moved in lockstep with right/wrong answers but had no
+ * relationship to what FSRS actually believes about the word. That let the
+ * marketed spaced-repetition model and the number the learner sees quietly
+ * diverge. Both now read the real FSRS card: `state` (has this word
+ * actually graduated past initial learning into a real review cycle?) and
+ * `stability` (FSRS's own estimate, in days, of how long the word will
+ * stay remembered without review).
+ */
+const MASTERED_STABILITY_DAYS = 21;
+
 export function knownWordCount(state: ProgressState): number {
-  return Object.values(state.words).filter((w) => w.strength >= 2).length;
+  return Object.values(state.words).filter(
+    (w) => w.fsrs && (w.fsrs.state === State.Review || w.fsrs.state === State.Relearning)
+  ).length;
 }
 
 export function masteredWordCount(state: ProgressState): number {
-  return Object.values(state.words).filter((w) => w.strength >= 5).length;
+  return Object.values(state.words).filter(
+    (w) => w.fsrs && w.fsrs.state === State.Review && w.fsrs.stability >= MASTERED_STABILITY_DAYS
+  ).length;
 }
 
 /** Stars (0-3) earned for a lesson based on best accuracy */
