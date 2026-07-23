@@ -1,4 +1,6 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
+import type { Request } from 'express';
 import type { AuthRequest } from '@/middleware/auth';
 
 /**
@@ -26,6 +28,37 @@ export const registerLimiter = rateLimit({
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  message: authMessage,
+});
+
+/**
+ * /auth/refresh runs before any auth middleware (there's no access token to
+ * check yet — that's the point), so it can't use the userKey pattern as-is.
+ * Instead we decode (not verify — this only needs the claim for keying, the
+ * service layer does the real verification) the refresh token out of the
+ * body to key by user, falling back to IP if that's missing or malformed.
+ */
+function refreshKey(req: Request): string {
+  try {
+    const token = (req.body as { refreshToken?: unknown } | undefined)?.refreshToken;
+    if (typeof token === 'string') {
+      const decoded = jwt.decode(token) as { userId?: string } | null;
+      if (decoded && typeof decoded.userId === 'string' && decoded.userId) {
+        return decoded.userId;
+      }
+    }
+  } catch {
+    // Fall through to IP-based keying below.
+  }
+  return ipKeyGenerator(req.ip || 'unknown');
+}
+
+export const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: refreshKey,
   message: authMessage,
 });
 
