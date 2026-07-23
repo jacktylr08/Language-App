@@ -8,12 +8,12 @@
  * practical "can-do" goal, so a voice call has structure instead of drifting
  * into random phrases.
  */
-import { curriculum, type CurriculumLesson } from './curriculum';
+import { getCurriculum, type CurriculumLesson } from './curriculum';
 import { loadProgress, weekReachedFor } from './progress';
 import { loadProfile, isEvaluationDue, dueWeaknessesFirst } from './tutor-memory';
 import { buildLessonInsights } from './learner-insights';
 import { loadLearnerGoal, GOAL_LABELS, type LearnerGoal } from './learner-goal';
-import { getActiveLanguage } from './languages';
+import { getActiveLanguage, getActiveLanguageId } from './languages';
 import type { Scenario } from './scenarios';
 
 export interface TutorContext {
@@ -48,10 +48,24 @@ export interface TutorContext {
   learnerGoal?: LearnerGoal | null;
 }
 
-// vocab id -> Spanish, built once.
-const vocabById = new Map<string, string>();
-for (const lesson of curriculum) {
-  for (const v of lesson.vocab) vocabById.set(v.id, v.es);
+// vocab id -> Spanish. Rebuilt only when the active language actually
+// changes (not on every call) rather than once at module load, which would
+// keep serving the first language's vocab forever after a future language
+// switch — ES module top-level code only ever runs once.
+let cachedLanguageId: string | null = null;
+let vocabById = new Map<string, string>();
+let orderedCurriculum: CurriculumLesson[] = [];
+
+function refreshForActiveLanguage(): void {
+  const id = getActiveLanguageId();
+  if (id === cachedLanguageId) return;
+  cachedLanguageId = id;
+  const all = getCurriculum();
+  vocabById = new Map();
+  for (const lesson of all) {
+    for (const v of lesson.vocab) vocabById.set(v.id, v.es);
+  }
+  orderedCurriculum = [...all].sort((a, b) => a.week - b.week || a.order - b.order);
 }
 
 /** A practical "can-do" goal for each lesson theme. */
@@ -78,11 +92,6 @@ export function canDoGoal(theme: CurriculumLesson['theme']): string {
   }
 }
 
-/** Curriculum order: by week, then order within the week. */
-const orderedCurriculum = [...curriculum].sort(
-  (a, b) => a.week - b.week || a.order - b.order
-);
-
 /**
  * The lesson the tutor should anchor on: the learner's MOST RECENT completed
  * lesson — so it consolidates what they've actually learned rather than
@@ -106,6 +115,7 @@ function anchorLesson(reallyCompleted: Set<string>, doneOrPlaced: Set<string>): 
 }
 
 export function buildTutorContext(focusSlug?: string): TutorContext {
+  refreshForActiveLanguage();
   const progress = loadProgress();
 
   // Lessons genuinely completed in the app vs. lessons placed-out-of at
@@ -130,7 +140,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   // use it freely) + any word they've been tested on. Deduped and capped so
   // the prompt stays lean.
   const known = new Set<string>();
-  for (const lesson of curriculum) {
+  for (const lesson of orderedCurriculum) {
     if (doneOrPlaced.has(lesson.slug)) {
       for (const v of lesson.vocab) known.add(v.es);
     }
@@ -184,7 +194,7 @@ export function buildTutorContext(focusSlug?: string): TutorContext {
   // most recent completed lesson — so every call consolidates learned material
   // and never drifts into lessons they haven't done.
   const lesson =
-    (focusSlug ? curriculum.find((l) => l.slug === focusSlug) : undefined) ??
+    (focusSlug ? orderedCurriculum.find((l) => l.slug === focusSlug) : undefined) ??
     anchorLesson(reallyCompleted, doneOrPlaced);
 
   const targetWords = lesson.vocab

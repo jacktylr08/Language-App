@@ -4,7 +4,7 @@
  * streaks. Each course week becomes a milestone; its status comes from the
  * lessons the learner has actually completed.
  */
-import { curriculum, type CurriculumLesson } from './curriculum';
+import { getCurriculum, type CurriculumLesson } from './curriculum';
 import { loadProgress } from './progress';
 import { canDoGoal } from './tutor-context';
 
@@ -31,7 +31,7 @@ export function getAbilities(): Ability[] {
 
   // Group lessons by week.
   const byWeek = new Map<number, CurriculumLesson[]>();
-  for (const l of curriculum) {
+  for (const l of getCurriculum()) {
     const arr = byWeek.get(l.week);
     if (arr) arr.push(l);
     else byWeek.set(l.week, [l]);

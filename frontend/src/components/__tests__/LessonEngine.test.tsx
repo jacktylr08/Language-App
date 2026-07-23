@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { LessonEngine } from '@/components/LessonEngine';
-import { curriculum } from '@/lib/curriculum';
+import { getCurriculum } from '@/lib/curriculum';
 import type { Exercise } from '@/lib/exercise-engine';
 import { api } from '@/lib/api';
 
@@ -27,7 +27,7 @@ jest.mock('@/lib/exercise-engine', () => {
 
 import { buildLessonSession } from '@/lib/exercise-engine';
 
-const lesson = curriculum.find((l) => l.slug === 'ser-identity')!;
+const lesson = getCurriculum().find((l) => l.slug === 'ser-identity')!;
 
 function vocab(id: string, es: string, en: string) {
   return { id, es, en, pron: '', exampleEs: '', exampleEn: '' };

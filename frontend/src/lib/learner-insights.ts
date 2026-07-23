@@ -7,14 +7,27 @@
  *
  * All derived from the same synced progress store — no extra storage needed.
  */
-import { curriculum } from './curriculum';
+import { getCurriculum } from './curriculum';
 import { loadProgress, getMistakeWordIds } from './progress';
 import { normalizeLoose } from './speech';
 import { loadProfile, type LearnerProfile } from './tutor-memory';
+import { getActiveLanguageId } from './languages';
 
-const vocabMeta = new Map<string, { es: string; en: string }>();
-for (const lesson of curriculum) {
-  for (const v of lesson.vocab) vocabMeta.set(v.id, { es: v.es, en: v.en });
+// Rebuilt only when the active language actually changes (not on every
+// call — this runs per exercise result) rather than once at module load,
+// which would keep serving the first language's vocab forever after a
+// future language switch.
+let vocabMetaLanguageId: string | null = null;
+let vocabMeta = new Map<string, { es: string; en: string }>();
+function getVocabMeta(): Map<string, { es: string; en: string }> {
+  const id = getActiveLanguageId();
+  if (id === vocabMetaLanguageId) return vocabMeta;
+  vocabMetaLanguageId = id;
+  vocabMeta = new Map();
+  for (const lesson of getCurriculum()) {
+    for (const v of lesson.vocab) vocabMeta.set(v.id, { es: v.es, en: v.en });
+  }
+  return vocabMeta;
 }
 
 export interface LessonInsights {
@@ -35,8 +48,9 @@ export function buildLessonInsights(): LessonInsights {
   const strong: string[] = [];
   const pron: string[] = [];
 
+  const vocabMetaNow = getVocabMeta();
   for (const [id, w] of Object.entries(p.words)) {
-    const meta = vocabMeta.get(id);
+    const meta = vocabMetaNow.get(id);
     if (!meta) continue;
     const label = `${meta.es} (${meta.en})`;
 
@@ -58,7 +72,7 @@ export function buildLessonInsights(): LessonInsights {
   const coveredRecently = Object.entries(p.lessons)
     .filter(([, r]) => r.completed && r.lastCompleted)
     .sort((a, b) => (b[1].lastCompleted || '').localeCompare(a[1].lastCompleted || ''))
-    .map(([slug]) => curriculum.find((l) => l.slug === slug)?.title)
+    .map(([slug]) => getCurriculum().find((l) => l.slug === slug)?.title)
     .filter((t): t is string => !!t)
     .slice(0, 3);
 
@@ -88,7 +102,7 @@ export function tutorFlaggedVocabIds(profile: LearnerProfile | null): string[] {
   const tokens = new Set(blob.split(/[^a-z0-9]+/i).filter(Boolean));
   const ids: string[] = [];
 
-  for (const lesson of curriculum) {
+  for (const lesson of getCurriculum()) {
     for (const v of lesson.vocab) {
       const word = normalizeLoose(v.es);
       if (!word) continue;

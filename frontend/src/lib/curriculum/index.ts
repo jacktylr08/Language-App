@@ -43,12 +43,32 @@ export function getCurriculumFor(languageId: string): CurriculumModule['curricul
   return (REGISTRY[languageId] ?? es).curriculum;
 }
 
-// Re-exported as plain values/functions (not language-parameterized) for
-// every existing call site — there's only ever one active language per
-// session today, resolved once here, same as before this refactor.
-export const curriculum = activeModule().curriculum;
-export const getLessonBySlug = activeModule().getLessonBySlug;
-export const phaseForWeek = activeModule().phaseForWeek;
-export const getAllVocab = activeModule().getAllVocab;
-export const getVocabById = activeModule().getVocabById;
-export const getPriorLessons = activeModule().getPriorLessons;
+// Re-resolved from activeModule() on every call rather than bound once at
+// import time — with only one language registered today these are
+// indistinguishable, but a frozen binding would silently keep serving the
+// PREVIOUS language's data forever after a future language switch, since ES
+// module top-level code only runs once. getCurriculum() is a function (a
+// small, bounded set of call sites already treat it as one, updated
+// alongside this fix) rather than a plain array for the same reason — a
+// plain array binding has this exact bug and can't be fixed without
+// becoming a function.
+export function getCurriculum(): CurriculumModule['curriculum'] {
+  return activeModule().curriculum;
+}
+export function getLessonBySlug(slug: string): ReturnType<CurriculumModule['getLessonBySlug']> {
+  return activeModule().getLessonBySlug(slug);
+}
+export function phaseForWeek(week: number): ReturnType<CurriculumModule['phaseForWeek']> {
+  return activeModule().phaseForWeek(week);
+}
+export function getAllVocab(): ReturnType<CurriculumModule['getAllVocab']> {
+  return activeModule().getAllVocab();
+}
+export function getVocabById(id: string): ReturnType<CurriculumModule['getVocabById']> {
+  return activeModule().getVocabById(id);
+}
+export function getPriorLessons(
+  ...args: Parameters<CurriculumModule['getPriorLessons']>
+): ReturnType<CurriculumModule['getPriorLessons']> {
+  return activeModule().getPriorLessons(...args);
+}

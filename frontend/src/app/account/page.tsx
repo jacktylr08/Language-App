@@ -16,7 +16,7 @@ import {
   masteredWordCount,
   ProgressState,
 } from '@/lib/progress';
-import { curriculum } from '@/lib/curriculum';
+import { getCurriculum } from '@/lib/curriculum';
 import { pushSupported, getExistingSubscription, enablePushReminders, disablePushReminders } from '@/lib/push';
 import { TUTOR_VOICES, loadTutorVoice, saveTutorVoice } from '@/lib/tutor-voice';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -160,7 +160,7 @@ export default function AccountPage() {
     : null;
 
   const lessonsDone = progress
-    ? curriculum.filter((l) => progress.lessons[l.slug]?.completed).length
+    ? getCurriculum().filter((l) => progress.lessons[l.slug]?.completed).length
     : 0;
   const streak = progress ? currentStreak(progress) : 0;
   const known = progress ? knownWordCount(progress) : 0;

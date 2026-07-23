@@ -19,6 +19,8 @@ export interface CourseLanguage {
   name: string;
   /** The language's own name for itself, e.g. "Español". */
   nativeName: string;
+  /** BCP-47 locale tag for speech APIs (Web Speech recognition/synthesis, TTS) — e.g. "es-ES". */
+  locale: string;
   flag: string;
   /**
    * The flag's horizontal colour bands, top to bottom, weights summing to 1 —
@@ -35,6 +37,7 @@ export const LANGUAGES: CourseLanguage[] = [
     id: 'es',
     name: 'Spanish',
     nativeName: 'Español',
+    locale: 'es-ES',
     flag: '🇪🇸',
     flagBands: [
       { color: '#AA151B', weight: 0.25 },
@@ -61,10 +64,15 @@ export function getActiveLanguageId(): string {
   }
 }
 
+/** Fired whenever the active language changes, so mounted components can
+ * refresh without requiring a full reload (see CourseChip/LanguageFlagBanner). */
+export const LANGUAGE_CHANGE_EVENT = 'fluenta-language-change';
+
 export function setActiveLanguageId(id: string): void {
   if (typeof window === 'undefined' || !LANGUAGES.some((l) => l.id === id)) return;
   try {
     localStorage.setItem(ACTIVE_LANGUAGE_KEY, id);
+    window.dispatchEvent(new CustomEvent(LANGUAGE_CHANGE_EVENT));
   } catch {
     /* ignore */
   }
@@ -73,11 +81,3 @@ export function setActiveLanguageId(id: string): void {
 export function getActiveLanguage(): CourseLanguage {
   return getLanguage(getActiveLanguageId());
 }
-
-/**
- * Backward-compatible: the app's only display-layer consumers (CourseChip,
- * LanguageFlagBanner) read this directly. With a single registered language
- * it's identical to getActiveLanguage() at any point in time — kept as a
- * plain value (not a function) so those components don't need to change.
- */
-export const CURRENT_LANGUAGE: CourseLanguage = getActiveLanguage();

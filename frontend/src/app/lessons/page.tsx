@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRequireAuth } from '@/lib/hooks';
 import { AbilitiesPanel } from '@/components/AbilitiesPanel';
-import { curriculum, phaseForWeek } from '@/lib/curriculum';
+import { getCurriculum, phaseForWeek } from '@/lib/curriculum';
 import {
   loadProgress,
   currentStreak,
@@ -57,6 +57,7 @@ export default function LessonsPage() {
     );
   }
 
+  const curriculum = getCurriculum();
   const streak = currentStreak(progress);
   const wordsKnown = knownWordCount(progress);
   const mistakes = combinedMistakeCount();

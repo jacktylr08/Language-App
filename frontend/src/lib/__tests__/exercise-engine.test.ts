@@ -1,6 +1,8 @@
 import { buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry, sentenceTiles } from '../exercise-engine';
-import { curriculum, getAllVocab } from '../curriculum';
+import { getCurriculum, getAllVocab } from '../curriculum';
 import { recordWordResult } from '../progress';
+
+const curriculum = getCurriculum();
 
 describe('buildLessonSession — free-composition writing exercise', () => {
   it('adds exactly one write_answer capstone for a lesson with enough vocab', () => {

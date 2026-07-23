@@ -64,7 +64,7 @@ export function isLessonDone(rec?: LessonRecord): boolean {
 /** Highest course week behind the learner — done or placed-out-of. Default: week 1. */
 export function weekReachedFor(state: ProgressState): number {
   let week = 1;
-  for (const lesson of curriculum) {
+  for (const lesson of getCurriculum()) {
     if (isLessonDone(state.lessons[lesson.slug])) week = Math.max(week, lesson.week);
   }
   return week;
@@ -81,7 +81,7 @@ export interface ProgressState {
 
 import { progressKeyFor } from './keys';
 import { scheduleSync } from './sync';
-import { curriculum } from './curriculum';
+import { getCurriculum } from './curriculum';
 import { getActiveLanguageId } from './languages';
 
 /**
@@ -321,7 +321,7 @@ export function completeLessonLocal(slug: string, accuracy: number): ProgressSta
 export function placeLearnerAtWeek(startWeek: number): void {
   if (startWeek <= 1) return;
   const state = loadProgress();
-  for (const lesson of curriculum) {
+  for (const lesson of getCurriculum()) {
     if (lesson.week >= startWeek) continue;
     const existing = state.lessons[lesson.slug];
     if (existing?.completed) continue;

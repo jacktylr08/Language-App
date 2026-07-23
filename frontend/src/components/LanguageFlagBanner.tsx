@@ -1,4 +1,7 @@
-import { CURRENT_LANGUAGE } from '@/lib/languages';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { getActiveLanguage, LANGUAGE_CHANGE_EVENT, type CourseLanguage } from '@/lib/languages';
 
 const VIEW_W = 400;
 const VIEW_H = 900;
@@ -12,11 +15,21 @@ const WAVE_PATH = `M0,0 L360,0 Q400,112 350,225 Q300,337 380,450 Q400,562 330,67
  * A large, faint waving flag along the left edge of the screen — the
  * course's ambient identity. The silhouette is a hand-tuned wave (four soft
  * ripples); a subtle turbulence filter adds a touch of organic cloth texture
- * to the fill without breaking up the shape itself.
+ * to the fill without breaking up the shape itself. Reads the active
+ * language live (and re-reads on LANGUAGE_CHANGE_EVENT) rather than a value
+ * frozen at first import.
  */
 export function LanguageFlagBanner() {
+  const [language, setLanguage] = useState<CourseLanguage>(() => getActiveLanguage());
+
+  useEffect(() => {
+    const refresh = () => setLanguage(getActiveLanguage());
+    window.addEventListener(LANGUAGE_CHANGE_EVENT, refresh);
+    return () => window.removeEventListener(LANGUAGE_CHANGE_EVENT, refresh);
+  }, []);
+
   let y = 0;
-  const bands = CURRENT_LANGUAGE.flagBands.map((band, i) => {
+  const bands = language.flagBands.map((band, i) => {
     const height = band.weight * VIEW_H;
     const rect = { y, height, color: band.color };
     y += height;

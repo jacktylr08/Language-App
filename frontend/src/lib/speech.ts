@@ -3,6 +3,7 @@
  * and speech recognition (listening to the learner speak Spanish).
  * Both are free, on-device browser APIs — no keys, no cost.
  */
+import { getActiveLanguage } from './languages';
 
 const VOICE_PREF_KEY = 'tutor-voice-uri';
 
@@ -17,9 +18,12 @@ function readVoicePref(): string | null {
 
 let chosenVoiceURI: string | null = readVoicePref();
 
-function allSpanishVoices(): SpeechSynthesisVoice[] {
+function allCourseLanguageVoices(): SpeechSynthesisVoice[] {
   if (typeof window === 'undefined' || !window.speechSynthesis) return [];
-  return window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('es'));
+  // Match on the locale's base language subtag (e.g. "es" from "es-ES") —
+  // browsers expose voices tagged with all sorts of region variants.
+  const base = getActiveLanguage().locale.split('-')[0].toLowerCase();
+  return window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith(base));
 }
 
 /**
@@ -45,7 +49,7 @@ function scoreVoice(v: SpeechSynthesisVoice): number {
 
 /** All Spanish voices on this device, best first. */
 export function listSpanishVoices(): SpeechSynthesisVoice[] {
-  return allSpanishVoices().sort((a, b) => scoreVoice(b) - scoreVoice(a));
+  return allCourseLanguageVoices().sort((a, b) => scoreVoice(b) - scoreVoice(a));
 }
 
 function pickSpanishVoice(): SpeechSynthesisVoice | null {
@@ -92,7 +96,7 @@ export function speak(text: string, rate = 0.95): Promise<void> {
     const voice = pickSpanishVoice();
     // Match the utterance language to the chosen voice — a mismatch makes some
     // engines silently fall back to a default (usually worse) voice.
-    u.lang = voice?.lang || 'es-ES';
+    u.lang = voice?.lang || getActiveLanguage().locale;
     u.rate = rate;
     u.pitch = 1.0;
     if (voice) u.voice = voice;
@@ -131,7 +135,7 @@ export function listenOnce(timeoutMs = 8000): Promise<RecognitionResult> {
     if (!Ctor) return resolve({ transcript: '', error: 'unsupported' });
 
     const rec = new Ctor();
-    rec.lang = 'es-ES';
+    rec.lang = getActiveLanguage().locale;
     rec.interimResults = false;
     rec.maxAlternatives = 3;
 
@@ -256,7 +260,7 @@ export class LiveMic {
       return;
     }
     const rec = new Ctor();
-    rec.lang = 'es-ES';
+    rec.lang = getActiveLanguage().locale;
     rec.continuous = true;
     rec.interimResults = true;
     rec.maxAlternatives = 1;

@@ -1,8 +1,10 @@
 import { buildTutorContext, buildScenarioContext } from '../tutor-context';
 import { completeLessonLocal, placeLearnerAtWeek } from '../progress';
-import { curriculum } from '../curriculum';
+import { getCurriculum } from '../curriculum';
 import { saveLearnerGoal } from '../learner-goal';
 import { SCENARIOS } from '../scenarios';
+
+const curriculum = getCurriculum();
 
 describe('buildTutorContext', () => {
   beforeEach(() => {
