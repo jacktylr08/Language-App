@@ -12,6 +12,7 @@ jest.mock('@/config/database', () => {
     where: jest.fn().mockReturnThis(),
     whereNull: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockResolvedValue(undefined),
     first: jest.fn(),
   };
   return { knexInstance: jest.fn(() => builder), __builder: builder };
@@ -25,6 +26,7 @@ const { __builder: refreshTokenBuilder } = jest.requireMock('@/config/database')
     where: jest.Mock;
     whereNull: jest.Mock;
     update: jest.Mock;
+    delete: jest.Mock;
     first: jest.Mock;
   };
 };
@@ -186,5 +188,50 @@ describe('refresh token rotation', () => {
     expect(refreshTokenBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ revoked_at: expect.any(String) })
     );
+  });
+});
+
+describe('deleteAccount()', () => {
+  it('rejects with the wrong password without touching any data', async () => {
+    const user = fakeUser({ token_version: 2 });
+    const findById = jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(user) });
+    (User.query as jest.Mock).mockReturnValue({ findById });
+    jest.spyOn(auth, 'comparePassword').mockResolvedValue(false);
+
+    await expect(auth.deleteAccount('user-1', 'wrong-password')).rejects.toThrow(/incorrect password/i);
+    expect(user.__patch).not.toHaveBeenCalled();
+  });
+
+  it('anonymizes the email, invalidates the password hash, bumps token_version, and deletes learner data on a correct password', async () => {
+    const user = fakeUser({ id: 'user-1', email: 'someone@example.com', token_version: 2 });
+    const findById = jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(user) });
+    (User.query as jest.Mock).mockReturnValue({ findById });
+    jest.spyOn(auth, 'comparePassword').mockResolvedValue(true);
+
+    await auth.deleteAccount('user-1', 'correct-password');
+
+    expect(user.__patch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deleted_at: expect.any(String),
+        email: 'deleted-user-1@deleted.fluenta.invalid',
+        token_version: 3,
+      })
+    );
+    // Password hash is replaced with something that isn't the original —
+    // the exact value doesn't matter, only that no usable credential survives.
+    const patchArg = user.__patch.mock.calls[0][0];
+    expect(patchArg.password_hash).not.toBe(user.password_hash);
+
+    expect(refreshTokenBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ revoked_at: expect.any(String) })
+    );
+    expect(refreshTokenBuilder.delete).toHaveBeenCalledTimes(2); // user_state + push_subscriptions
+  });
+
+  it('rejects for an already-deleted (or unknown) user', async () => {
+    const findById = jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) });
+    (User.query as jest.Mock).mockReturnValue({ findById });
+
+    await expect(auth.deleteAccount('ghost-user', 'anything')).rejects.toThrow(/not found/i);
   });
 });

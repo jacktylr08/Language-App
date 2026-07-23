@@ -42,9 +42,15 @@ class ApiClient {
                 refreshToken: auth.refreshToken,
               });
 
+              // The backend rotates the refresh token on every use (the old
+              // one is revoked server-side) — persisting only the new
+              // accessToken and continuing to reuse the now-revoked
+              // refreshToken would make the *next* refresh fail and force a
+              // re-login, even though nothing was actually wrong.
               const newAuth = {
                 ...auth,
                 accessToken: response.data.accessToken,
+                refreshToken: response.data.refreshToken || auth.refreshToken,
               };
               setAuth(newAuth);
 

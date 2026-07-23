@@ -51,6 +51,12 @@ export default function AccountPage() {
   // Profe's voice
   const [tutorVoice, setTutorVoice] = useState('cedar');
 
+  // Delete account
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
   useEffect(() => {
     setProgress(loadProgress());
     setTutorVoice(loadTutorVoice());
@@ -114,6 +120,29 @@ export default function AccountPage() {
     clearAuth();
     clearLocalLearnerState();
     router.push('/login');
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleteError('');
+    if (!deletePassword) {
+      setDeleteError('Enter your password to confirm.');
+      return;
+    }
+    try {
+      setDeleting(true);
+      await api.delete('/auth/account', { data: { password: deletePassword } });
+      // The account (and every bit of local learner state for it) is gone —
+      // same cleanup as signing out, then off the app entirely rather than
+      // back to a login screen for an account that no longer exists.
+      clearAuth();
+      clearLocalLearnerState();
+      router.push('/');
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error || 'Could not delete your account. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleSelectVoice = (id: string) => {
@@ -421,6 +450,67 @@ export default function AccountPage() {
               Sign out
             </button>
           </div>
+        </section>
+
+        {/* Delete account */}
+        <section className="surface !border-terra-300/60 dark:!border-terra-700/50 p-6 mt-6">
+          <h2 className="font-display text-2xl font-black text-terra-600 dark:text-terra-400">
+            Delete account
+          </h2>
+          <p className="text-sm text-ink-soft dark:text-stone-400 mt-1 mb-5">
+            Permanently deletes your account and everything tied to it — progress, streak, and
+            what Profe knows about you. This can&apos;t be undone.
+          </p>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="btn-3d px-5 py-2.5 rounded-2xl border-2 border-terra-300 dark:border-terra-700 font-extrabold text-terra-600 dark:text-terra-400 hover:bg-terra-500/10 transition-colors"
+            >
+              Delete my account
+            </button>
+          ) : (
+            <form onSubmit={handleDeleteAccount} className="space-y-4">
+              {deleteError && (
+                <div className="rounded-xl bg-terra-500/10 border border-terra-400/30 px-4 py-3 text-sm font-medium text-terra-600 dark:text-terra-300">
+                  {deleteError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-bold text-ink dark:text-stone-200 mb-1.5">
+                  Enter your password to confirm
+                </label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-terra-500 focus:outline-none focus:ring-4 focus:ring-terra-500/15 transition-all"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeletePassword('');
+                    setDeleteError('');
+                  }}
+                  className="btn-3d flex-1 py-3 rounded-2xl border-2 border-stone-200 dark:border-stone-700 font-extrabold text-ink-soft dark:text-stone-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleting || !deletePassword}
+                  className="btn-danger flex-1 py-3"
+                >
+                  {deleting ? 'Deleting…' : 'Permanently delete'}
+                </button>
+              </div>
+            </form>
+          )}
         </section>
       </main>
     </div>

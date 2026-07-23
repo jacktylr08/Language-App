@@ -22,6 +22,10 @@ const changePasswordSchema = Joi.object({
   newPassword: Joi.string().min(8).required(),
 });
 
+const deleteAccountSchema = Joi.object({
+  password: Joi.string().required(),
+});
+
 // Register
 router.post('/register', registerLimiter, async (req, res: Response): Promise<void> => {
   try {
@@ -159,6 +163,27 @@ router.post('/logout', verifyToken, async (req: AuthRequest, res: Response): Pro
     // Logout should never appear to fail to the client — worst case the
     // refresh token just outlives the session slightly longer than intended.
     res.json({ success: true });
+  }
+});
+
+// Delete account: permanent, requires the current password as a second
+// confirmation beyond just holding a valid session (unlike change-password,
+// where a valid session alone is enough). Body: { password }.
+router.delete('/account', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { error, value } = deleteAccountSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({ error: error.details[0].message });
+      return;
+    }
+
+    await auth.deleteAccount(req.userId!, value.password);
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete account';
+    logger.error('Delete account error:', err);
+    const status = /incorrect|not found/i.test(message) ? 400 : 500;
+    res.status(status).json({ error: message });
   }
 });
 

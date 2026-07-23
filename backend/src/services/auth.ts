@@ -158,7 +158,7 @@ export const auth = {
 
   async login(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }> {
     const normalizedEmail = normalizeEmail(email);
-    const user = await User.query().findOne('email', normalizedEmail);
+    const user = await User.query().findOne('email', normalizedEmail).where('deleted_at', null);
     if (!user) {
       throw new Error('Invalid email or password');
     }
@@ -269,5 +269,48 @@ export const auth = {
     });
 
     logger.info(`Password changed for user: ${maskEmail(user.email)}`);
+  },
+
+  /**
+   * Permanently deletes a learner's account. Requires the current password —
+   * unlike changePassword, a valid session alone isn't enough authorization
+   * for something this irreversible.
+   *
+   * Soft-deletes the users row (deleted_at, matching this codebase's existing
+   * "where deleted_at is null" convention already used everywhere a user is
+   * looked up) and anonymizes the email/password hash so the address is
+   * freed up for a future registration and no usable credential survives —
+   * a flag alone would leave a real password hash and email sitting there
+   * forever, which isn't really "deleting" anything. Also bumps
+   * token_version and revokes every refresh token so every session dies
+   * immediately, and hard-deletes the actual learner data (progress blob,
+   * push subscriptions) rather than leaving it attached to a "deleted" row.
+   */
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    const user = await User.query().findById(userId).where('deleted_at', null);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const valid = await this.comparePassword(password, user.password_hash);
+    if (!valid) {
+      throw new Error('Incorrect password');
+    }
+
+    const anonymizedEmail = `deleted-${user.id}@deleted.fluenta.invalid`;
+    const now = new Date().toISOString();
+
+    await user.$query().patch({
+      deleted_at: now,
+      email: anonymizedEmail,
+      password_hash: crypto.randomUUID(),
+      token_version: (user.token_version ?? 0) + 1,
+      updated_at: now,
+    });
+    await knexInstance('refresh_tokens').where({ user_id: userId }).whereNull('revoked_at').update({ revoked_at: now });
+    await knexInstance('user_state').where({ user_id: userId }).delete();
+    await knexInstance('push_subscriptions').where({ user_id: userId }).delete();
+
+    logger.info(`Account deleted: user ${userId}`);
   },
 };
