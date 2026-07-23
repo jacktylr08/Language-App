@@ -159,14 +159,3 @@ export const useAuth = create<AuthStore>((set) => {
     },
   };
 });
-
-// Store for app state
-interface AppStore {
-  currentLesson: any | null;
-  setCurrentLesson: (lesson: any | null) => void;
-}
-
-export const useAppStore = create<AppStore>((set) => ({
-  currentLesson: null,
-  setCurrentLesson: (lesson) => set({ currentLesson: lesson }),
-}));
