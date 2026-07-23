@@ -9,6 +9,7 @@ export class User extends Model {
   current_level!: number;
   locale!: string;
   preferences?: Record<string, unknown>;
+  token_version!: number;
   created_at?: string;
   updated_at?: string;
   last_active_at?: string;
@@ -25,6 +26,7 @@ export class User extends Model {
         current_level: { type: 'integer', minimum: 0, maximum: 5 },
         locale: { type: 'string' },
         preferences: { type: 'object' },
+        token_version: { type: 'integer', minimum: 0 },
         created_at: { type: 'string', format: 'date-time' },
         updated_at: { type: 'string', format: 'date-time' },
         last_active_at: { type: 'string', format: 'date-time' },

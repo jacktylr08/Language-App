@@ -6,6 +6,7 @@ import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
 import { createRealtimeClientSecret, REALTIME_VOICES } from '@/services/openai-service';
 import { assessPronunciation } from '@/services/pronunciation-service';
+import { isValidWav } from '@/utils/wav';
 import { logger } from '@/utils/logger';
 
 const router = Router();
@@ -304,6 +305,13 @@ router.post(
       }
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
         res.status(400).json({ error: 'A WAV audio recording is required' });
+        return;
+      }
+      // Reject anything that isn't actually a WAV file before it's forwarded
+      // to the paid Azure API — otherwise a malicious or buggy client could
+      // burn real Azure calls sending arbitrary garbage bytes.
+      if (!isValidWav(req.body)) {
+        res.status(400).json({ error: 'Uploaded audio must be a valid WAV file' });
         return;
       }
 

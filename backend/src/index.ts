@@ -2,8 +2,9 @@ import express, { Express, Request, Response } from 'express';
 import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import type { Server } from 'http';
 import { logger } from '@/utils/logger';
-import { initRedis } from '@/config/redis';
+import { initRedis, redisClient } from '@/config/redis';
 import { knexInstance } from '@/config/database';
 import { errorHandler } from '@/middleware/auth';
 import authRoutes from '@/routes/auth';
@@ -11,6 +12,7 @@ import tutorRoutes from '@/routes/tutor';
 import stateRoutes from '@/routes/state';
 import pushRoutes from '@/routes/push';
 import { startReminderScheduler } from '@/services/reminder-scheduler';
+import { getHealthStatus } from '@/services/health-service';
 
 dotenv.config();
 
@@ -43,9 +45,13 @@ app.use(cors(corsOrigins?.length ? { origin: corsOrigins } : undefined));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check — actually verifies dependencies (DB reachability, Redis
+// status) instead of unconditionally answering "ok"; see health-service.ts.
+// Railway (or whatever's watching) should not see "healthy" while every
+// DB-dependent route is actually broken.
+app.get('/health', async (_req: Request, res: Response) => {
+  const health = await getHealthStatus();
+  res.status(health.status === 'ok' ? 200 : 503).json(health);
 });
 
 // API status
@@ -71,11 +77,13 @@ app.use((_req: Request, res: Response) => {
 // Error handling middleware
 app.use(errorHandler);
 
+let httpServer: Server | undefined;
+
 // Start server
 const start = async (): Promise<void> => {
   // Listen immediately so the platform health check can reach /health
   // even while the database is still coming up.
-  app.listen(port, () => {
+  httpServer = app.listen(port, () => {
     logger.info(`Server running on port ${port}`);
     logger.info(`Environment: ${process.env.NODE_ENV}`);
   });
@@ -124,5 +132,58 @@ const start = async (): Promise<void> => {
 };
 
 start();
+
+// Graceful shutdown: on SIGTERM/SIGINT (Railway/Docker send SIGTERM on every
+// deploy or restart), stop accepting new connections, give in-flight
+// requests a bounded window to finish, then close the DB/Redis connections
+// cleanly before exiting. Without this, in-flight requests get killed
+// mid-response and connections are left dangling instead of closed properly.
+const SHUTDOWN_TIMEOUT_MS = 10000;
+let shuttingDown = false;
+
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(`${signal} received — shutting down gracefully`);
+
+  const forceExitTimer = setTimeout(() => {
+    logger.warn(`Graceful shutdown did not finish within ${SHUTDOWN_TIMEOUT_MS}ms — forcing exit`);
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceExitTimer.unref();
+
+  try {
+    if (httpServer) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer!.close((err) => (err ? reject(err) : resolve()));
+      });
+      logger.info('HTTP server closed — no longer accepting new connections');
+    }
+  } catch (err) {
+    logger.error('Error closing HTTP server:', err);
+  }
+
+  try {
+    await knexInstance.destroy();
+    logger.info('Database connection closed');
+  } catch (err) {
+    logger.error('Error closing database connection:', err);
+  }
+
+  try {
+    if (redisClient.isOpen) {
+      await redisClient.quit();
+      logger.info('Redis connection closed');
+    }
+  } catch (err) {
+    logger.error('Error closing Redis connection:', err);
+  }
+
+  clearTimeout(forceExitTimer);
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
 
 export default app;
