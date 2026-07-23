@@ -39,6 +39,8 @@ export interface SessionEntry {
   note: string;
   /** Concrete mistakes made in this session. */
   mistakes: string[];
+  /** Concrete things they did well in this specific session. */
+  sessionWins?: string[];
   /** True if this session was a periodic evaluation check-in. */
   wasEvaluation?: boolean;
   /**
@@ -52,8 +54,10 @@ export interface SessionEntry {
 
 export interface LearnerProfile {
   summary: string;
+  /** Cumulative, ongoing strengths across every session — not specific to any one. */
   strengths: string[];
   weaknesses: string[];
+  /** Concrete mistakes made in the session just reflected on (not cumulative). */
   mistakes: string[];
   updatedAt: string;
   /** weakness text -> spacing schedule. */
@@ -66,6 +70,8 @@ export interface LearnerProfile {
   history?: SessionEntry[];
   /** One-line diary note for the session just reflected on (from the API). */
   sessionNote?: string;
+  /** Concrete things they did well in the session just reflected on (not cumulative — see `strengths` for that). */
+  sessionWins?: string[];
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -108,6 +114,8 @@ export function loadProfile(): LearnerProfile | null {
       sessions: typeof p.sessions === 'number' ? p.sessions : 0,
       lastEvalSession: typeof p.lastEvalSession === 'number' ? p.lastEvalSession : 0,
       history: Array.isArray(p.history) ? p.history : [],
+      sessionWins: Array.isArray(p.sessionWins) ? p.sessionWins : [],
+      sessionNote: typeof p.sessionNote === 'string' ? p.sessionNote : undefined,
     };
   } catch {
     return null;
@@ -181,8 +189,16 @@ export function markEvaluationDone(): void {
 /**
  * Send a finished conversation to the backend, which distils an updated
  * profile and returns it. We fold in the spacing schedule and session count,
- * persist, and return the result. Fails soft: if the tutor isn't configured or
- * the network hiccups, we keep the old profile.
+ * persist, and return the result.
+ *
+ * Returns null — never the stale, previously-stored profile — whenever
+ * there's nothing fresh to report on this specific session (too short to
+ * bother, the tutor isn't configured, or the network hiccups). A caller
+ * showing a post-session recap must be able to tell "nothing to show" apart
+ * from "here's what actually just happened" — returning the old profile as
+ * a fallback previously meant a failed/skipped reflection silently
+ * displayed a PREVIOUS session's mistakes/wins as if they were from the one
+ * the learner just had. The stored profile itself is untouched either way.
  */
 export async function reflectAndSave(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -194,7 +210,7 @@ export async function reflectAndSave(
   // thing the learner said is worth remembering. A stricter cutoff here
   // previously meant a short call with one real exchange (say something,
   // then hang up) silently never got reflected on at all.
-  if (messages.filter((m) => m.role === 'user').length < 1) return prev;
+  if (messages.filter((m) => m.role === 'user').length < 1) return null;
 
   try {
     const res = await api.post('/tutor/reflect', {
@@ -213,6 +229,7 @@ export async function reflectAndSave(
         date: new Date(now).toISOString(),
         note: fresh.sessionNote || 'Had a conversation with Profe.',
         mistakes: fresh.mistakes,
+        sessionWins: fresh.sessionWins,
         wasEvaluation: wasEvaluation || undefined,
         transcript: trimTranscript(messages),
       };
@@ -222,7 +239,7 @@ export async function reflectAndSave(
       return fresh;
     }
   } catch {
-    /* keep the existing profile */
+    /* the stored profile is untouched — just nothing fresh to report */
   }
-  return prev;
+  return null;
 }

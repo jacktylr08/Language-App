@@ -87,12 +87,16 @@ function memoryCallbackFragment(note?: string, days?: number): string {
 /** Persisted learner profile — the tutor's memory of one learner. */
 export interface LearnerProfile {
   summary: string;
+  /** Cumulative, ongoing strengths — merged across every session, not specific to any one. */
   strengths: string[];
   weaknesses: string[];
+  /** Concrete mistakes made in THIS specific session. */
   mistakes: string[];
   updatedAt: string;
   /** One-line diary entry for this specific session (not the running summary). */
   sessionNote?: string;
+  /** Concrete things they did well in THIS specific session — distinct from the cumulative `strengths` above. */
+  sessionWins?: string[];
 }
 
 export class TutorService {
@@ -293,9 +297,10 @@ Teach lightly:
 Read the conversation and return a JSON object with EXACTLY these keys:
 {
   "summary": string,        // 1-2 sentence running summary of the learner: their level, what they can do, their vibe. Update, don't just append.
-  "strengths": string[],    // up to 6 short phrases: grammar/vocab/skills they handled well
+  "strengths": string[],    // up to 6 short phrases: the learner's ONGOING, cumulative strengths across every session so far — merge this session's evidence into what you already knew, don't just describe today's call.
   "weaknesses": string[],   // up to 6 short phrases: specific things to focus on next time (e.g. "confuses ser and estar", "forgets accents on question words")
-  "mistakes": string[],     // up to 6 short, concrete examples of errors they made this session, each phrased like "said 'X', should be 'Y'"
+  "mistakes": string[],     // up to 6 short, concrete examples of errors they made THIS SESSION ONLY, each phrased like "said 'X', should be 'Y'" — never carried over from a previous session.
+  "sessionWins": string[],  // up to 6 short, concrete things they specifically did well IN THIS SESSION ONLY (e.g. "used the subjunctive correctly unprompted", "recalled 'aunque' without help") — never a general/cumulative strength, and never carried over from a previous session. Empty array if nothing specific stood out today.
   "sessionNote": string     // ONE short sentence (under 90 chars) describing what THIS specific conversation was about, e.g. "Talked about weekend plans; mixed up por/para twice." This is a diary entry for this one session, not the overall summary.
 }
 
@@ -324,6 +329,7 @@ Be specific and actionable — these notes decide what the tutor drills next tim
       strengths: cleanList(parsed.strengths),
       weaknesses: cleanList(parsed.weaknesses),
       mistakes: cleanList(parsed.mistakes),
+      sessionWins: cleanList(parsed.sessionWins),
       sessionNote: typeof parsed.sessionNote === 'string' ? parsed.sessionNote.slice(0, 200) : '',
       updatedAt: new Date().toISOString(),
     };

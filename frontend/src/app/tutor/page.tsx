@@ -34,8 +34,12 @@ function TutorPageInner() {
 
   // The call ended — distil it into the tutor's memory, then show the
   // learner what came out of it (reflect() already computes concrete
-  // mistakes and strengths every session; this used to only ever silently
-  // bias future prompts) before heading back to lessons.
+  // mistakes and session-specific wins every session; this used to only
+  // ever silently bias future prompts) before heading back to lessons.
+  // reflectAndSave returns null (never a stale previously-stored profile)
+  // whenever there's nothing fresh from THIS session to report — a failed
+  // or skipped reflection must never display an old session's recap as if
+  // it were the one that just happened.
   const handleClose = useCallback(
     (transcript: Array<{ role: 'user' | 'assistant'; content: string }>) => {
       const wasEval = !!ctx?.evaluation;
@@ -43,7 +47,7 @@ function TutorPageInner() {
       void (async () => {
         const profile = await reflectAndSave(transcript, wasEval);
         if (wasEval) markEvaluationDone();
-        if (profile && (profile.mistakes?.length || profile.strengths?.length || profile.sessionNote)) {
+        if (profile && (profile.mistakes?.length || profile.sessionWins?.length || profile.sessionNote)) {
           setPhase({ kind: 'report', profile });
         } else {
           router.push('/lessons');
@@ -74,7 +78,7 @@ function TutorPageInner() {
       <SessionReport
         note={phase.profile.sessionNote}
         mistakes={phase.profile.mistakes ?? []}
-        strengths={phase.profile.strengths ?? []}
+        sessionWins={phase.profile.sessionWins ?? []}
         onContinue={() => router.push('/lessons')}
       />
     );

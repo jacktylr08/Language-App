@@ -133,6 +133,18 @@ export function TutorProfilePanel() {
                             </span>
                           )}
                           {h.note}
+                          {h.sessionWins && h.sessionWins.length > 0 && (
+                            <ul className="mt-1 space-y-0.5">
+                              {h.sessionWins.map((w, wi) => (
+                                <li key={wi} className="text-[13px] text-brand-600 dark:text-brand-400 flex gap-1.5">
+                                  <span className="shrink-0" aria-hidden>
+                                    ✓
+                                  </span>
+                                  {w}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {h.mistakes && h.mistakes.length > 0 && (
                             <ul className="mt-1 space-y-0.5">
                               {h.mistakes.map((m, mi) => (

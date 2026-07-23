@@ -1,6 +1,6 @@
 jest.mock('../api', () => ({ api: { post: jest.fn() } }));
 
-import { reconcileReviews, dueWeaknessesFirst, isEvaluationDue, trimTranscript, reflectAndSave } from '../tutor-memory';
+import { reconcileReviews, dueWeaknessesFirst, isEvaluationDue, trimTranscript, reflectAndSave, loadProfile, saveProfile } from '../tutor-memory';
 import type { LearnerProfile } from '../tutor-memory';
 import { api } from '../api';
 
@@ -139,5 +139,58 @@ describe('reflectAndSave', () => {
 
     expect(api.post).toHaveBeenCalledWith('/tutor/reflect', expect.objectContaining({ profile: null }));
     expect(result?.summary).toBe('Has a morning coffee routine.');
+  });
+
+  it('regression: never returns a stale previous session as the result when the reflect call fails', async () => {
+    // Reported bug: after a real conversation, the post-session recap showed
+    // mistakes/wins from an OLDER session, not the one just had — traced to
+    // this falling back to the last-stored profile on any failure and the
+    // caller treating that fallback as if it were a fresh result.
+    saveProfile(
+      baseProfile({
+        mistakes: ['said "estoy 20 años", should be "tengo 20 años"'],
+        sessionWins: ['used the preterite correctly'],
+        sessionNote: 'An old session from days ago.',
+      } as Partial<LearnerProfile> as LearnerProfile)
+    );
+    (api.post as jest.Mock).mockRejectedValue(new Error('network error'));
+
+    const result = await reflectAndSave([
+      { role: 'assistant', content: '¿Qué tal?' },
+      { role: 'user', content: 'Bien, gracias' },
+    ]);
+
+    expect(result).toBeNull();
+    // The old profile is untouched in storage — just not surfaced as this session's result.
+    expect(loadProfile()?.sessionNote).toBe('An old session from days ago.');
+  });
+
+  it('regression: returns null (not the stale profile) for a true hello-and-goodbye with nothing to reflect on', async () => {
+    saveProfile(baseProfile({ sessionNote: 'An old session from days ago.' }));
+
+    const result = await reflectAndSave([{ role: 'assistant', content: 'Hola! ¿Cómo estás?' }]);
+
+    expect(result).toBeNull();
+  });
+
+  it('stores this session-specific sessionWins in the history entry, separate from cumulative strengths', async () => {
+    (api.post as jest.Mock).mockResolvedValue({
+      data: {
+        profile: baseProfile({
+          strengths: ['generally solid on present tense'],
+          mistakes: [],
+          sessionWins: ['nailed the subjunctive unprompted'],
+          sessionNote: 'Talked about plans for next week.',
+        } as Partial<LearnerProfile> as LearnerProfile),
+      },
+    });
+
+    const result = await reflectAndSave([
+      { role: 'assistant', content: '¿Qué planes tienes?' },
+      { role: 'user', content: 'Espero que llueva mañana' },
+    ]);
+
+    expect(result?.sessionWins).toEqual(['nailed the subjunctive unprompted']);
+    expect(result?.history?.[0].sessionWins).toEqual(['nailed the subjunctive unprompted']);
   });
 });
