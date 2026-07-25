@@ -14,6 +14,7 @@ import {
   isLessonDone,
   ProgressState,
 } from '@/lib/progress';
+import { coursePositionFor } from '@/lib/course-progress';
 import { combinedMistakeCount } from '@/lib/learner-insights';
 import { buildTutorContext } from '@/lib/tutor-context';
 import { CourseChip } from '@/components/CourseChip';
@@ -90,16 +91,12 @@ export default function LessonsPage() {
   const coursePct = Math.round(((lessonsDone + lessonsSkipped) / curriculum.length) * 100);
   const activity = recentActivity(progress, 14);
 
-  // A lesson unlocks once the previous one is behind the learner — really
-  // completed, or placed-out-of at onboarding.
-  const isUnlocked = (index: number): boolean => {
-    if (index === 0) return true;
-    return isLessonDone(progress.lessons[curriculum[index - 1].slug]);
-  };
-  const currentIndex = curriculum.findIndex(
-    (l, i) => isUnlocked(i) && !isLessonDone(progress.lessons[l.slug])
-  );
+  // Unlocking / "what's next" — see lib/course-progress.ts for why this is
+  // anchored on furthest-reached rather than "is the previous array item
+  // done" (the latter re-locks earned lessons whenever the curriculum grows).
+  const { currentIndex, isUnlocked, newlyAvailableIndexes } = coursePositionFor(curriculum, progress);
   const nextLesson = currentIndex >= 0 ? curriculum[currentIndex] : null;
+  const newlyAvailable = newlyAvailableIndexes.map((i) => curriculum[i]);
 
   const weeks = Array.from(new Set(curriculum.map((l) => l.week))).sort((a, b) => a - b);
 
@@ -162,6 +159,12 @@ export default function LessonsPage() {
         {lessonsSkipped > 0 && (
           <p className="text-[11px] text-ink-soft/70 dark:text-stone-500 mb-4">
             {lessonsSkipped} lesson{lessonsSkipped === 1 ? '' : 's'} placed out of at signup
+          </p>
+        )}
+        {newlyAvailable.length > 0 && (
+          <p className="text-[11px] text-ink-soft/70 dark:text-stone-500 mb-4">
+            {newlyAvailable.length} new lesson{newlyAvailable.length === 1 ? '' : 's'} added to
+            earlier weeks — your completed lessons all still count.
           </p>
         )}
         <div className={`grid grid-cols-2 gap-3 ${lessonsSkipped > 0 ? '' : 'mt-4'} mb-4`}>

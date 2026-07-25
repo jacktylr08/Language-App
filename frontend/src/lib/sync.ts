@@ -230,8 +230,22 @@ export function clearLocalLearnerState(): void {
 
 async function pushNow(): Promise<void> {
   if (!isAuthenticated()) return;
+  const blob = localBlob();
+
+  // Never let an empty device overwrite a full account. PUT /state replaces
+  // the stored blob outright, so pushing "no progress" before this session
+  // has pulled would destroy the server's copy — the one backup that can
+  // restore a learner whose localStorage was cleared. A device with nothing
+  // to say has nothing worth saying; wait until syncOnLoad has merged the
+  // real state in first.
+  const hasAnythingToSave =
+    Object.keys(blob.progress?.lessons ?? {}).length > 0 ||
+    Object.keys(blob.progress?.words ?? {}).length > 0 ||
+    !!blob.tutorProfile;
+  if (!pulledThisSession && !hasAnythingToSave) return;
+
   try {
-    await api.put('/state', { data: localBlob() });
+    await api.put('/state', { data: blob });
   } catch {
     /* offline or endpoint not ready — local state is untouched, retry later */
   }

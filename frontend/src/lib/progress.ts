@@ -361,26 +361,37 @@ export function getMistakeWordIds(limit = 40): string[] {
 }
 
 /**
- * "Known"/"mastered" used to be read off `strength` — a separate, cruder
- * 0-5 counter that moved in lockstep with right/wrong answers but had no
- * relationship to what FSRS actually believes about the word. That let the
- * marketed spaced-repetition model and the number the learner sees quietly
- * diverge. Both now read the real FSRS card: `state` (has this word
- * actually graduated past initial learning into a real review cycle?) and
- * `stability` (FSRS's own estimate, in days, of how long the word will
- * stay remembered without review).
+ * "Known"/"mastered" used to be read purely off `strength` — a cruder 0-5
+ * counter with no relationship to what FSRS actually believes about the
+ * word, which let the spaced-repetition model and the number the learner
+ * sees quietly diverge. Both now prefer the real FSRS card: `state` (has
+ * this word graduated past initial learning into a real review cycle?) and
+ * `stability` (FSRS's estimate, in days, of how long it stays remembered
+ * without review).
+ *
+ * They deliberately fall back to the legacy `strength` thresholds rather
+ * than replacing them outright. FSRS-only counting silently collapsed these
+ * numbers for anyone with existing history — a word drilled correctly for
+ * weeks can still sit in FSRS's `Learning` state, so a learner who'd built
+ * up hundreds of known words watched the figure crash overnight and read it
+ * as lost progress. A stat that only ever goes up unless the learner
+ * actually forgets something is worth more than a purist definition.
  */
 const MASTERED_STABILITY_DAYS = 21;
 
 export function knownWordCount(state: ProgressState): number {
   return Object.values(state.words).filter(
-    (w) => w.fsrs && (w.fsrs.state === State.Review || w.fsrs.state === State.Relearning)
+    (w) =>
+      (w.fsrs && (w.fsrs.state === State.Review || w.fsrs.state === State.Relearning)) ||
+      w.strength >= 2
   ).length;
 }
 
 export function masteredWordCount(state: ProgressState): number {
   return Object.values(state.words).filter(
-    (w) => w.fsrs && w.fsrs.state === State.Review && w.fsrs.stability >= MASTERED_STABILITY_DAYS
+    (w) =>
+      (w.fsrs && w.fsrs.state === State.Review && w.fsrs.stability >= MASTERED_STABILITY_DAYS) ||
+      w.strength >= 5
   ).length;
 }
 
