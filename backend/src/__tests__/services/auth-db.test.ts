@@ -49,37 +49,71 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe('email normalization (case-insensitivity)', () => {
-  it('register() lowercases the email before checking existence and storing it', async () => {
-    const findOne = jest.fn().mockResolvedValue(undefined);
-    const insert = jest.fn().mockImplementation((row: Record<string, unknown>) => Promise.resolve({ ...fakeUser(), ...row }));
-    (User.query as jest.Mock).mockReturnValue({ findOne, insert });
+/**
+ * Mocks the case-insensitive lookup chain used by findByEmail:
+ *   User.query().whereRaw(...).whereNull(...).first()   — or  .whereRaw(...).first()
+ * Returns the spies so a test can assert on the SQL actually issued.
+ */
+function mockEmailLookup(result: unknown, extras: Record<string, unknown> = {}) {
+  const first = jest.fn().mockResolvedValue(result);
+  const whereNull = jest.fn().mockReturnValue({ first });
+  const whereRaw = jest.fn().mockReturnValue({ whereNull, first });
+  (User.query as jest.Mock).mockReturnValue({ whereRaw, ...extras });
+  return { whereRaw, whereNull, first };
+}
+
+describe('email lookups are case-insensitive', () => {
+  it('register() stores the lowercased address and checks existence case-insensitively', async () => {
+    const insert = jest
+      .fn()
+      .mockImplementation((row: Record<string, unknown>) => Promise.resolve({ ...fakeUser(), ...row }));
+    const { whereRaw } = mockEmailLookup(undefined, { insert });
 
     const user = await auth.register('Mixed.Case@Example.com', 'password123');
 
-    expect(findOne).toHaveBeenCalledWith('email', 'mixed.case@example.com');
+    expect(whereRaw).toHaveBeenCalledWith('LOWER(email) = ?', ['mixed.case@example.com']);
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ email: 'mixed.case@example.com' }));
     expect(user.email).toBe('mixed.case@example.com');
   });
 
-  it('login() looks up the lowercased email regardless of the casing supplied', async () => {
-    const user = fakeUser({ email: 'someone@example.com' });
-    // comparePassword will fail against 'irrelevant' hash — that's fine, we
-    // only care that the lookup itself was normalized.
-    const findOne = jest.fn().mockResolvedValue(user);
-    (User.query as jest.Mock).mockReturnValue({ findOne });
+  it('login() matches on LOWER(email) rather than an exact comparison', async () => {
+    // comparePassword will fail against the 'irrelevant' hash — we only care
+    // that the lookup itself was case-insensitive.
+    const { whereRaw } = mockEmailLookup(fakeUser({ email: 'someone@example.com' }));
 
     await expect(auth.login('Someone@EXAMPLE.com', 'whatever')).rejects.toThrow();
-    expect(findOne).toHaveBeenCalledWith('email', 'someone@example.com');
+    expect(whereRaw).toHaveBeenCalledWith('LOWER(email) = ?', ['someone@example.com']);
+  });
+
+  it('regression: finds an account whose stored email predates normalization', async () => {
+    // The real incident: rows written before lowercasing existed kept their
+    // original casing, and an exact-match lookup made them invisible at
+    // login — indistinguishable from the account having been deleted.
+    const legacy = fakeUser({ email: 'Jack.Taylor@Gmail.com' });
+    const { first } = mockEmailLookup(legacy);
+
+    await expect(auth.login('jack.taylor@gmail.com', 'whatever')).rejects.toThrow(
+      /invalid email or password/i // reached the password check, i.e. the row WAS found
+    );
+    expect(first).toHaveBeenCalled();
   });
 });
 
 describe('register() enumeration-safe error tagging', () => {
   it('tags a duplicate-email failure with code "email_taken" (route turns this into a generic message)', async () => {
-    const findOne = jest.fn().mockResolvedValue(fakeUser());
-    (User.query as jest.Mock).mockReturnValue({ findOne });
+    mockEmailLookup(fakeUser());
 
     await expect(auth.register('taken@example.com', 'password123')).rejects.toMatchObject({
+      code: 'email_taken',
+    });
+  });
+
+  it('regression: refuses to create a duplicate when the existing row differs only by case', async () => {
+    // Without this, a learner locked out by the casing bug who hit "register"
+    // silently got a second, empty account instead of an error.
+    mockEmailLookup(fakeUser({ email: 'Jack.Taylor@Gmail.com' }));
+
+    await expect(auth.register('jack.taylor@gmail.com', 'password123')).rejects.toMatchObject({
       code: 'email_taken',
     });
   });

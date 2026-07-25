@@ -39,12 +39,28 @@ export interface TokenPayload {
 
 /**
  * Emails are matched case-insensitively everywhere (registration, login, the
- * admin reset-password script) by normalizing to lowercase at the one point
- * they enter the system — otherwise "User@x.com" and "user@x.com" would
- * silently become two different accounts.
+ * admin reset-password script) — otherwise "User@x.com" and "user@x.com"
+ * would silently become two different accounts.
+ *
+ * New rows are stored already-lowercased, but LOOKUPS must never assume that:
+ * accounts created before normalization existed still hold their original
+ * casing. Matching a lowercased input with a case-sensitive `=` made every
+ * one of those rows invisible to login — the account looked deleted, and
+ * registering again produced an empty duplicate. Always compare with
+ * findByEmail below, never with a bare equality on the column.
  */
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+/**
+ * Case-insensitive lookup that works regardless of how the row was stored.
+ * `includeDeleted` is for the registration uniqueness check, which must see
+ * soft-deleted rows too so their address isn't silently re-registered.
+ */
+function findByEmail(email: string, { includeDeleted = false } = {}) {
+  const q = User.query().whereRaw('LOWER(email) = ?', [normalizeEmail(email)]);
+  return includeDeleted ? q.first() : q.whereNull('deleted_at').first();
 }
 
 /** Never log a raw email address — mask everything but a short prefix. */
@@ -123,8 +139,10 @@ export const auth = {
   async register(email: string, password: string): Promise<User> {
     const normalizedEmail = normalizeEmail(email);
 
-    // Check if user exists
-    const existing = await User.query().findOne('email', normalizedEmail);
+    // Case-insensitive, and deliberately includes soft-deleted rows — a
+    // case-sensitive check here is what let a locked-out learner create an
+    // empty duplicate of an account that already existed.
+    const existing = await findByEmail(email, { includeDeleted: true });
     if (existing) {
       // Tagged so the route can respond with a generic message — surfacing
       // "email already registered" as a distinct error from every other
@@ -157,8 +175,7 @@ export const auth = {
   },
 
   async login(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }> {
-    const normalizedEmail = normalizeEmail(email);
-    const user = await User.query().findOne('email', normalizedEmail).where('deleted_at', null);
+    const user = await findByEmail(email);
     if (!user) {
       throw new Error('Invalid email or password');
     }
