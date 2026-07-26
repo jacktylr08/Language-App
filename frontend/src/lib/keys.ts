@@ -16,6 +16,10 @@ export const TUTOR_VOICE_KEY = 'aprende-tutor-voice-v1';
 export const LAST_USER_ID_KEY = 'aprende-last-user-id';
 // The account's chosen course language (see lib/languages.ts).
 export const ACTIVE_LANGUAGE_KEY = 'aprende-active-language';
+// An interrupted lesson's position, so it can be resumed rather than
+// restarted (see lib/lesson-resume.ts). Deliberately device-local and NOT
+// synced — a half-finished lesson belongs to the phone you left it on.
+export const LESSON_CHECKPOINT_KEY = 'aprende-lesson-checkpoint-v1';
 
 // Spanish ('es') is the original, default course — its data keeps the exact
 // existing key names so no current learner's progress ever needs migrating.

@@ -20,7 +20,13 @@ import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, Match
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { loadProgress, currentStreak } from '@/lib/progress';
 import { buildTutorContext } from '@/lib/tutor-context';
-import { startRecording, assessPronunciationFromBlob, type PronunciationResult } from '@/lib/pronunciation';
+import {
+  startRecording,
+  assessPronunciationFromBlob,
+  pronunciationRecordingSupported,
+  type ActiveRecording,
+  type PronunciationResult,
+} from '@/lib/pronunciation';
 import { api } from '@/lib/api';
 import { PronunciationScoreCard } from '@/components/PronunciationScoreCard';
 import { useLessonSession } from './lesson-engine/useLessonSession';
@@ -49,6 +55,16 @@ const ACCENT_CHARS = ['á', 'é', 'í', 'ó', 'ú', 'ñ', '¿', '¡'];
 export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const router = useRouter();
   const srAvailable = useMemo(() => speechRecognitionSupported(), []);
+  /**
+   * Whether to put speaking exercises in the queue at all. This used to be
+   * srAvailable alone, which silently removed every speaking exercise on
+   * Firefox and in some iOS contexts — even though recording to Azure works
+   * there perfectly well. Either route is enough to run the exercise.
+   */
+  const speakingAvailable = useMemo(
+    () => speechRecognitionSupported() || pronunciationRecordingSupported(),
+    []
+  );
   const allVocab = useMemo(() => getAllVocab(), []);
 
   const {
@@ -67,13 +83,19 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     finished,
     grade,
     handleContinue,
-  } = useLessonSession({ lesson, mode, srAvailable, allVocab });
+    resumable,
+    resume,
+    restart,
+  } = useLessonSession({ lesson, mode, srAvailable: speakingAvailable, allVocab });
 
   // Per-exercise UI state
   const [selected, setSelected] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
   const [listening, setListening] = useState(false);
   const [spokenText, setSpokenText] = useState('');
+  // Only used on the no-Web-Speech path, where the learner taps to stop.
+  const [recording, setRecording] = useState<ActiveRecording | null>(null);
+  const [scoring, setScoring] = useState(false);
   // Best-effort phoneme-level score (Azure Speech) — an extra readout on top
   // of the existing transcript-match grading, never a replacement for it.
   // null whenever it's not (yet, or ever) available; the exercise is graded
@@ -208,8 +230,62 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     }
   };
 
+  /**
+   * Speaking without the Web Speech API.
+   *
+   * Firefox has never shipped SpeechRecognition and it's unreliable on iOS,
+   * particularly in a home-screen PWA. Speaking exercises used to be dropped
+   * entirely for those browsers — no message, no fallback — so the app's
+   * headline feature silently vanished for a chunk of learners.
+   *
+   * MediaRecorder + Azure works everywhere and is a stronger signal anyway
+   * (it scores HOW the word was said, not just whether a transcript matched),
+   * so here it grades the exercise on its own. The learner taps to start and
+   * taps again to stop, since there's no recogniser to detect end-of-speech.
+   */
+  const startRecordOnlySpeaking = async () => {
+    if (feedback || !current) return;
+    const word = current.word;
+
+    if (recording) {
+      // Second tap — stop, score, grade.
+      setRecording(null);
+      setListening(false);
+      setScoring(true);
+      const clip = await recording.stop();
+      const score = clip
+        ? await assessPronunciationFromBlob(clip, word.es, buildTutorContext().languageName)
+        : null;
+      setScoring(false);
+
+      if (!score) {
+        // Nothing came back — a mic problem, or Azure isn't configured
+        // server-side. Never mark the learner wrong for our own gap.
+        setSpokenText('__none__');
+        return;
+      }
+      setPronScore(score);
+      // Azure's own scale: 60 is the conventional "understandable" threshold.
+      grade(score.pronScore >= 60, word.es);
+      return;
+    }
+
+    setSpokenText('');
+    setPronScore(null);
+    const rec = await startRecording();
+    if (!rec) {
+      // Mic denied or unavailable — skipping is right, and it's the same
+      // outcome the learner gets from "Can't speak right now".
+      handleSkipSpeaking();
+      return;
+    }
+    setRecording(rec);
+    setListening(true);
+  };
+
   const startListening = async () => {
     if (feedback || !current || listening) return;
+    if (!srAvailable) return startRecordOnlySpeaking();
     setListening(true);
     setSpokenText('');
     setPronScore(null);
@@ -387,15 +463,38 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   : lesson?.tip}
               </p>
             </div>
-            <button
-              onClick={() => setStarted(true)}
-              className="btn-primary w-full py-4 text-lg"
-            >
-              {mode === 'mistakes' ? 'FIX THESE' : mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
-            </button>
-            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
-              {total} exercises · 🔥 {currentStreak(p)} day streak
-            </p>
+            {resumable ? (
+              /* Picked up rather than restarted. The alternative — silently
+                 dropping someone back into exercise 41 — leaves them with no
+                 idea why the lesson opened mid-flow, so the position is
+                 stated and starting over stays one tap away. */
+              <>
+                <button onClick={resume} className="btn-primary w-full py-4 text-lg">
+                  RESUME · {resumable.index} / {resumable.total}
+                </button>
+                <button
+                  onClick={restart}
+                  className="mt-3 w-full py-3 text-sm font-bold text-stone-500 dark:text-stone-400 hover:text-ink dark:hover:text-stone-200 transition-colors"
+                >
+                  Start again from the beginning
+                </button>
+                <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
+                  You left off part-way · 🔥 {currentStreak(p)} day streak
+                </p>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setStarted(true)}
+                  className="btn-primary w-full py-4 text-lg"
+                >
+                  {mode === 'mistakes' ? 'FIX THESE' : mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
+                </button>
+                <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
+                  {total} exercises · 🔥 {currentStreak(p)} day streak
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -718,22 +817,47 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
 
             <button
               onClick={startListening}
-              disabled={!!feedback || listening}
+              /* Without Web Speech there's no recogniser to detect the end of
+                 speech, so the mic stays live until a second tap — it must
+                 not be disabled while recording. */
+              disabled={!!feedback || scoring || (listening && srAvailable)}
               className={`w-24 h-24 rounded-[32px] flex items-center justify-center text-4xl transition-all active:scale-95 ${
                 listening
                   ? 'bg-terra-500 text-white animate-pulse-ring'
                   : 'bg-gradient-to-br from-sky-400 to-blue-600 hover:brightness-105 text-white shadow-[0_4px_0_0_#1D4ED8,0_16px_32px_-8px_rgba(37,99,235,0.5)] active:translate-y-1 active:shadow-[0_1px_0_0_#1D4ED8]'
               }`}
-              aria-label={listening ? 'Listening — tap to stop' : 'Tap to speak'}
+              aria-label={
+                scoring
+                  ? 'Checking your pronunciation'
+                  : listening
+                  ? srAvailable
+                    ? 'Listening — tap to stop'
+                    : 'Recording — tap when you have finished'
+                  : 'Tap to speak'
+              }
             >
-              🎤
+              {scoring ? '⏳' : '🎤'}
             </button>
-            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
-              {listening ? 'Listening… speak now' : 'Tap the mic, then speak'}
+            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400" aria-live="polite">
+              {scoring
+                ? 'Checking how you said it…'
+                : listening
+                ? srAvailable
+                  ? 'Listening… speak now'
+                  : 'Recording — say it, then tap again'
+                : 'Tap the mic, then speak'}
             </p>
             {spokenText === '__none__' && !feedback && (
               <p className="mt-2 text-sm text-terra-500 font-semibold">
                 Didn&apos;t catch that — try again, a bit louder
+              </p>
+            )}
+            {/* No transcript to echo back on the record-only path, so the
+                score card below is the whole of the feedback. Say what's
+                happening rather than leaving a silent gap. */}
+            {!srAvailable && !listening && !scoring && !feedback && !spokenText && (
+              <p className="mt-2 text-xs text-stone-400 dark:text-stone-500 max-w-xs text-center">
+                Your browser can&apos;t transcribe speech, so this is scored on pronunciation instead.
               </p>
             )}
             {spokenText && spokenText !== '__none__' && (

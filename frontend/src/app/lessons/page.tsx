@@ -12,6 +12,7 @@ import {
   lessonStars,
   recentActivity,
   isLessonDone,
+  dueWordCount,
   ProgressState,
 } from '@/lib/progress';
 import { coursePositionFor } from '@/lib/course-progress';
@@ -85,6 +86,7 @@ export default function LessonsPage() {
   const streak = currentStreak(progress);
   const wordsKnown = knownWordCount(progress);
   const mistakes = combinedMistakeCount();
+  const due = dueWordCount(progress);
   // "Done" (real completions) stays separate from "placed out of at
   // onboarding" (skipped) — the journey stat below should be honest about
   // which is which, even though both count toward being unlocked/reached.
@@ -197,6 +199,35 @@ export default function LessonsPage() {
         </div>
       </div>
 
+      {/* Review — above Continue on purpose. Spaced repetition only works if
+          the review actually happens on the day it comes due, so when
+          something IS due it outranks starting new material. This card is
+          also the only route to the practice session from the dashboard —
+          the mode existed with no link to it at all. */}
+      {due > 0 && (
+        <Link
+          href="/practice"
+          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-saffron-500 via-saffron-400 to-terra-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+        >
+          <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
+            ⚡
+          </div>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+            Due today
+          </p>
+          <p className="font-extrabold text-white text-lg mt-1 leading-tight">
+            {due} {due === 1 ? 'word' : 'words'} ready for review
+          </p>
+          <p className="text-white/85 text-sm mt-0.5">
+            Catch these before you forget them — about {Math.max(2, Math.round(Math.min(due, 18) * 0.4))} minutes.
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white">
+            Start review
+            <span className="transition-transform group-hover:translate-x-1">→</span>
+          </span>
+        </Link>
+      )}
+
       {/* Continue — pick up where you left off, right next to the journey summary */}
       {nextLesson ? (
         <Link
@@ -277,6 +308,27 @@ export default function LessonsPage() {
           More practice
         </p>
         <div className="space-y-1">
+          {/* Only when nothing is due — otherwise the big Review card above
+              is already saying this, more urgently. With nothing due the
+              session falls back to the weakest words, which is still worth
+              offering, just not worth shouting about. */}
+          {due === 0 && (
+            <Link
+              href="/practice"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-3 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors"
+            >
+              <span className="text-xl shrink-0" aria-hidden>⚡</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-bold text-ink dark:text-stone-200">
+                  Smart Practice
+                </span>
+                <span className="block text-xs text-ink-soft dark:text-stone-400 truncate">
+                  Nothing due — keep your weakest words sharp.
+                </span>
+              </span>
+              <span className="text-stone-300 dark:text-stone-600 shrink-0" aria-hidden>→</span>
+            </Link>
+          )}
           {mistakes > 0 && (
             <Link
               href="/practice?mode=mistakes"

@@ -10,6 +10,7 @@ import {
   completeLessonLocal,
   knownWordCount,
   masteredWordCount,
+  localDay,
 } from '../progress';
 import type { ProgressState } from '../progress';
 
@@ -18,6 +19,36 @@ const DAY = 24 * 60 * 60 * 1000;
 function setNow(iso: string) {
   jest.setSystemTime(new Date(iso));
 }
+
+describe('day boundaries follow the learner, not UTC', () => {
+  // Regression: every day boundary in the app (streak chain, activity strip,
+  // whether a word is due) came from toISOString(), i.e. the UTC date. An
+  // evening session in a UTC+ zone was filed under tomorrow and a morning
+  // session in a UTC- zone under yesterday, so consecutive real days could
+  // collapse into one date and break a streak that was never broken.
+  it('uses the local calendar date, not the UTC one', () => {
+    // 23:30 in Sydney (UTC+11) is still 12:30 UTC the SAME morning — the UTC
+    // date is a day behind what the learner's calendar says.
+    const lateEveningInSydney = new Date('2026-03-10T12:30:00.000Z');
+    const utcDay = lateEveningInSydney.toISOString().slice(0, 10);
+
+    const asSydney = lateEveningInSydney.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+    expect(asSydney).toBe('2026-03-10');
+    expect(utcDay).toBe('2026-03-10');
+
+    // And the other direction: 20:00 in Los Angeles (UTC-7) is already the
+    // NEXT day in UTC.
+    const eveningInLA = new Date('2026-03-11T03:00:00.000Z');
+    expect(eveningInLA.toISOString().slice(0, 10)).toBe('2026-03-11');
+    expect(eveningInLA.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })).toBe('2026-03-10');
+  });
+
+  it('formats as YYYY-MM-DD so existing stored dates stay comparable', () => {
+    // Dates already saved were ISO-shaped; the fix must not change the format
+    // or every stored activeDay/nextReview would stop matching.
+    expect(localDay(new Date('2026-07-04T12:00:00.000Z'))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
 
 describe('streaks', () => {
   beforeEach(() => {

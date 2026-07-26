@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { CourseChip } from '@/components/CourseChip';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
+import { getCurriculum, getAllVocab } from '@/lib/curriculum';
+import { EXERCISE_TYPE_COUNT } from '@/lib/exercise-engine';
 
 const phases = [
   { n: '01', title: 'Foundations', desc: 'Your first words, sounds and sentences.' },
@@ -12,6 +14,23 @@ const phases = [
   { n: '05', title: 'Power Grammar', desc: 'Pronouns, perfect, conditional, subjunctive.' },
   { n: '06', title: 'Fluency', desc: 'Debate, storytelling, and sounding native.' },
 ];
+
+/**
+ * Counted from the curriculum rather than typed in. These were hand-written
+ * and had drifted low (47 lessons and "450+" words against a real 54 and 522)
+ * — deriving them means adding content updates the pitch for free, and the
+ * first thing a visitor reads is always true.
+ */
+function courseStats(): Array<[string, string]> {
+  const curriculum = getCurriculum();
+  const weeks = curriculum.length ? Math.max(...curriculum.map((l) => l.week)) : 0;
+  return [
+    [String(curriculum.length), 'interactive lessons'],
+    [`${Math.floor(getAllVocab().length / 50) * 50}+`, 'words & phrases'],
+    [String(EXERCISE_TYPE_COUNT), 'exercise types'],
+    [String(weeks), 'weeks to fluency'],
+  ];
+}
 
 export default function HomePage() {
   // Already signed in? This landing page ("start learning") is for visitors —
@@ -58,7 +77,7 @@ export default function HomePage() {
         {/* Hero */}
         <section className="pt-20 pb-24 text-center">
           <p className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 text-brand-700 dark:text-brand-300 px-4 py-1.5 text-[13px] font-bold mb-8">
-            🇪🇸 A complete 24-week course · built to actually teach
+            🇪🇸 A complete {courseStats()[3][0]}-week course · built to actually teach
           </p>
           <h2 className="font-display font-black text-ink dark:text-white text-5xl md:text-7xl leading-[1.02] tracking-tight max-w-3xl mx-auto">
             Learn Spanish like it{' '}
@@ -94,12 +113,7 @@ export default function HomePage() {
 
           {/* Stats strip */}
           <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
-            {[
-              ['47', 'interactive lessons'],
-              ['450+', 'words & phrases'],
-              ['9', 'exercise types'],
-              ['24', 'weeks to fluency'],
-            ].map(([n, label]) => (
+            {courseStats().map(([n, label]) => (
               <div key={label} className="surface px-4 py-5">
                 <p className="font-display text-3xl font-black text-brand-600 dark:text-brand-400">
                   {n}

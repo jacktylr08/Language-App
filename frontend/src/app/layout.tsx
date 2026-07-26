@@ -3,6 +3,7 @@ import '@/styles/globals.css';
 import { LanguageFlagBanner } from '@/components/LanguageFlagBanner';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { ThemeScript } from '@/components/ThemeScript';
+import { BottomNav } from '@/components/BottomNav';
 
 export const metadata: Metadata = {
   title: 'Fluenta — Learn Spanish for real',
@@ -24,6 +25,7 @@ export default function RootLayout({
         <div className="ambient" aria-hidden="true" />
         <LanguageFlagBanner />
         <main className="min-h-screen">{children}</main>
+        <BottomNav />
       </body>
     </html>
   );

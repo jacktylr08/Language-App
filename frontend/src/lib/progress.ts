@@ -113,14 +113,32 @@ function defaultState(): ProgressState {
   };
 }
 
+/**
+ * A calendar day in the LEARNER'S timezone, as YYYY-MM-DD.
+ *
+ * This used to be `toISOString().slice(0, 10)`, which is the UTC date — and
+ * every day boundary in the app runs through here: the streak chain, the
+ * 14-day activity strip, and whether a word is due. In UTC+ zones an evening
+ * session lands on tomorrow's date; in UTC- zones it lands on yesterday's.
+ * Either way two sessions on consecutive real days can collapse to one date
+ * (breaking a streak that was never broken) or split one day across two.
+ *
+ * 'en-CA' is the shortest route to ISO-shaped output — it formats as
+ * YYYY-MM-DD — so stored dates keep exactly the same format and nothing
+ * already saved needs migrating.
+ */
+export function localDay(date: Date = new Date()): string {
+  return date.toLocaleDateString('en-CA');
+}
+
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDay();
 }
 
 function yesterday(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 
 export function loadProgress(): ProgressState {
@@ -160,7 +178,7 @@ export function recentActivity(state: ProgressState, days = 14): boolean[] {
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    out.push(active.has(d.toISOString().slice(0, 10)));
+    out.push(active.has(localDay(d)));
   }
   return out;
 }
@@ -265,7 +283,10 @@ export function recordWordResult(
     state: next.state,
     last_review: next.last_review?.toISOString(),
   };
-  w.nextReview = next.due.toISOString().slice(0, 10);
+  // Local day, to match today() — getReviewWordIds compares these two as
+  // strings, so a UTC due date against a local today drifts a word in or out
+  // of "due" by a day depending on the learner's timezone.
+  w.nextReview = localDay(next.due);
 
   state.words[wordId] = w;
   save(state);
@@ -345,6 +366,19 @@ export function getReviewWordIds(limit = 12): { due: string[]; weak: string[] } 
     .sort((a, b) => a[1].strength - b[1].strength || b[1].wrong - a[1].wrong)
     .map(([id]) => id);
   return { due: due.slice(0, limit), weak: weak.slice(0, limit) };
+}
+
+/**
+ * How many words are actually due for review right now — uncapped, unlike
+ * getReviewWordIds, which returns at most `limit` because it's building a
+ * session queue. This is the number the dashboard shows to bring someone
+ * back, so it has to be the true count, not a page of one.
+ */
+export function dueWordCount(state: ProgressState = loadProgress()): number {
+  const t = today();
+  return Object.values(state.words).filter(
+    (w) => w.correct + w.wrong > 0 && w.nextReview && w.nextReview <= t
+  ).length;
 }
 
 /**

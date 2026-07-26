@@ -2625,7 +2625,7 @@ export const curriculum: CurriculumLesson[] = [
     sentences: [
       { es: 'Tome esta pastilla.', en: 'Take this pill.', blank: 'Tome' },
       { es: 'Descanse este fin de semana.', en: 'Rest this weekend.', blank: 'Descanse' },
-      { es: 'No fume aquí, por favor.', en: 'Don\'t smoke here, please.', blank: 'no fume' },
+      { es: 'No fume aquí, por favor.', en: 'Don\'t smoke here, please.', blank: 'No fume' },
       { es: 'Dígame qué necesita.', en: 'Tell me what you need.', blank: 'Dígame' },
       { es: 'Siga todo recto.', en: 'Continue straight ahead.', blank: 'Siga' },
     ],

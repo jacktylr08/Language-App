@@ -19,21 +19,31 @@ import { getReviewWordIds, getMistakeWordIds } from './progress';
 import { loadProfile } from './tutor-memory';
 import { tutorFlaggedVocabIds } from './learner-insights';
 
-export type ExerciseType =
-  | 'teach' // flashcard-style introduction, no grading
-  | 'grammar_slide' // teacher explanation card, no grading
-  | 'dialogue_slide' // conversation presented with audio, no grading
-  | 'concept_check' // graded understanding question with explanation
-  | 'build_sentence' // assemble a sentence from word tiles
-  | 'mcq_es_en' // see Spanish, pick English
-  | 'mcq_en_es' // see English, pick Spanish
-  | 'listen_meaning' // hear Spanish, pick the meaning
-  | 'type_es' // see English, type the Spanish
-  | 'type_en' // see Spanish, type the English — true recall, the other direction
-  | 'fill_blank' // complete the sentence
-  | 'match_pairs' // match Spanish to English
-  | 'speak' // say the Spanish out loud
-  | 'write_answer'; // free composition, graded by the tutor
+/**
+ * A runtime array rather than a bare union type, so the count is derivable —
+ * the landing page advertises this number and had drifted to claiming 9.
+ */
+export const EXERCISE_TYPES = [
+  'teach', // flashcard-style introduction, no grading
+  'grammar_slide', // teacher explanation card, no grading
+  'dialogue_slide', // conversation presented with audio, no grading
+  'concept_check', // graded understanding question with explanation
+  'build_sentence', // assemble a sentence from word tiles
+  'mcq_es_en', // see Spanish, pick English
+  'mcq_en_es', // see English, pick Spanish
+  'listen_meaning', // hear Spanish, pick the meaning
+  'type_es', // see English, type the Spanish
+  'type_en', // see Spanish, type the English — true recall, the other direction
+  'fill_blank', // complete the sentence
+  'match_pairs', // match Spanish to English
+  'speak', // say the Spanish out loud
+  'write_answer', // free composition, graded by the tutor
+] as const;
+
+export type ExerciseType = (typeof EXERCISE_TYPES)[number];
+
+/** How many distinct kinds of exercise the app can put in front of a learner. */
+export const EXERCISE_TYPE_COUNT = EXERCISE_TYPES.length;
 
 /**
  * Which FSRS rating tier a correct-on-first-try answer deserves (see
