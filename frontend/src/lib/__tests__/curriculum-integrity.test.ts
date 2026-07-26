@@ -167,6 +167,31 @@ describe('course structure', () => {
     expect(slugs.length).toBe(new Set(slugs).size);
   });
 
+  it('gives every non-review lesson a dialogue', () => {
+    // Grammar was taught as slides and drills alone in 41 of 54 lessons —
+    // including the whole spine (both preterites, the imperfect, the
+    // subjunctive pair, object pronouns, the perfect, the conditional).
+    // Those are exactly the structures a learner only internalises by
+    // hearing them used in an exchange.
+    const missing = curriculum.filter((l) => !l.isReview && !l.dialogue?.length).map((l) => l.slug);
+    expect(missing).toEqual([]);
+  });
+
+  it('writes dialogues as a real exchange, not a monologue', () => {
+    const bad = curriculum
+      .filter((l) => l.dialogue?.length)
+      .flatMap((l) => {
+        const turns = l.dialogue!;
+        const speakers = new Set(turns.map((t) => t.speaker));
+        const problems: string[] = [];
+        if (turns.length < 6) problems.push(`${l.slug}: only ${turns.length} turns`);
+        if (speakers.size < 2) problems.push(`${l.slug}: only one speaker`);
+        if (turns.some((t) => !t.es.trim() || !t.en.trim())) problems.push(`${l.slug}: a turn is missing text`);
+        return problems;
+      });
+    expect(bad).toEqual([]);
+  });
+
   it('gives every non-review lesson something to teach', () => {
     // Review lessons deliberately carry no vocab — they pull from earlier
     // lessons. Everything else needs its own material or the generated

@@ -23,7 +23,8 @@ export interface ReadingPassage {
   glossary?: Record<string, string>;
 }
 
-export const READINGS: ReadingPassage[] = [
+export const READINGS: ReadingPassage[
+] = [
   {
     slug: 'mi-familia',
     title: 'Mi familia',
@@ -50,6 +51,80 @@ Vivimos en una casa en Madrid. La casa es pequeña pero bonita. Me gusta mucho m
       'pero': 'but',
       'es': 'is',
       'mi': 'my',
+    },
+  },
+  {
+    slug: 'buenos-dias-vecina',
+    title: 'Buenos días, vecina',
+    emoji: '👋',
+    minWeek: 1,
+    blurb: 'Two neighbours meet on the stairs. Ten words, one whole conversation.',
+    text: `Buenos días. ¿Cómo estás?
+
+Muy bien, gracias. ¿Y tú?
+
+Bien también. Me llamo Rosa. Soy tu vecina.
+
+Mucho gusto, Rosa. Yo soy Sam.
+
+Encantada, Sam. Hasta luego.
+
+Adiós. Buenas noches.`,
+    glossary: {
+      'buenos': 'good (plural)',
+      'días': 'days',
+      'cómo': 'how',
+      'estás': 'you are',
+      'muy': 'very',
+      'bien': 'well',
+      'gracias': 'thank you',
+      'y': 'and',
+      'tú': 'you',
+      'también': 'too / also',
+      'me': 'me',
+      'llamo': 'I call',
+      'soy': 'I am',
+      'tu': 'your',
+      'vecina': 'neighbour (f)',
+      'mucho': 'much',
+      'gusto': 'pleasure',
+      'yo': 'I',
+      'encantada': 'delighted (f)',
+      'hasta': 'until',
+      'luego': 'later',
+      'adiós': 'goodbye',
+      'noches': 'nights',
+    },
+  },
+  {
+    slug: 'soy-estudiante',
+    title: 'Soy estudiante',
+    emoji: '🎓',
+    minWeek: 1,
+    blurb: 'Someone introduces himself. Everything you need to do the same.',
+    text: `Hola. Me llamo Diego. Soy de México.
+
+Soy estudiante. Mi amigo Luis es doctor. Él es de Madrid.
+
+Ella se llama Marta. Es mi amiga. Es estudiante también.
+
+Nosotros somos estudiantes. ¿Y tú? ¿De dónde eres?`,
+    glossary: {
+      'hola': 'hello',
+      'de': 'from',
+      'estudiante': 'student',
+      'mi': 'my',
+      'amigo': 'friend (m)',
+      'amiga': 'friend (f)',
+      'es': 'is',
+      'doctor': 'doctor',
+      'él': 'he',
+      'ella': 'she',
+      'se': '(reflexive marker)',
+      'nosotros': 'we',
+      'somos': 'we are',
+      'dónde': 'where',
+      'eres': 'you are',
     },
   },
   {
@@ -86,6 +161,215 @@ Me gusta la cocina de mi casa. Es pequeña, pero muy bonita.`,
     },
   },
   {
+    slug: 'la-mesa-del-desayuno',
+    title: 'La mesa del desayuno',
+    emoji: '🥐',
+    minWeek: 2,
+    blurb: 'Breakfast, named one item at a time.',
+    text: `Hay pan en la mesa. Hay café y leche.
+
+Mi madre come pan. Mi padre bebe café. Yo bebo leche.
+
+Hay fruta también. La fruta es buena.
+
+¿Dónde está el agua? El agua está en la cocina.`,
+    glossary: {
+      'hay': 'there is / there are',
+      'pan': 'bread',
+      'en': 'in / on',
+      'la': 'the (f)',
+      'mesa': 'table',
+      'café': 'coffee',
+      'leche': 'milk',
+      'madre': 'mother',
+      'come': 'eats',
+      'padre': 'father',
+      'bebe': 'drinks',
+      'bebo': 'I drink',
+      'fruta': 'fruit',
+      'buena': 'good (f)',
+      'está': 'is (located)',
+      'el': 'the (m)',
+      'agua': 'water',
+      'cocina': 'kitchen',
+    },
+  },
+  {
+    slug: 'mi-hermana-y-yo',
+    title: 'Mi hermana y yo',
+    emoji: '👯',
+    minWeek: 2,
+    blurb: 'A sister, an age, a city — the first things you ever say about people.',
+    text: `Tengo una hermana. Se llama Clara. Tiene veinte años.
+
+Clara vive en Barcelona. Yo vivo en Sevilla. Ella trabaja y yo estudio.
+
+Mi abuela vive con Clara. Tiene ochenta años. Es muy buena.
+
+Cada día hablo con mi hermana. Quiero ver a mi familia.`,
+    glossary: {
+      'tengo': 'I have',
+      'una': 'a (f)',
+      'hermana': 'sister',
+      'llama': 'is called',
+      'tiene': 'has / is (age)',
+      'veinte': 'twenty',
+      'años': 'years',
+      'vive': 'lives',
+      'vivo': 'I live',
+      'trabaja': 'works',
+      'estudio': 'I study',
+      'abuela': 'grandmother',
+      'con': 'with',
+      'ochenta': 'eighty',
+      'cada': 'each / every',
+      'día': 'day',
+      'hablo': 'I speak',
+      'quiero': 'I want',
+      'ver': 'to see',
+      'familia': 'family',
+    },
+  },
+  {
+    slug: 'una-casa-pequena',
+    title: 'Una casa pequeña',
+    emoji: '🏠',
+    minWeek: 3,
+    blurb: 'A small flat described room by room — colours, sizes, the lot.',
+    text: `Vivo en una casa pequeña. No es nueva, es vieja, pero es bonita.
+
+La cocina es grande. La mesa es roja. Hay dos sillas azules.
+
+Mi cuarto es pequeño. La cama es nueva. El agua del baño está muy fría.
+
+Me gusta mi casa. Es vieja pero es buena.`,
+    glossary: {
+      'vivo': 'I live',
+      'casa': 'house',
+      'pequeña': 'small (f)',
+      'nueva': 'new (f)',
+      'vieja': 'old (f)',
+      'pero': 'but',
+      'bonita': 'pretty',
+      'grande': 'big',
+      'roja': 'red (f)',
+      'dos': 'two',
+      'sillas': 'chairs',
+      'azules': 'blue (pl)',
+      'cuarto': 'room',
+      'cama': 'bed',
+      'baño': 'bathroom',
+      'fría': 'cold (f)',
+      'me gusta': 'I like',
+    },
+  },
+  {
+    slug: 'el-mercado-de-colores',
+    title: 'El mercado de colores',
+    emoji: '🍎',
+    minWeek: 3,
+    blurb: 'A market stall, described entirely in colours and sizes.',
+    text: `En el mercado hay mucha fruta. Las manzanas son rojas. Las manzanas grandes son buenas.
+
+Hay pan nuevo. El pan está caliente.
+
+El café es bueno aquí. No es malo, es muy bueno.
+
+La señora es vieja pero muy simpática. Su tienda es pequeña y bonita.`,
+    glossary: {
+      'mercado': 'market',
+      'mucha': 'a lot of (f)',
+      'las': 'the (f pl)',
+      'manzanas': 'apples',
+      'son': 'are',
+      'rojas': 'red (f pl)',
+      'grandes': 'big (pl)',
+      'buenas': 'good (f pl)',
+      'nuevo': 'new (m)',
+      'caliente': 'hot',
+      'bueno': 'good (m)',
+      'aquí': 'here',
+      'malo': 'bad',
+      'señora': 'lady',
+      'simpática': 'nice (f)',
+      'su': 'her / his',
+      'tienda': 'shop',
+    },
+  },
+  {
+    slug: 'un-sabado-tranquilo',
+    title: 'Un sábado tranquilo',
+    emoji: '🛋️',
+    minWeek: 4,
+    blurb: 'A quiet Saturday — everything you\'ve learned so far, in one place.',
+    text: `Es sábado. No trabajo hoy.
+
+Por la mañana bebo café en la cocina. Como pan con fruta. La cocina está tranquila.
+
+Mi hermano viene a la casa. Hablamos mucho. Él tiene un coche nuevo, muy grande y azul.
+
+Por la tarde vamos al mercado. Compramos carne y agua.
+
+Por la noche estoy cansado, pero estoy feliz. Me gusta el sábado.`,
+    glossary: {
+      'sábado': 'Saturday',
+      'hoy': 'today',
+      'por la mañana': 'in the morning',
+      'como': 'I eat',
+      'tranquila': 'quiet (f)',
+      'hermano': 'brother',
+      'viene': 'comes',
+      'hablamos': 'we talk',
+      'coche': 'car',
+      'tarde': 'afternoon',
+      'vamos': 'we go',
+      'al': 'to the',
+      'compramos': 'we buy',
+      'carne': 'meat',
+      'noche': 'night',
+      'estoy': 'I am (right now)',
+      'cansado': 'tired',
+      'feliz': 'happy',
+    },
+  },
+  {
+    slug: 'la-familia-de-marta',
+    title: 'La familia de Marta',
+    emoji: '👵',
+    minWeek: 4,
+    blurb: 'A slightly bigger family, and the first real paragraph you\'ll read.',
+    text: `Marta tiene una familia grande. Tiene dos hermanos y una hermana.
+
+Su padre se llama Jorge. Trabaja en un banco. Su madre se llama Pilar y es doctora.
+
+Sus abuelos viven cerca. El abuelo tiene setenta y cinco años. La abuela cocina muy bien.
+
+Cada domingo la familia come en la casa de los abuelos. Hay mucha comida: carne, pan, fruta. Todos hablan mucho.
+
+Marta dice que su familia es ruidosa, pero le gusta.`,
+    glossary: {
+      'hermanos': 'brothers',
+      'su': 'his / her',
+      'banco': 'bank',
+      'doctora': 'doctor (f)',
+      'sus': 'his / her (pl)',
+      'abuelos': 'grandparents',
+      'viven': 'they live',
+      'cerca': 'nearby',
+      'setenta': 'seventy',
+      'cinco': 'five',
+      'cocina': 'cooks',
+      'domingo': 'Sunday',
+      'comida': 'food',
+      'todos': 'everyone',
+      'hablan': 'they talk',
+      'dice': 'says',
+      'que': 'that',
+      'ruidosa': 'noisy (f)',
+      'le gusta': 'she likes it',
+    },
+  },
+  {
     slug: 'un-dia-normal',
     title: 'Un día normal',
     emoji: '☀️',
@@ -116,6 +400,77 @@ Por la noche, ceno en casa y hablo con mi hermano. A veces vemos la televisión 
       'vemos': 'we watch',
       'juntos': 'together',
       'once': 'eleven',
+    },
+  },
+  {
+    slug: 'lo-que-hago-cada-dia',
+    title: 'Lo que hago cada día',
+    emoji: '⏰',
+    minWeek: 5,
+    blurb: 'A whole day in -AR verbs, from the alarm to the sofa.',
+    text: `Cada día trabajo por la mañana. Estudio español por la tarde.
+
+Escucho música cuando trabajo. Miro la televisión por la noche, pero no mucho.
+
+Los sábados compro la comida en el mercado. Cocino en casa. Necesito comprar pan y fruta.
+
+Mi amiga Ana me ayuda con el español. Usamos un libro y hablamos mucho.
+
+A veces bailamos en la cocina. Es tonto, pero me gusta.`,
+    glossary: {
+      'trabajo': 'I work',
+      'escucho': 'I listen to',
+      'música': 'music',
+      'cuando': 'when',
+      'miro': 'I watch',
+      'televisión': 'television',
+      'los sábados': 'on Saturdays',
+      'compro': 'I buy',
+      'cocino': 'I cook',
+      'necesito': 'I need',
+      'comprar': 'to buy',
+      'ayuda': 'helps',
+      'usamos': 'we use',
+      'libro': 'book',
+      'a veces': 'sometimes',
+      'bailamos': 'we dance',
+      'tonto': 'silly',
+    },
+  },
+  {
+    slug: 'el-cafe-de-la-esquina',
+    title: 'El café de la esquina',
+    emoji: '☕',
+    minWeek: 5,
+    blurb: 'An ordinary café, ordered from and paid for.',
+    text: `Hay un café pequeño cerca de mi casa. Trabajo allí por la mañana a veces.
+
+El camarero se llama Nacho. Siempre escucha la radio. Habla mucho con todos.
+
+Compro un café con leche y pan. Cuesta dos euros. Pago y busco una mesa.
+
+Miro a la gente en la calle. Estudio un poco. Escucho las conversaciones.
+
+Necesito una hora tranquila cada día. Este café es perfecto.`,
+    glossary: {
+      'esquina': 'corner',
+      'allí': 'there',
+      'camarero': 'waiter',
+      'siempre': 'always',
+      'escucha': 'listens to',
+      'radio': 'radio',
+      'habla': 'talks',
+      'cuesta': 'it costs',
+      'euros': 'euros',
+      'pago': 'I pay',
+      'busco': 'I look for',
+      'gente': 'people',
+      'calle': 'street',
+      'un poco': 'a little',
+      'conversaciones': 'conversations',
+      'hora': 'hour',
+      'este': 'this',
+      'perfecto': 'perfect',
     },
   },
   {
@@ -163,6 +518,152 @@ Por la tarde, estoy cansado, pero contento. Vuelvo a casa, ceno con mi hermana y
       'vuelvo': 'I return',
       'un poco': 'a little',
       'vida': 'life',
+    },
+  },
+  {
+    slug: 'leo-antes-de-dormir',
+    title: 'Leo antes de dormir',
+    emoji: '📚',
+    minWeek: 6,
+    blurb: 'Reading in bed — -ER and -IR verbs doing real work.',
+    text: `Cada noche leo un poco antes de dormir. Bebo un té y abro mi libro.
+
+Leo en español ahora. No comprendo todo, pero aprendo mucho.
+
+Escribo las palabras nuevas en un cuaderno pequeño. Esta semana escribí veinte palabras.
+
+Mi hermana lee libros ingleses. Dice que es más fácil. Yo corro el riesgo y leo en español.
+
+Algunos días comprendo casi todo. Esos días estoy muy feliz.`,
+    glossary: {
+      'antes de': 'before',
+      'dormir': 'to sleep',
+      'leo': 'I read',
+      'té': 'tea',
+      'abro': 'I open',
+      'comprendo': 'I understand',
+      'todo': 'everything',
+      'aprendo': 'I learn',
+      'escribo': 'I write',
+      'palabras': 'words',
+      'cuaderno': 'notebook',
+      'esta': 'this (f)',
+      'semana': 'week',
+      'escribí': 'I wrote',
+      'lee': 'reads',
+      'ingleses': 'English (pl)',
+      'más': 'more',
+      'fácil': 'easy',
+      'corro': 'I run',
+      'riesgo': 'risk',
+      'algunos': 'some',
+      'casi': 'almost',
+      'esos': 'those',
+    },
+  },
+  {
+    slug: 'estoy-o-soy',
+    title: 'Estoy o soy',
+    emoji: '🎭',
+    minWeek: 6,
+    blurb: 'The same person described two ways — the ser/estar difference, felt rather than explained.',
+    text: `Mi amigo Pedro es alto y simpático. Es de Valencia. Es profesor.
+
+Hoy Pedro está cansado. Está enfermo, creo. Normalmente está muy feliz, pero hoy no.
+
+Su casa es grande y bonita. Pero hoy la casa está fría — la ventana está abierta.
+
+Pedro es una buena persona. Ahora mismo está triste, pero eso pasa.
+
+Mañana estará bien. Él siempre está listo para trabajar.`,
+    glossary: {
+      'alto': 'tall',
+      'profesor': 'teacher',
+      'cansado': 'tired',
+      'enfermo': 'ill',
+      'creo': 'I think',
+      'normalmente': 'normally',
+      'ventana': 'window',
+      'abierta': 'open (f)',
+      'persona': 'person',
+      'ahora mismo': 'right now',
+      'triste': 'sad',
+      'eso': 'that',
+      'pasa': 'happens',
+      'mañana': 'tomorrow',
+      'estará': 'he will be',
+      'listo': 'ready',
+    },
+  },
+  {
+    slug: 'la-hora-del-tren',
+    title: 'La hora del tren',
+    emoji: '🚆',
+    minWeek: 7,
+    blurb: 'Numbers and clock time, doing the one job they exist for.',
+    text: `El tren sale a las ocho y media. Son las siete ahora.
+
+Tengo una hora. Bebo un café — cuesta dos euros con cincuenta.
+
+Hay mucha gente. Cuento las personas: uno, dos, tres, cuatro… no, hay demasiadas.
+
+El tren de las ocho llega tarde. Ahora sale a las nueve.
+
+¿Qué hora es? Son las ocho y media. Todavía tengo media hora.`,
+    glossary: {
+      'tren': 'train',
+      'sale': 'leaves',
+      'a las': 'at (o\'clock)',
+      'ocho': 'eight',
+      'y media': 'half past',
+      'son las': 'it is (o\'clock)',
+      'siete': 'seven',
+      'ahora': 'now',
+      'cincuenta': 'fifty',
+      'cuento': 'I count',
+      'personas': 'people',
+      'uno': 'one',
+      'dos': 'two',
+      'tres': 'three',
+      'cuatro': 'four',
+      'demasiadas': 'too many',
+      'llega': 'arrives',
+      'nueve': 'nine',
+      'qué': 'what',
+      'todavía': 'still',
+    },
+  },
+  {
+    slug: 'cuantos-anos-tienes',
+    title: '¿Cuántos años tienes?',
+    emoji: '🎂',
+    minWeek: 7,
+    blurb: 'A birthday party, counted out in numbers.',
+    text: `Hoy es el cumpleaños de mi abuela. Tiene noventa años.
+
+Somos diez personas en la casa. Hay una mesa con diez sillas.
+
+La fiesta empieza a las seis. Mi hermano llega a las seis y media, siempre tarde.
+
+Mi abuela habla de su vida. Trabajó cuarenta años. Tuvo cuatro hijos.
+
+A las once, la abuela dice que está cansada. Todos vamos a casa. Fue un día bueno.`,
+    glossary: {
+      'cumpleaños': 'birthday',
+      'noventa': 'ninety',
+      'diez': 'ten',
+      'sillas': 'chairs',
+      'fiesta': 'party',
+      'empieza': 'begins',
+      'seis': 'six',
+      'llega': 'arrives',
+      'vida': 'life',
+      'trabajó': 'she worked',
+      'cuarenta': 'forty',
+      'tuvo': 'she had',
+      'hijos': 'children',
+      'once': 'eleven',
+      'fue': 'it was',
     },
   },
   {
@@ -219,6 +720,76 @@ El turista camina por la calle. Ve el banco, gira a la izquierda y encuentra la 
     },
   },
   {
+    slug: 'perdon-donde-esta',
+    title: 'Perdón, ¿dónde está?',
+    emoji: '🗺️',
+    minWeek: 8,
+    blurb: 'Lost in a small town, and asking your way out of it.',
+    text: `Perdón, señora. ¿Dónde está la estación?
+
+Está lejos. Todo recto y a la derecha. Diez minutos a pie.
+
+Gracias. ¿Y hay un banco cerca?
+
+Sí, en esta calle, a la izquierda. Al lado del mercado.
+
+Muy amable. ¿La tienda está abierta?
+
+Creo que sí. Está en el centro de la ciudad, aquí mismo.
+
+Gracias otra vez. Adiós.`,
+    glossary: {
+      'perdón': 'excuse me',
+      'estación': 'station',
+      'lejos': 'far',
+      'todo recto': 'straight ahead',
+      'a la derecha': 'on the right',
+      'minutos': 'minutes',
+      'a pie': 'on foot',
+      'a la izquierda': 'on the left',
+      'al lado de': 'next to',
+      'amable': 'kind',
+      'abierta': 'open (f)',
+      'centro': 'centre',
+      'ciudad': 'city',
+      'aquí mismo': 'right here',
+      'otra vez': 'again',
+    },
+  },
+  {
+    slug: 'salgo-a-las-ocho',
+    title: 'Salgo a las ocho',
+    emoji: '🚪',
+    minWeek: 8,
+    blurb: 'The yo-irregular verbs, all in one very ordinary morning.',
+    text: `Yo salgo de casa a las ocho. Antes hago un café y veo las noticias.
+
+Pongo mis cosas en la mochila: el libro, el cuaderno, las llaves.
+
+Digo adiós a mi hermana. Ella todavía está en la cama.
+
+En el trabajo veo a mis amigos. Les doy los buenos días.
+
+Por la tarde hago la tarea. Vengo a casa tarde, pero estoy contento.`,
+    glossary: {
+      'salgo': 'I leave / go out',
+      'hago': 'I make / do',
+      'veo': 'I see',
+      'noticias': 'news',
+      'pongo': 'I put',
+      'cosas': 'things',
+      'mochila': 'backpack',
+      'llaves': 'keys',
+      'digo': 'I say',
+      'cama': 'bed',
+      'les': 'to them',
+      'doy': 'I give',
+      'tarea': 'homework',
+      'vengo': 'I come',
+      'contento': 'content / pleased',
+    },
+  },
+  {
     slug: 'el-fin-de-semana-pasado',
     title: 'El fin de semana pasado',
     emoji: '🌅',
@@ -250,6 +821,82 @@ El domingo, descansé todo el día. Leí un libro y dormí una siesta. Fue un fi
       'leí': 'I read',
       'dormí': 'I slept',
       'perfecto': 'perfect',
+    },
+  },
+  {
+    slug: 'la-carta-que-escribi',
+    title: 'La carta que escribí',
+    emoji: '✉️',
+    minWeek: 9,
+    blurb: 'A letter written last night, told entirely in the past.',
+    text: `Anoche escribí una carta a mi abuela. No usé el ordenador — escribí a mano.
+
+Le hablé de mi trabajo y de mis amigos aquí. Le conté que estudié español todo el año.
+
+Comí algo, bebí un té, y volví a escribir. Terminé muy tarde.
+
+Esta mañana salí temprano y la mandé. Costó dos euros.
+
+Mi abuela no usa el teléfono. Pero siempre lee mis cartas dos veces.`,
+    glossary: {
+      'anoche': 'last night',
+      'escribí': 'I wrote',
+      'carta': 'letter',
+      'usé': 'I used',
+      'ordenador': 'computer',
+      'a mano': 'by hand',
+      'le': 'to her',
+      'hablé': 'I spoke',
+      'conté': 'I told',
+      'estudié': 'I studied',
+      'comí': 'I ate',
+      'bebí': 'I drank',
+      'volví': 'I went back / returned',
+      'terminé': 'I finished',
+      'salí': 'I went out',
+      'temprano': 'early',
+      'mandé': 'I sent',
+      'costó': 'it cost',
+      'lee': 'reads',
+      'dos veces': 'twice',
+    },
+  },
+  {
+    slug: 'el-dia-que-llegue-tarde',
+    title: 'El día que llegué tarde',
+    emoji: '⏱️',
+    minWeek: 9,
+    blurb: 'Everything that went wrong on one Tuesday morning.',
+    text: `El martes pasado llegué muy tarde al trabajo.
+
+Me levanté a las ocho. Normalmente me levanto a las seis y media, pero no escuché el despertador.
+
+No desayuné. Salí de casa corriendo. Perdí el autobús de las ocho y cuarto.
+
+Caminé veinte minutos. Llegué a las nueve y media.
+
+Mi jefe no dijo nada. Solo miró el reloj. Fue peor que un grito.`,
+    glossary: {
+      'martes': 'Tuesday',
+      'pasado': 'last / past',
+      'llegué': 'I arrived',
+      'me levanté': 'I got up',
+      'escuché': 'I heard',
+      'despertador': 'alarm clock',
+      'desayuné': 'I had breakfast',
+      'corriendo': 'running',
+      'perdí': 'I missed / lost',
+      'autobús': 'bus',
+      'y cuarto': 'quarter past',
+      'caminé': 'I walked',
+      'jefe': 'boss',
+      'dijo': 'said',
+      'nada': 'nothing',
+      'solo': 'only',
+      'miró': 'looked at',
+      'reloj': 'clock',
+      'peor': 'worse',
+      'grito': 'shout',
     },
   },
   {
@@ -324,6 +971,164 @@ Cuando por fin salí de la oficina, estaba muy cansado. Fui a casa, cené algo l
       'hoy': 'today',
       'espero': 'I hope for',
       'tranquilo': 'calm',
+    },
+  },
+  {
+    slug: 'aquel-verano',
+    title: 'Aquel verano',
+    emoji: '🌅',
+    minWeek: 10,
+    blurb: 'A childhood summer, told the way memories actually are.',
+    text: `Cuando era niño, pasábamos todos los veranos en el pueblo de mi abuela.
+
+La casa era vieja y siempre hacía calor. No había televisión. Jugábamos en la calle hasta las diez de la noche.
+
+Mi abuela cocinaba para todos. Siempre había gente en la cocina. La gente hablaba, cantaba, discutía.
+
+Yo tenía siete años y creía que el verano no terminaba nunca.
+
+Ahora el pueblo está casi vacío. Pero cuando cierro los ojos, todavía huele a la cocina de mi abuela.`,
+    glossary: {
+      'cuando': 'when',
+      'era': 'I / it was',
+      'niño': 'boy / child',
+      'pasábamos': 'we used to spend',
+      'veranos': 'summers',
+      'pueblo': 'village',
+      'hacía calor': 'it was hot',
+      'había': 'there was / were',
+      'jugábamos': 'we used to play',
+      'cocinaba': 'used to cook',
+      'cantaba': 'used to sing',
+      'discutía': 'used to argue',
+      'tenía': 'I had / was (age)',
+      'creía': 'I believed',
+      'terminaba': 'used to end',
+      'nunca': 'never',
+      'vacío': 'empty',
+      'cierro': 'I close',
+      'ojos': 'eyes',
+      'huele a': 'it smells of',
+    },
+  },
+  {
+    slug: 'la-tienda-de-mi-padre',
+    title: 'La tienda de mi padre',
+    emoji: '🏪',
+    minWeek: 10,
+    blurb: 'A shop that no longer exists, remembered in the imperfect.',
+    text: `Mi padre tenía una tienda pequeña en el centro. Vendía pan, leche, fruta — todo un poco.
+
+Abría a las siete y cerraba a las nueve. Trabajaba seis días a la semana.
+
+Yo iba después de la escuela. Le ayudaba con las cajas. Él siempre me daba una manzana.
+
+Conocía a todos los vecinos. La gente entraba solo para hablar.
+
+La tienda ya no existe. Ahora hay un banco. No es igual.`,
+    glossary: {
+      'tenía': 'had',
+      'vendía': 'sold',
+      'abría': 'used to open',
+      'cerraba': 'used to close',
+      'trabajaba': 'used to work',
+      'iba': 'used to go',
+      'escuela': 'school',
+      'ayudaba': 'used to help',
+      'cajas': 'boxes',
+      'daba': 'used to give',
+      'manzana': 'apple',
+      'conocía': 'knew',
+      'vecinos': 'neighbours',
+      'entraba': 'used to come in',
+      'para': 'in order to',
+      'ya no': 'no longer',
+      'existe': 'exists',
+      'igual': 'the same',
+    },
+  },
+  {
+    slug: 'la-noche-de-la-tormenta',
+    title: 'La noche de la tormenta',
+    emoji: '⛈️',
+    minWeek: 11,
+    blurb: 'The storm was the background. One phone call was the story.',
+    text: `Era noviembre y llovía sin parar. Yo estaba en casa, leía un libro y esperaba a mi hermana.
+
+De repente, se fue la luz. Toda la calle estaba oscura.
+
+Busqué una vela mientras el viento golpeaba la ventana. Entonces sonó el teléfono.
+
+Era mi hermana. Su coche no funcionaba y estaba a diez kilómetros.
+
+Salí en ese momento. Conduje despacio porque no veía nada. La encontré a la una de la mañana, tranquila, esperando bajo un árbol.
+
+Esa noche cambió algo entre nosotras.`,
+    glossary: {
+      'noviembre': 'November',
+      'llovía': 'it was raining',
+      'sin parar': 'without stopping',
+      'estaba': 'I was',
+      'esperaba': 'I was waiting for',
+      'de repente': 'suddenly',
+      'se fue la luz': 'the power went out',
+      'oscura': 'dark',
+      'busqué': 'I looked for',
+      'vela': 'candle',
+      'mientras': 'while',
+      'viento': 'wind',
+      'golpeaba': 'was beating',
+      'sonó': 'rang',
+      'funcionaba': 'was working',
+      'kilómetros': 'kilometres',
+      'conduje': 'I drove',
+      'despacio': 'slowly',
+      'porque': 'because',
+      'encontré': 'I found',
+      'bajo': 'under',
+      'árbol': 'tree',
+      'cambió': 'changed',
+      'entre': 'between',
+    },
+  },
+  {
+    slug: 'la-primera-vez-que-hable',
+    title: 'La primera vez que hablé',
+    emoji: '😅',
+    minWeek: 11,
+    blurb: 'The first real conversation in a new language, and how badly it went.',
+    text: `Estudiaba español desde hacía un año, pero nunca hablaba con nadie.
+
+Un día entré en una panadería. Había una señora mayor detrás del mostrador. Sonreía.
+
+Quería decir "quiero dos panes". Dije algo muy diferente. La señora me miró un momento y luego se rió.
+
+Mientras yo buscaba las palabras, ella esperaba con paciencia. Al final me dio el pan correcto.
+
+Salí rojo de vergüenza. Pero volví al día siguiente. Y otra vez. Ahora hablamos cada mañana.`,
+    glossary: {
+      'estudiaba': 'I had been studying',
+      'desde hacía': 'for (a period)',
+      'nadie': 'nobody',
+      'entré': 'I went into',
+      'panadería': 'bakery',
+      'mayor': 'older',
+      'detrás de': 'behind',
+      'mostrador': 'counter',
+      'sonreía': 'was smiling',
+      'quería': 'I wanted',
+      'decir': 'to say',
+      'dije': 'I said',
+      'diferente': 'different',
+      'se rió': 'she laughed',
+      'buscaba': 'I was searching for',
+      'paciencia': 'patience',
+      'al final': 'in the end',
+      'dio': 'gave',
+      'correcto': 'correct',
+      'vergüenza': 'embarrassment',
+      'volví': 'I went back',
+      'siguiente': 'following',
     },
   },
   {
@@ -418,6 +1223,40 @@ Al final, fue un viaje corto pero inolvidable. Espero que podamos volver a Sevil
     },
   },
   {
+    slug: 'vamos-a-ver-a-tu-madre',
+    title: 'Vamos a ver a tu madre',
+    emoji: '🚗',
+    minWeek: 12,
+    blurb: 'A weekend being planned, out loud, in the car.',
+    text: `— ¿Qué vamos a hacer este fin de semana?
+
+— Voy a ver a mi madre. Tengo que llevarle unas cosas.
+
+— ¿Vas a ir el sábado?
+
+— Sí. Vamos a salir temprano. Tengo que estar allí a las once.
+
+— Entonces yo voy a preparar la comida el viernes.
+
+— Perfecto. Y el domingo vamos a descansar. No voy a hacer absolutamente nada.
+
+— Eso dices siempre. Y siempre acabas trabajando.`,
+    glossary: {
+      'fin de semana': 'weekend',
+      'llevarle': 'to take her',
+      'unas': 'some',
+      'ir': 'to go',
+      'salir': 'to leave',
+      'estar': 'to be',
+      'preparar': 'to prepare',
+      'viernes': 'Friday',
+      'descansar': 'to rest',
+      'absolutamente': 'absolutely',
+      'dices': 'you say',
+      'acabas': 'you end up',
+    },
+  },
+  {
     slug: 'en-el-mercado',
     title: 'En el mercado',
     emoji: '🍎',
@@ -473,6 +1312,73 @@ Al final, gasté más de lo que pensaba, pero no me importó. Creo que la comida
       'aunque': 'even though',
       'cueste': 'it costs (subjunctive)',
       'que': 'than / that',
+    },
+  },
+  {
+    slug: 'me-encanta-el-domingo',
+    title: 'Me encanta el domingo',
+    emoji: '☀️',
+    minWeek: 13,
+    blurb: 'Likes, loves and one strong opinion about football.',
+    text: `Me encanta el domingo. Es mi día favorito.
+
+Me gusta levantarme tarde. Me gustan los desayunos largos, con café y música.
+
+A mi hermano le gusta el fútbol. A mí no. Prefiero leer o caminar.
+
+Odio los domingos por la tarde, la verdad. Siempre pienso en el lunes.
+
+Pero por la noche veo una película con mi familia. Me encantan las películas viejas. Esas sí me gustan.`,
+    glossary: {
+      'me encanta': 'I love',
+      'favorito': 'favourite',
+      'levantarme': 'to get up',
+      'desayunos': 'breakfasts',
+      'largos': 'long',
+      'fútbol': 'football',
+      'a mí': 'for me',
+      'prefiero': 'I prefer',
+      'caminar': 'to walk',
+      'odio': 'I hate',
+      'la verdad': 'honestly',
+      'pienso': 'I think',
+      'lunes': 'Monday',
+      'película': 'film',
+      'películas': 'films',
+      'esas': 'those',
+    },
+  },
+  {
+    slug: 'mi-rutina-imposible',
+    title: 'Mi rutina imposible',
+    emoji: '🏃',
+    minWeek: 13,
+    blurb: 'A morning routine that is far too optimistic.',
+    text: `Me despierto a las cinco y media. En teoría.
+
+En realidad, me levanto a las siete. Me ducho rápido, me visto, y no desayuno.
+
+Mi compañero se levanta a las seis. Corre, se ducha, prepara el desayuno y lee las noticias. Todo antes de las siete.
+
+No comprendo cómo lo hace. Yo apenas encuentro los zapatos.
+
+Por la noche me acuesto tarde y digo que mañana será diferente. Nunca lo es.`,
+    glossary: {
+      'me despierto': 'I wake up',
+      'en teoría': 'in theory',
+      'en realidad': 'in reality',
+      'me levanto': 'I get up',
+      'me ducho': 'I shower',
+      'rápido': 'quickly',
+      'me visto': 'I get dressed',
+      'compañero': 'flatmate / partner',
+      'corre': 'runs',
+      'prepara': 'prepares',
+      'apenas': 'barely',
+      'encuentro': 'I find',
+      'zapatos': 'shoes',
+      'me acuesto': 'I go to bed',
+      'será': 'will be',
     },
   },
   {
@@ -546,6 +1452,159 @@ Cuando llegué a casa, ya hacía sol. Típico — el día que compro un abrigo, 
     },
   },
   {
+    slug: 'cuatro-estaciones',
+    title: 'Cuatro estaciones',
+    emoji: '🍂',
+    minWeek: 14,
+    blurb: 'A year in one town, one season at a time.',
+    text: `En primavera llueve mucho aquí, pero todo está verde. Es mi estación favorita.
+
+En verano hace muchísimo calor. La gente sale solo por la noche. Las calles están vacías a las tres de la tarde.
+
+En otoño hace fresco y hay viento. Es cuando la ciudad es más bonita.
+
+En invierno hace frío y a veces nieva en la montaña. Nunca nieva en el centro.
+
+¿Qué tiempo hace hoy? Hace sol. Perfecto para salir.`,
+    glossary: {
+      'primavera': 'spring',
+      'verde': 'green',
+      'estación': 'season',
+      'verano': 'summer',
+      'muchísimo': 'a huge amount of',
+      'vacías': 'empty (f pl)',
+      'otoño': 'autumn',
+      'fresco': 'cool',
+      'viento': 'wind',
+      'invierno': 'winter',
+      'nieva': 'it snows',
+      'montaña': 'mountain',
+      'tiempo': 'weather',
+      'hace sol': 'it\'s sunny',
+    },
+  },
+  {
+    slug: 'la-lista-de-la-compra',
+    title: 'La lista de la compra',
+    emoji: '🛒',
+    minWeek: 14,
+    blurb: 'Shopping, prices and one small argument at the till.',
+    text: `Necesito comprar muchas cosas hoy. Tengo una lista.
+
+Primero voy al mercado. La fruta es más barata allí. Compro manzanas y algo de carne.
+
+Después voy a la tienda de ropa. Busco una camisa azul. ¿Qué talla usas? La mediana, creo.
+
+La camisa cuesta cuarenta euros. Es muy cara. Hay un descuento del veinte por ciento, así que pago treinta y dos.
+
+Pago con tarjeta. La calidad es buena, así que no importa el precio.`,
+    glossary: {
+      'lista': 'list',
+      'primero': 'first',
+      'barata': 'cheap (f)',
+      'algo de': 'some',
+      'después': 'afterwards',
+      'ropa': 'clothes',
+      'camisa': 'shirt',
+      'talla': 'size',
+      'usas': 'you use / wear',
+      'mediana': 'medium',
+      'cara': 'expensive (f)',
+      'descuento': 'discount',
+      'por ciento': 'percent',
+      'así que': 'so',
+      'treinta': 'thirty',
+      'tarjeta': 'card',
+      'calidad': 'quality',
+      'no importa': 'it doesn\'t matter',
+      'precio': 'price',
+    },
+  },
+  {
+    slug: 'una-habitacion-con-vistas',
+    title: 'Una habitación con vistas',
+    emoji: '🏨',
+    minWeek: 15,
+    blurb: 'Checking into a hotel that isn\'t quite what was promised.',
+    text: `Buenas tardes. Tengo una reserva a nombre de Ramos.
+
+Sí, aquí está. Una habitación doble para tres noches. ¿Su pasaporte, por favor?
+
+Aquí tiene. ¿La habitación tiene vistas al mar?
+
+Tiene vistas… al patio. Lo siento. Las habitaciones con vistas están todas ocupadas.
+
+Entiendo. ¿Y el desayuno está incluido?
+
+Sí, de siete a diez. El ascensor está a la derecha. Habitación doscientos cuatro.
+
+Gracias. Una última cosa: ¿hay wifi?
+
+Claro. La contraseña está en la mesa de la habitación.`,
+    glossary: {
+      'reserva': 'reservation',
+      'a nombre de': 'in the name of',
+      'habitación': 'room',
+      'doble': 'double',
+      'pasaporte': 'passport',
+      'vistas': 'views',
+      'mar': 'sea',
+      'patio': 'courtyard',
+      'lo siento': 'I\'m sorry',
+      'ocupadas': 'occupied',
+      'entiendo': 'I understand',
+      'incluido': 'included',
+      'ascensor': 'lift',
+      'doscientos': 'two hundred',
+      'última': 'last',
+      'contraseña': 'password',
+    },
+  },
+  {
+    slug: 'me-duele-todo',
+    title: 'Me duele todo',
+    emoji: '🩺',
+    minWeek: 15,
+    blurb: 'A visit to the doctor, and some very unwelcome advice.',
+    text: `Buenos días, doctora. No me siento bien.
+
+¿Qué le pasa exactamente?
+
+Me duele la cabeza desde hace tres días. Y estoy muy cansado.
+
+¿Duerme bien?
+
+No mucho. Trabajo hasta muy tarde y luego no puedo dormir.
+
+¿Y bebe mucho café?
+
+Seis o siete al día, más o menos.
+
+Ah. Entonces ya sabemos el problema. Beba agua, no café. Y acuéstese antes de medianoche.
+
+¿No hay una pastilla?
+
+La pastilla se llama "dormir". Es gratis.`,
+    glossary: {
+      'me siento': 'I feel',
+      'le pasa': 'is wrong with you',
+      'exactamente': 'exactly',
+      'me duele': 'it hurts me',
+      'cabeza': 'head',
+      'desde hace': 'for (a period)',
+      'duerme': 'do you sleep',
+      'puedo': 'I can',
+      'más o menos': 'more or less',
+      'sabemos': 'we know',
+      'problema': 'problem',
+      'beba': 'drink (formal command)',
+      'acuéstese': 'go to bed (formal command)',
+      'medianoche': 'midnight',
+      'pastilla': 'pill',
+      'gratis': 'free',
+    },
+  },
+  {
     slug: 'la-ciudad-perfecta',
     title: 'La ciudad perfecta',
     emoji: '🏙️',
@@ -613,6 +1672,40 @@ Al final, para mí la ciudad perfecta depende de lo que buscas: para trabajar, M
     },
   },
   {
+    slug: 'mejor-que-antes',
+    title: 'Mejor que antes',
+    emoji: '⚖️',
+    minWeek: 16,
+    blurb: 'Two cities compared, and one clear winner.',
+    text: `Vivo en una ciudad más pequeña que antes. Es diferente, pero creo que es mejor.
+
+Madrid era más grande, más rápida, más cara. Había más trabajo, sí, pero también más estrés.
+
+Aquí todo es más lento. El alquiler es menos caro. La gente es tan amable como en el pueblo de mi abuela.
+
+Mi hermano dice que esta ciudad es la peor de España porque no hay nada que hacer. Él es mayor que yo y prefiere el ruido.
+
+Para mí, es el mejor sitio donde he vivido. Menos interesante, quizás. Pero mucho más tranquilo.`,
+    glossary: {
+      'más que': 'more than',
+      'mejor': 'better',
+      'rápida': 'fast (f)',
+      'estrés': 'stress',
+      'lento': 'slow',
+      'alquiler': 'rent',
+      'menos': 'less',
+      'tan… como': 'as… as',
+      'peor': 'worst',
+      'nada que hacer': 'nothing to do',
+      'mayor': 'older',
+      'ruido': 'noise',
+      'sitio': 'place',
+      'he vivido': 'I have lived',
+      'interesante': 'interesting',
+      'quizás': 'perhaps',
+    },
+  },
+  {
     slug: 'si-tuviera-mas-tiempo',
     title: 'Si tuviera más tiempo',
     emoji: '💭',
@@ -666,6 +1759,173 @@ Sin embargo, sé que estas son solo fantasías. Por ahora, tengo que concentrarm
       'cambien': 'change (subjunctive)',
       'pueda': 'I can (subjunctive)',
       'quiero': 'I want',
+    },
+  },
+  {
+    slug: 'ahora-mismo-en-la-plaza',
+    title: 'Ahora mismo en la plaza',
+    emoji: '🎪',
+    minWeek: 17,
+    blurb: 'A square at seven in the evening, described as it happens.',
+    text: `Son las siete y la plaza está llena. Estoy sentado en un banco, mirando.
+
+Un hombre está tocando la guitarra. Nadie le está escuchando, pero él sigue tocando.
+
+Dos niños están corriendo entre las mesas. Su madre les está llamando y ellos no le hacen caso.
+
+En el café de la esquina, un camarero está limpiando las mesas. Está cansado, se ve.
+
+Está empezando a llover. La gente está recogiendo sus cosas.
+
+Yo todavía estoy aquí, escribiendo esto. Ya casi no queda nadie.`,
+    glossary: {
+      'plaza': 'square',
+      'llena': 'full (f)',
+      'sentado': 'sitting',
+      'banco': 'bench',
+      'hombre': 'man',
+      'tocando': 'playing',
+      'guitarra': 'guitar',
+      'sigue': 'carries on',
+      'corriendo': 'running',
+      'llamando': 'calling',
+      'hacen caso': 'pay attention',
+      'limpiando': 'cleaning',
+      'se ve': 'you can tell',
+      'empezando': 'starting',
+      'llover': 'to rain',
+      'recogiendo': 'gathering up',
+      'escribiendo': 'writing',
+      'queda': 'remains',
+    },
+  },
+  {
+    slug: 'donde-lo-puse',
+    title: '¿Dónde lo puse?',
+    emoji: '🔑',
+    minWeek: 17,
+    blurb: 'Looking for keys. Every noun replaced by a pronoun.',
+    text: `No encuentro mis llaves. Las tenía esta mañana, estoy seguro.
+
+¿Las has visto?
+
+No, no las he visto. ¿Miraste en la chaqueta?
+
+La miré dos veces. No están.
+
+¿Y el bolso? A veces las pones ahí y luego no te acuerdas.
+
+Lo miré también… Espera. Aquí están. Estaban debajo del periódico.
+
+Te lo dije. Siempre las dejas en el mismo sitio y nunca lo recuerdas.
+
+No me lo digas. Ya lo sé.`,
+    glossary: {
+      'encuentro': 'I find',
+      'llaves': 'keys',
+      'seguro': 'sure',
+      'has visto': 'have you seen',
+      'he visto': 'I have seen',
+      'miraste': 'did you look',
+      'chaqueta': 'jacket',
+      'miré': 'I looked at',
+      'bolso': 'bag',
+      'pones': 'you put',
+      'ahí': 'there',
+      'te acuerdas': 'you remember',
+      'espera': 'wait',
+      'debajo de': 'under',
+      'periódico': 'newspaper',
+      'dejas': 'you leave',
+      'mismo': 'same',
+      'recuerdas': 'you remember',
+      'digas': 'say (subjunctive)',
+    },
+  },
+  {
+    slug: 'nunca-he-estado-alli',
+    title: 'Nunca he estado allí',
+    emoji: '✈️',
+    minWeek: 18,
+    blurb: 'Two people compare what they have and haven\'t done.',
+    text: `¿Has estado alguna vez en Argentina?
+
+Nunca. Todavía no he salido de Europa, la verdad.
+
+Yo he estado dos veces. He visto cosas increíbles allí.
+
+¿Has comido carne argentina de verdad?
+
+He comido en un restaurante argentino aquí, pero no es igual. Todo el mundo me lo dice.
+
+Ha sido el mejor viaje de mi vida. He hecho muchos viajes, pero ese fue especial.
+
+Este año no he ido a ninguna parte. He trabajado demasiado.
+
+Eso lo he oído antes.`,
+    glossary: {
+      'has estado': 'have you been',
+      'alguna vez': 'ever',
+      'he salido': 'I have left',
+      'he visto': 'I have seen',
+      'increíbles': 'incredible',
+      'has comido': 'have you eaten',
+      'argentina': 'Argentinian',
+      'ha sido': 'it has been',
+      'he hecho': 'I have done',
+      'especial': 'special',
+      'ninguna parte': 'nowhere',
+      'he trabajado': 'I have worked',
+      'he oído': 'I have heard',
+    },
+  },
+  {
+    slug: 'por-favor-espere',
+    title: 'Por favor, espere',
+    emoji: '🏛️',
+    minWeek: 18,
+    blurb: 'An office, a queue, and a lot of formal commands.',
+    text: `Buenos días. Pase, por favor. Siéntese.
+
+Gracias.
+
+Dígame, ¿en qué puedo ayudarle?
+
+Necesito renovar mi documento.
+
+Muy bien. Rellene este formulario. Escriba su nombre completo aquí y firme abajo.
+
+¿Y la foto?
+
+Déjela con el formulario. Y no se preocupe por la fecha, la ponemos nosotros.
+
+Perfecto.
+
+Espere un momento, por favor. Tome asiento. Le llamamos en diez minutos.
+
+Y por favor, no fume aquí dentro.`,
+    glossary: {
+      'pase': 'come in (formal)',
+      'siéntese': 'sit down (formal)',
+      'dígame': 'tell me (formal)',
+      'puedo': 'can I',
+      'ayudarle': 'help you',
+      'renovar': 'to renew',
+      'documento': 'document',
+      'rellene': 'fill in (formal)',
+      'formulario': 'form',
+      'escriba': 'write (formal)',
+      'completo': 'full',
+      'firme': 'sign (formal)',
+      'abajo': 'below',
+      'déjela': 'leave it (formal)',
+      'no se preocupe': 'don\'t worry (formal)',
+      'fecha': 'date',
+      'ponemos': 'we put',
+      'espere': 'wait (formal)',
+      'tome asiento': 'take a seat',
+      'no fume': 'don\'t smoke (formal)',
+      'dentro': 'inside',
     },
   },
   {
@@ -741,6 +2001,125 @@ Creo que, si todos fuéramos un poco más amables con nosotros mismos, seríamos
     },
   },
   {
+    slug: 'si-tuviera-una-casa',
+    title: 'Si tuviera una casa',
+    emoji: '🏡',
+    minWeek: 19,
+    blurb: 'An imaginary house, built entirely out of conditionals.',
+    text: `Si tuviera dinero, compraría una casa pequeña cerca del mar.
+
+No sería grande. Tendría dos habitaciones, una cocina con ventanas grandes, y una mesa larga para mucha gente.
+
+Me levantaría temprano. Escribiría por la mañana y caminaría por la tarde.
+
+Invitaría a mis amigos en verano. Cocinaríamos juntos y hablaríamos hasta muy tarde.
+
+¿Sería feliz? Creo que sí. Pero quizás me aburriría después de un año.
+
+Deberías comprarla igualmente, dice mi hermana. Podrías venderla si no te gusta.`,
+    glossary: {
+      'si': 'if',
+      'tuviera': 'I had (subjunctive)',
+      'compraría': 'I would buy',
+      'sería': 'it would be',
+      'tendría': 'it would have',
+      'habitaciones': 'bedrooms',
+      'larga': 'long (f)',
+      'me levantaría': 'I would get up',
+      'escribiría': 'I would write',
+      'caminaría': 'I would walk',
+      'invitaría': 'I would invite',
+      'cocinaríamos': 'we would cook',
+      'juntos': 'together',
+      'hablaríamos': 'we would talk',
+      'me aburriría': 'I would get bored',
+      'deberías': 'you should',
+      'igualmente': 'anyway',
+      'podrías': 'you could',
+      'venderla': 'sell it',
+    },
+  },
+  {
+    slug: 'ojala-llegue-a-tiempo',
+    title: 'Ojalá llegue a tiempo',
+    emoji: '🤞',
+    minWeek: 19,
+    blurb: 'Someone waiting at an airport, hoping out loud.',
+    text: `Espero que el avión llegue a tiempo. Ojalá no haya retraso.
+
+Mi madre quiere que la llame cuando aterrice. Es importante que sepa que estoy bien.
+
+Espero que mi hermano venga a buscarme. Le dije que no era necesario, pero quiero que venga igualmente.
+
+Ojalá tengamos suerte con el tiempo. No quiero que llueva el primer día.
+
+Es importante que descanse esta noche. Mañana empieza todo.
+
+Y ojalá que hable español mejor al final de este viaje.`,
+    glossary: {
+      'espero que': 'I hope that',
+      'avión': 'plane',
+      'llegue': 'arrives (subjunctive)',
+      'a tiempo': 'on time',
+      'ojalá': 'I hope / if only',
+      'haya': 'there is (subjunctive)',
+      'retraso': 'delay',
+      'llame': 'I call (subjunctive)',
+      'aterrice': 'it lands (subjunctive)',
+      'sepa': 'she knows (subjunctive)',
+      'venga': 'comes (subjunctive)',
+      'buscarme': 'to pick me up',
+      'necesario': 'necessary',
+      'tengamos': 'we have (subjunctive)',
+      'suerte': 'luck',
+      'llueva': 'it rains (subjunctive)',
+      'descanse': 'I rest (subjunctive)',
+      'hable': 'I speak (subjunctive)',
+    },
+  },
+  {
+    slug: 'si-pudiera-volver',
+    title: 'Si pudiera volver',
+    emoji: '🕰️',
+    minWeek: 20,
+    blurb: 'Regret, advice and one very direct piece of it.',
+    text: `Si pudiera volver atrás, haría las cosas de otra manera.
+
+Si hablara con mi yo de veinte años, le diría tres cosas.
+
+Primero: no tengas miedo. Ojalá alguien me lo hubiera dicho entonces.
+
+Segundo: no hables tanto y escucha más. Si escuchara más, aprendería el doble.
+
+Y tercero: si fuera tú, empezaría hoy. No mañana.
+
+Mi abuelo me dijo algo parecido una vez. Yo no le hice caso. Si le hubiera escuchado, todo habría sido más fácil.
+
+Así que: no esperes. No busques el momento perfecto. No existe.`,
+    glossary: {
+      'pudiera': 'I could (subjunctive)',
+      'volver atrás': 'to go back',
+      'de otra manera': 'differently',
+      'hablara': 'I spoke (subjunctive)',
+      'diría': 'I would say',
+      'no tengas': 'don\'t have',
+      'miedo': 'fear',
+      'hubiera dicho': 'had said',
+      'segundo': 'second',
+      'no hables': 'don\'t talk',
+      'escuchara': 'I listened (subjunctive)',
+      'el doble': 'twice as much',
+      'tercero': 'third',
+      'fuera': 'I were',
+      'empezaría': 'I would start',
+      'parecido': 'similar',
+      'hice caso': 'I paid attention',
+      'habría sido': 'would have been',
+      'no esperes': 'don\'t wait',
+      'no busques': 'don\'t look for',
+    },
+  },
+  {
     slug: 'una-decision-dificil',
     title: 'Una decisión difícil',
     emoji: '⚖️',
@@ -807,6 +2186,49 @@ Al final, creo que la decisión depende de lo que valore más: la seguridad de l
       'decidido': 'decided',
       'elegir': 'to choose',
       'pronto': 'soon',
+    },
+  },
+  {
+    slug: 'la-carta-al-futuro',
+    title: 'La carta al futuro',
+    emoji: '🔮',
+    minWeek: 21,
+    blurb: 'A letter written to yourself, ten years out.',
+    text: `Querido yo del futuro:
+
+Cuando leas esto, tendrás treinta y cinco años. Espero que estés bien.
+
+¿Hablarás español todavía? Creo que sí. Habrás vivido en España, o quizás en México.
+
+Tendrás un trabajo que te gustará. No será fácil, pero será tuyo.
+
+Verás a la familia más a menudo. Eso lo prometo. Iré más veces, aunque el vuelo sea caro.
+
+Algún día escribirás algo importante. No sé qué. Pero lo harás.
+
+Y si no, tampoco pasa nada. Estarás bien igualmente.
+
+Hasta pronto.`,
+    glossary: {
+      'querido': 'dear',
+      'leas': 'you read (subjunctive)',
+      'tendrás': 'you will have',
+      'estés': 'you are (subjunctive)',
+      'hablarás': 'you will speak',
+      'habrás vivido': 'you will have lived',
+      'gustará': 'will please',
+      'tuyo': 'yours',
+      'verás': 'you will see',
+      'a menudo': 'often',
+      'prometo': 'I promise',
+      'iré': 'I will go',
+      'aunque': 'even though',
+      'vuelo': 'flight',
+      'sea': 'is (subjunctive)',
+      'escribirás': 'you will write',
+      'harás': 'you will do',
+      'tampoco': 'neither',
+      'pasa nada': 'it matters',
     },
   },
   {
@@ -901,6 +2323,169 @@ No sé todavía si conseguiré el puesto, pero salí de la entrevista sintiéndo
       'emocionada': 'excited',
       'futuro': 'future',
       'profesional': 'professional',
+    },
+  },
+  {
+    slug: 'la-entrevista',
+    title: 'La entrevista',
+    emoji: '💼',
+    minWeek: 22,
+    blurb: 'Twenty minutes of nerves, described honestly.',
+    text: `Esta mañana estaba tan nervioso que no pude desayunar.
+
+Llegué media hora antes. Me senté fuera y esperé. Estaba preocupado por todo: la ropa, las preguntas, mi acento.
+
+Cuando entré, la mujer me sonrió y me sentí un poco mejor. Me preguntó por qué quería el trabajo. Le dije la verdad.
+
+En un momento me quedé en blanco. No me salían las palabras. Ella esperó. No pasó nada.
+
+Al salir estaba emocionado y agotado a la vez. No sé si me darán el trabajo.
+
+Pero estoy orgulloso de haber ido. Hace un año no habría entrado por esa puerta.`,
+    glossary: {
+      'nervioso': 'nervous',
+      'pude': 'I could',
+      'me senté': 'I sat down',
+      'esperé': 'I waited',
+      'preocupado': 'worried',
+      'preguntas': 'questions',
+      'acento': 'accent',
+      'mujer': 'woman',
+      'sonrió': 'smiled',
+      'me sentí': 'I felt',
+      'preguntó': 'asked',
+      'quedé en blanco': 'went blank',
+      'no me salían': 'wouldn\'t come out',
+      'emocionado': 'excited',
+      'agotado': 'exhausted',
+      'a la vez': 'at the same time',
+      'darán': 'they will give',
+      'orgulloso': 'proud',
+      'haber ido': 'having gone',
+      'habría entrado': 'would have gone in',
+      'puerta': 'door',
+    },
+  },
+  {
+    slug: 'no-te-preocupes',
+    title: 'No te preocupes',
+    emoji: '🫂',
+    minWeek: 22,
+    blurb: 'One friend talking another down from a bad evening.',
+    text: `¿Estás bien? Te veo rara.
+
+Estoy enfadada. Y triste. Y no sé por qué.
+
+No te preocupes. A veces pasa.
+
+Me siento tonta. Todo el mundo parece tranquilo y yo no.
+
+Eso no es verdad. Todo el mundo lo parece. Es diferente.
+
+Supongo que sí.
+
+Mira, siéntate. ¿Quieres un té?
+
+Sí. Gracias por escuchar.
+
+Siempre. Y mañana nos reímos de esto, ya verás.
+
+Quizás. Hoy no, pero quizás mañana.`,
+    glossary: {
+      'rara': 'odd (f)',
+      'enfadada': 'angry (f)',
+      'triste': 'sad',
+      'no te preocupes': 'don\'t worry',
+      'tonta': 'silly (f)',
+      'todo el mundo': 'everyone',
+      'parece': 'seems',
+      'supongo': 'I suppose',
+      'siéntate': 'sit down',
+      'escuchar': 'listening',
+      'nos reímos': 'we\'ll laugh',
+      'ya verás': 'you\'ll see',
+    },
+  },
+  {
+    slug: 'el-hombre-del-tren',
+    title: 'El hombre del tren',
+    emoji: '🚉',
+    minWeek: 23,
+    blurb: 'A short story with a proper ending. Everything you\'ve learned, working together.',
+    text: `Resulta que aquel día perdí el tren por dos minutos. Dos.
+
+Mientras esperaba el siguiente, se sentó a mi lado un hombre mayor con un sombrero viejo. No dijo nada durante veinte minutos.
+
+De repente me preguntó si yo era extranjero. Le dije que sí. Sonrió y empezó a hablar.
+
+Me contó que había trabajado cuarenta años en los trenes. Que había visto de todo. Que su mujer había muerto en marzo y que ya no sabía qué hacer con los días.
+
+Mientras tanto llegó mi tren. No me subí.
+
+En ese momento me di cuenta de que perder aquel tren había sido lo mejor del viaje. Hablamos dos horas. Nunca supe su nombre.
+
+Fue un día inolvidable, y todavía es mi mejor recuerdo de aquel verano.`,
+    glossary: {
+      'resulta que': 'it turns out that',
+      'aquel': 'that (distant)',
+      'siguiente': 'next',
+      'se sentó': 'sat down',
+      'a mi lado': 'next to me',
+      'sombrero': 'hat',
+      'durante': 'for / during',
+      'extranjero': 'foreigner',
+      'empezó': 'began',
+      'contó': 'told',
+      'había trabajado': 'had worked',
+      'había visto': 'had seen',
+      'de todo': 'everything',
+      'había muerto': 'had died',
+      'marzo': 'March',
+      'mientras tanto': 'meanwhile',
+      'me subí': 'I got on',
+      'me di cuenta': 'I realised',
+      'perder': 'missing',
+      'supe': 'I found out',
+      'inolvidable': 'unforgettable',
+      'recuerdo': 'memory',
+    },
+  },
+  {
+    slug: 'la-carta-de-mi-abuelo',
+    title: 'La carta de mi abuelo',
+    emoji: '📜',
+    minWeek: 23,
+    blurb: 'A letter found in a drawer, forty years late.',
+    text: `El mes pasado, mientras vaciaba la casa de mi abuelo, encontré una carta en un cajón.
+
+Estaba escrita en 1978 y nunca la había mandado. Era para mi abuela.
+
+En ella le decía cosas que yo nunca le oí decir en voz alta. Que la echaba de menos. Que sentía no haber hablado más.
+
+Me senté en el suelo y la leí tres veces. Fuera estaba lloviendo.
+
+Resulta que las personas que parecen más calladas a veces guardan más cosas dentro.
+
+Por fin entendí a mi abuelo, cuarenta años tarde. Le he dado la carta a mi madre. Ella todavía no la ha abierto.`,
+    glossary: {
+      'mes': 'month',
+      'vaciaba': 'I was emptying',
+      'cajón': 'drawer',
+      'escrita': 'written',
+      'había mandado': 'had sent',
+      'decía': 'said',
+      'oí': 'I heard',
+      'en voz alta': 'out loud',
+      'echaba de menos': 'missed',
+      'sentía': 'regretted',
+      'suelo': 'floor',
+      'fuera': 'outside',
+      'calladas': 'quiet (f pl)',
+      'guardan': 'keep',
+      'dentro': 'inside',
+      'entendí': 'I understood',
+      'he dado': 'I have given',
+      'ha abierto': 'has opened',
     },
   },
   {
@@ -1006,6 +2591,52 @@ Si pudiera darle un consejo a la persona que empezó este curso hace seis meses,
       'se termina': 'finishes',
       'de aprender': 'of learning',
       'del todo': 'completely',
+    },
+  },
+  {
+    slug: 'lo-que-diria-ahora',
+    title: 'Lo que diría ahora',
+    emoji: '🎤',
+    minWeek: 24,
+    blurb: 'Looking back at a year of learning — and what it was actually for.',
+    text: `Hace un año no podía decir ni una frase completa en español.
+
+Me acuerdo de la primera lección. Aprendí "hola" y "gracias" y creía que ya era mucho.
+
+Durante meses no vi ningún progreso. Estudiaba, olvidaba, volvía a estudiar. Había días en los que quería dejarlo.
+
+Pero seguí. Y un día, en una tienda, entendí una conversación entera sin pensar. No la traduje. Simplemente la entendí.
+
+Si alguien me preguntara ahora qué he aprendido, no hablaría de gramática. Diría que he aprendido a no tener miedo de sonar tonto.
+
+Todavía cometo errores cada día. Seguiré cometiéndolos. Pero ahora los cometo hablando, no callado.
+
+Y eso, al final, era todo lo que necesitaba.`,
+    glossary: {
+      'hace un año': 'a year ago',
+      'ni': 'not even',
+      'frase': 'sentence',
+      'me acuerdo': 'I remember',
+      'lección': 'lesson',
+      'aprendí': 'I learned',
+      'meses': 'months',
+      'ningún': 'any',
+      'progreso': 'progress',
+      'olvidaba': 'I forgot',
+      'dejarlo': 'to quit',
+      'seguí': 'I carried on',
+      'entera': 'whole (f)',
+      'sin': 'without',
+      'traduje': 'I translated',
+      'simplemente': 'simply',
+      'preguntara': 'asked (subjunctive)',
+      'gramática': 'grammar',
+      'sonar': 'to sound',
+      'cometo': 'I make (errors)',
+      'errores': 'mistakes',
+      'seguiré': 'I will carry on',
+      'callado': 'silent',
+      'necesitaba': 'I needed',
     },
   },
 ];

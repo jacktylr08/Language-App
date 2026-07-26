@@ -19,6 +19,31 @@ describe('READINGS content', () => {
     expect(weeks).toEqual(sorted);
   });
 
+  it('gives every course week something to read', () => {
+    // Extensive reading only works on volume — that's the whole premise of
+    // the model this is built on. Eight of the 24 weeks used to have no
+    // passage at all, so a learner hit a wall and the habit broke.
+    const weeks = new Set(READINGS.map((r) => r.minWeek));
+    const empty = [];
+    for (let w = 1; w <= 24; w++) if (!weeks.has(w)) empty.push(w);
+    expect(empty).toEqual([]);
+  });
+
+  it('keeps enough reading volume for the habit to be worth having', () => {
+    // The module shipped with 16 passages / ~1,800 Spanish words — about
+    // fifteen minutes of reading across a six-month course.
+    const words = READINGS.reduce((n, r) => n + r.text.split(/\s+/).filter(Boolean).length, 0);
+    expect(READINGS.length).toBeGreaterThanOrEqual(50);
+    expect(words).toBeGreaterThanOrEqual(4000);
+  });
+
+  it('glosses enough of each passage to be readable without a dictionary', () => {
+    // A passage whose unknown words aren't glossed isn't extensive reading,
+    // it's a translation exercise.
+    const thin = READINGS.filter((r) => Object.keys(r.glossary ?? {}).length < 8).map((r) => r.slug);
+    expect(thin).toEqual([]);
+  });
+
   it('getReading resolves a real slug and returns undefined for an unknown one', () => {
     expect(getReading(READINGS[0].slug)?.title).toBe(READINGS[0].title);
     expect(getReading('not-a-real-slug')).toBeUndefined();
