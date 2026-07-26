@@ -1,0 +1,73 @@
+name: Database backup
+
+# A nightly off-site copy of the learner database, in addition to Railway's
+# own managed backups (see DEPLOYMENT.md — that stays the primary). This one
+# exists so a backup survives losing access to the Railway project itself.
+#
+# It is opt-in: without both secrets configured the job skips rather than
+# failing, so a fork or a fresh clone doesn't show a permanently red workflow.
+#
+# Required repository secrets:
+#   BACKUP_DATABASE_URL      connection string for the production database
+#   BACKUP_ENCRYPTION_KEY    passphrase the dump is encrypted with. Keep a
+#                            copy somewhere OUTSIDE GitHub — an artifact you
+#                            can't decrypt is not a backup.
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # 03:17 UTC daily
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the backup secrets are configured
+        id: check
+        run: |
+          if [ -z "${{ secrets.BACKUP_DATABASE_URL }}" ] || [ -z "${{ secrets.BACKUP_ENCRYPTION_KEY }}" ]; then
+            echo "Backup secrets are not set — skipping. See .github/workflows/backup.yml."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.configured == 'true'
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+        if: steps.check.outputs.configured == 'true'
+
+      - name: Take the backup
+        if: steps.check.outputs.configured == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_DIR: ${{ github.workspace }}/backup-out
+        run: npx tsx scripts/backup-db.ts
+
+      - name: Verify the backup can actually be read back
+        # A backup nobody has ever opened is a guess. This decrypts it and
+        # checks the payload against its manifest before we call the job green.
+        if: steps.check.outputs.configured == 'true'
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: npx tsx scripts/restore-db.ts "$(ls -1 ${{ github.workspace }}/backup-out/* | head -1)"
+
+      - name: Upload the encrypted backup
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fluenta-db-backup-${{ github.run_id }}
+          path: ${{ github.workspace }}/backup-out/*
+          retention-days: 90

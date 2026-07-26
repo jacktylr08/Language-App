@@ -247,6 +247,88 @@ npm run db:seed
 
 ---
 
+## Backups
+
+Learner progress lives in Postgres (`user_state`), so the database *is* the
+product. Three layers, in order of what you should reach for first:
+
+| Layer | Protects against | How to recover |
+| --- | --- | --- |
+| `user_state_history` (last 20 versions per learner) | A bad *write* — one device overwriting good progress | `backend/scripts/recover-account.ts` |
+| Railway managed backups | Losing the database | Restore the snapshot in the Railway dashboard |
+| Nightly encrypted dump (GitHub Actions) | Losing access to Railway itself | `npm run db:restore <file> --apply` |
+
+### 1. Turn on Railway managed backups (do this first)
+
+Railway → your project → the Postgres service → **Backups** → enable daily
+backups. This is the primary safety net and needs no code. Do it before you
+let anyone but yourself sign up.
+
+### 2. Off-site nightly dump
+
+`.github/workflows/backup.yml` runs `scripts/backup-db.ts` every night,
+encrypts the dump, and keeps it as a GitHub Actions artifact for 90 days. It
+skips itself until you set two repository secrets (Settings → Secrets and
+variables → Actions):
+
+- `BACKUP_DATABASE_URL` — the production connection string
+- `BACKUP_ENCRYPTION_KEY` — a long random passphrase
+
+**Store `BACKUP_ENCRYPTION_KEY` somewhere outside GitHub too** (a password
+manager). A backup you can't decrypt isn't a backup.
+
+The dump is AES-256-GCM encrypted because it contains every learner's email
+address and bcrypt password hash. The workflow decrypts and verifies each
+backup before it reports success, so a silently-corrupt archive fails the
+job rather than sitting there looking fine.
+
+### Taking a backup by hand
+
+```bash
+cd backend
+BACKUP_ENCRYPTION_KEY=... railway run npx tsx scripts/backup-db.ts --stdout \
+  > fluenta-$(date +%F).json.gz.enc
+```
+
+Without `--stdout` it writes into `BACKUP_DIR` (default `./backups`) and
+prunes anything older than `BACKUP_RETENTION_DAYS` (default 30), never
+deleting the last remaining file.
+
+### Restoring
+
+`restore-db.ts` is read-only until you pass `--apply`, and it only ever adds
+rows back — it never deletes a row that exists now and isn't in the backup.
+
+```bash
+# Inspect the file and check it against its own manifest (no DB needed)
+npm run db:restore -- fluenta-2026-07-26.json.gz.enc
+
+# Compare it against the live database, still writing nothing
+DATABASE_URL=... npm run db:restore -- fluenta-2026-07-26.json.gz.enc
+
+# Actually restore
+DATABASE_URL=... npm run db:restore -- fluenta-2026-07-26.json.gz.enc --apply
+
+# Or put back just one learner (their account, state, and history)
+DATABASE_URL=... npm run db:restore -- fluenta-2026-07-26.json.gz.enc \
+  --user someone@example.com --apply
+```
+
+Restores are idempotent (upsert on the primary key), so running one twice is
+harmless. Refresh tokens are deliberately *not* restored — resurrecting old
+sessions would revive credentials a learner may have signed out of since.
+
+Restore into a database at the same schema version as the backup (the file
+records the last applied migration and the script prints it). If the schema
+has moved on, run `npm run db:migrate` first, then restore.
+
+### Practise it
+
+Restore last night's backup into a scratch database at least once, before you
+need to. An untested backup is an assumption.
+
+---
+
 ## Frontend Mobile Setup
 
 The app is now a **Progressive Web App (PWA)** with:

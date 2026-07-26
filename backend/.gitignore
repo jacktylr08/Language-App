@@ -14,3 +14,9 @@ logs/
 coverage/
 .nyc_output/
 pnpm-lock.yaml
+
+# Database dumps written by scripts/backup-db.ts — never commit learner data,
+# encrypted or otherwise.
+backups/
+fluenta-*.json.gz
+fluenta-*.json.gz.enc

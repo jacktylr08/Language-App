@@ -13,6 +13,8 @@
     "db:seed:dev": "knex seed:run --env development",
     "db:rollback": "knex migrate:rollback --env production",
     "reset-password": "tsx scripts/reset-password.ts",
+    "db:backup": "tsx scripts/backup-db.ts",
+    "db:restore": "tsx scripts/restore-db.ts",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
