@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import bcryptjs from 'bcryptjs';
 import crypto from 'crypto';
 import { User } from '@/models/User';
@@ -17,8 +17,16 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || FALLBACK_JWT_SECRET;
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
-const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '30d';
+/**
+ * Typed as SignOptions['expiresIn'] rather than string. jsonwebtoken's types
+ * accept a `StringValue` template literal ("7d", "30m", …) or a number, not
+ * an arbitrary string, so a plain `string` fails every jwt.sign overload —
+ * which is why `tsc --noEmit` had never been clean here. The env var is
+ * genuinely a string, so the assertion is the honest way to say "this is a
+ * duration and the caller is responsible for it being well-formed".
+ */
+const JWT_EXPIRY = (process.env.JWT_EXPIRY || '7d') as SignOptions['expiresIn'];
+const JWT_REFRESH_EXPIRY = (process.env.JWT_REFRESH_EXPIRY || '30d') as SignOptions['expiresIn'];
 
 // Fallback lifetime used only if a freshly-signed refresh JWT's `exp` claim
 // can't be read back out (should never happen) — keeps the DB record's

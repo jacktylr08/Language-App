@@ -65,7 +65,18 @@ export interface CurriculumLesson {
   tip: string;
   vocab: VocabItem[];
   /** Sentences used for fill-in-the-blank exercises. `blank` must appear in `es`. */
-  sentences: Array<{ es: string; en: string; blank: string }>;
+  /**
+   * Sentences used for fill-in-the-blank exercises. `blank` must appear in
+   * `es` verbatim (asserted by curriculum-integrity.test.ts).
+   *
+   * `wordId` names the vocab item the blank actually tests. Without it the
+   * engine guessed by substring match and fell back to the lesson's FIRST
+   * word when the guess failed — feeding a right/wrong answer to FSRS
+   * against a word the learner was never asked about. Omit it and the
+   * exercise simply doesn't record a result, which is honest; a wrong
+   * attribution is not.
+   */
+  sentences: Array<{ es: string; en: string; blank: string; wordId?: string }>;
   /** Teaching slides shown and explained before/while practising */
   grammar?: GrammarSlide[];
   /** Understanding questions with explanations */
@@ -218,7 +229,7 @@ export const curriculum: CurriculumLesson[] = [
       { es: 'Mi hermano se llama Carlos.', en: 'My brother is called Carlos.', blank: 'se llama' },
       { es: 'Mi abuela vive con nosotros.', en: 'My grandmother lives with us.', blank: 'abuela' },
       { es: 'Mi familia es pequeña.', en: 'My family is small.', blank: 'familia' },
-      { es: 'Ella tiene treinta años.', en: 'She is thirty years old.', blank: 'años' },
+      { es: 'Ella tiene treinta años.', en: 'She is thirty years old.', blank: 'años', wordId: 'anos' },
     ],
   },
   {
@@ -250,7 +261,7 @@ export const curriculum: CurriculumLesson[] = [
       { es: 'Hay pan en la mesa.', en: 'There is bread on the table.', blank: 'Hay' },
       { es: 'Un vaso de agua, por favor.', en: 'A glass of water, please.', blank: 'agua' },
       { es: 'El café está caliente.', en: 'The coffee is hot.', blank: 'café' },
-      { es: '¿Dónde está la cocina?', en: 'Where is the kitchen?', blank: 'Dónde está' },
+      { es: '¿Dónde está la cocina?', en: 'Where is the kitchen?', blank: 'Dónde está', wordId: 'donde-esta' },
       { es: 'La comida está en la mesa.', en: 'The food is on the table.', blank: 'comida' },
     ],
   },
@@ -360,11 +371,11 @@ export const curriculum: CurriculumLesson[] = [
       v('bailar', 'bailar', 'to dance', 'bahy-LAR', 'Ellos bailan flamenco.', 'They dance flamenco.', ['dance']),
     ],
     sentences: [
-      { es: 'Trabajo en una oficina.', en: 'I work in an office.', blank: 'Trabajo' },
-      { es: 'Ella estudia medicina.', en: 'She studies medicine.', blank: 'estudia' },
-      { es: 'Compro pan en el mercado.', en: 'I buy bread at the market.', blank: 'Compro' },
-      { es: 'Mi padre cocina muy bien.', en: 'My father cooks very well.', blank: 'cocina' },
-      { es: 'Ellos bailan flamenco.', en: 'They dance flamenco.', blank: 'bailan' },
+      { es: 'Trabajo en una oficina.', en: 'I work in an office.', blank: 'Trabajo', wordId: 'trabajar' },
+      { es: 'Ella estudia medicina.', en: 'She studies medicine.', blank: 'estudia', wordId: 'estudiar' },
+      { es: 'Compro pan en el mercado.', en: 'I buy bread at the market.', blank: 'Compro', wordId: 'comprar' },
+      { es: 'Mi padre cocina muy bien.', en: 'My father cooks very well.', blank: 'cocina', wordId: 'cocinar' },
+      { es: 'Ellos bailan flamenco.', en: 'They dance flamenco.', blank: 'bailan', wordId: 'bailar' },
     ],
     builds: [
       { es: 'Yo estudio español cada día', en: 'I study Spanish every day' },
@@ -437,11 +448,11 @@ export const curriculum: CurriculumLesson[] = [
       v('cuesta', 'cuesta', 'it costs', 'KWEHS-tah', 'El pan cuesta un euro.', 'The bread costs one euro.', ['costs', 'it cost']),
     ],
     sentences: [
-      { es: '¿Qué es esto?', en: 'What is this?', blank: 'Qué' },
-      { es: '¿Dónde vives?', en: 'Where do you live?', blank: 'Dónde' },
-      { es: '¿Cuánto cuesta?', en: 'How much does it cost?', blank: 'Cuánto' },
+      { es: '¿Qué es esto?', en: 'What is this?', blank: 'Qué', wordId: 'que-q' },
+      { es: '¿Dónde vives?', en: 'Where do you live?', blank: 'Dónde', wordId: 'donde-q' },
+      { es: '¿Cuánto cuesta?', en: 'How much does it cost?', blank: 'Cuánto', wordId: 'cuanto' },
       { es: 'Estudio porque me gusta.', en: 'I study because I like it.', blank: 'porque' },
-      { es: '¿Quién es ella?', en: 'Who is she?', blank: 'Quién' },
+      { es: '¿Quién es ella?', en: 'Who is she?', blank: 'Quién', wordId: 'quien' },
     ],
     builds: [
       { es: '¿Dónde está mi café?', en: 'Where is my coffee?' },
@@ -506,11 +517,11 @@ export const curriculum: CurriculumLesson[] = [
       v('semana', 'la semana', 'week', 'seh-MAH-nah', 'Trabajo cinco días a la semana.', 'I work five days a week.', ['the week']),
     ],
     sentences: [
-      { es: 'Bebo café por la mañana.', en: 'I drink coffee in the morning.', blank: 'Bebo' },
-      { es: 'Leo un libro cada semana.', en: 'I read a book every week.', blank: 'Leo' },
-      { es: 'Aprendemos español juntos.', en: 'We learn Spanish together.', blank: 'Aprendemos' },
-      { es: 'Escribo mensajes a mi familia.', en: 'I write messages to my family.', blank: 'Escribo' },
-      { es: 'Venden fruta en el mercado.', en: 'They sell fruit at the market.', blank: 'Venden' },
+      { es: 'Bebo café por la mañana.', en: 'I drink coffee in the morning.', blank: 'Bebo', wordId: 'beber' },
+      { es: 'Leo un libro cada semana.', en: 'I read a book every week.', blank: 'Leo', wordId: 'leer' },
+      { es: 'Aprendemos español juntos.', en: 'We learn Spanish together.', blank: 'Aprendemos', wordId: 'aprender' },
+      { es: 'Escribo mensajes a mi familia.', en: 'I write messages to my family.', blank: 'Escribo', wordId: 'escribir' },
+      { es: 'Venden fruta en el mercado.', en: 'They sell fruit at the market.', blank: 'Venden', wordId: 'vender' },
     ],
     builds: [
       { es: 'Yo leo un libro nuevo', en: 'I read a new book' },
@@ -740,7 +751,7 @@ export const curriculum: CurriculumLesson[] = [
       { es: 'Son las cinco y media.', en: 'It\'s half past five.', blank: 'y media' },
       { es: 'Me despierto a las siete.', en: 'I wake up at seven.', blank: 'siete' },
       { es: 'La tienda abre a las ocho.', en: 'The shop opens at eight.', blank: 'ocho' },
-      { es: '¿Qué hora es?', en: 'What time is it?', blank: 'hora' },
+      { es: '¿Qué hora es?', en: 'What time is it?', blank: 'hora', wordId: 'que-hora' },
     ],
     builds: [
       { es: 'Son las tres y media', en: 'It\'s half past three' },
@@ -812,7 +823,7 @@ export const curriculum: CurriculumLesson[] = [
       v('pescado', 'el pescado', 'fish (food)', 'pehs-KAH-doh', 'El pescado está muy bueno.', 'The fish is very good.', ['the fish', 'fish']),
       v('pollo', 'el pollo', 'chicken', 'POH-yoh', 'El pollo con verduras.', 'The chicken with vegetables.', ['the chicken']),
       v('vino', 'el vino', 'wine', 'BEE-noh', 'Un vaso de vino, por favor.', 'A glass of wine, please.', ['the wine']),
-      v('rico', 'rico', 'delicious', 'RREE-koh', '¡Qué rico está esto!', 'This is so delicious!', ['tasty', 'yummy']),
+      v('rico', 'rico', 'delicious', 'RREE-koh', '¡Qué rico está esto!', 'This is so delicious!', ['tasty', 'yummy', 'rich']),
     ],
     sentences: [
       { es: 'La cuenta, por favor.', en: 'The bill, please.', blank: 'cuenta' },
@@ -1782,7 +1793,7 @@ export const curriculum: CurriculumLesson[] = [
       v('zapatos', 'los zapatos', 'shoes', 'sah-PAH-tohs', 'Los zapatos son cómodos.', 'The shoes are comfortable.', ['the shoes']),
       v('pagar', 'pagar', 'to pay', 'pah-GAHR', 'Quiero pagar ahora.', 'I want to pay now.', ['pay']),
       v('tarjeta', 'la tarjeta', 'card', 'tahr-HEH-tah', 'Pago con tarjeta.', 'I pay by card.', ['the card', 'credit card']),
-      v('regalo', 'el regalo', 'gift', 'rreh-GAH-loh', 'Es un regalo para mi madre.', 'It\'s a gift for my mother.', ['the gift', 'present']),
+      v('descuento', 'el descuento', 'discount', 'dehs-KWEHN-toh', 'Hay un descuento del veinte por ciento.', 'There\'s a twenty percent discount.', ['the discount', 'sale']),
       v('euros', 'los euros', 'euros', 'EH-oo-rohs', 'Cuesta veinte euros.', 'It costs twenty euros.', ['the euros', 'euro']),
       v('calidad', 'la calidad', 'quality', 'kah-lee-DAHD', 'Es de muy buena calidad.', 'It\'s very good quality.', ['the quality']),
     ],
@@ -1791,7 +1802,7 @@ export const curriculum: CurriculumLesson[] = [
       { es: 'Este restaurante es muy caro.', en: 'This restaurant is very expensive.', blank: 'caro' },
       { es: 'El mercado es más barato.', en: 'The market is cheaper.', blank: 'barato' },
       { es: 'Pago con tarjeta.', en: 'I pay by card.', blank: 'tarjeta' },
-      { es: 'Es un regalo para mi madre.', en: 'It\'s a gift for my mother.', blank: 'regalo' },
+      { es: 'Hay un descuento del veinte por ciento.', en: 'There\'s a twenty percent discount.', blank: 'descuento', wordId: 'descuento' },
     ],
     builds: [
       { es: '¿Cuánto cuestan los zapatos?', en: 'How much are the shoes?' },
@@ -1856,7 +1867,7 @@ export const curriculum: CurriculumLesson[] = [
       v('montana', 'la montaña', 'mountain', 'mohn-TAH-nyah', 'La montaña es muy alta.', 'The mountain is very high.', ['the mountain']),
     ],
     sentences: [
-      { es: 'Hoy hace mucho calor.', en: 'Today it\'s very hot.', blank: 'hace mucho calor' },
+      { es: 'Hoy hace mucho calor.', en: 'Today it\'s very hot.', blank: 'hace mucho calor', wordId: 'hace-calor' },
       { es: 'En invierno hace frío.', en: 'In winter it\'s cold.', blank: 'hace frío' },
       { es: 'Llueve mucho hoy.', en: 'It\'s raining a lot today.', blank: 'Llueve' },
       { es: 'En verano voy a la playa.', en: 'In summer I go to the beach.', blank: 'verano' },
@@ -2153,7 +2164,7 @@ export const curriculum: CurriculumLesson[] = [
       v('para-siempre', 'para siempre', 'forever', 'PAH-rah SYEHM-preh', 'Te querré para siempre.', 'I will love you forever.', ['forever']),
       v('el-plazo', 'el plazo', 'deadline', 'ehl PLAH-soh', 'Necesito esto para el plazo.', 'I need this by the deadline.', ['the deadline']),
       v('pague', 'pagué', 'I paid', 'pah-GEH', 'Pagué veinte euros por el billete.', 'I paid twenty euros for the ticket.', ['i paid']),
-      v('billete-por', 'el billete', 'ticket', 'ehl bee-YEH-teh', 'Pagué por el billete de tren.', 'I paid for the train ticket.', ['the ticket']),
+      v('por-telefono', 'por teléfono', 'by phone', 'por teh-LEH-foh-noh', 'Hablamos por teléfono ayer.', 'We spoke by phone yesterday.', ['on the phone', 'by telephone']),
       v('caminamos', 'caminamos', 'we walk/walked', 'kah-mee-NAH-mohs', 'Caminamos por el parque.', 'We walked through the park.', ['we walk']),
       v('para-aprender', 'para aprender', 'in order to learn', 'PAH-rah ah-prehn-DEHR', 'Estudio para aprender, no para un examen.', 'I study to learn, not for an exam.', ['to learn']),
     ],
@@ -2246,7 +2257,7 @@ export const curriculum: CurriculumLesson[] = [
     sentences: [
       { es: 'Estoy hablando con mi madre.', en: 'I\'m speaking with my mother.', blank: 'Estoy hablando' },
       { es: 'No puedo, estoy trabajando.', en: 'I can\'t, I\'m working.', blank: 'estoy trabajando' },
-      { es: 'Estoy aprendiendo mucho español.', en: 'I\'m learning a lot of Spanish.', blank: 'aprendiendo' },
+      { es: 'Estoy aprendiendo mucho español.', en: 'I\'m learning a lot of Spanish.', blank: 'aprendiendo', wordId: 'estoy-aprendiendo' },
       { es: 'Ya estoy en casa.', en: 'I\'m already home.', blank: 'Ya' },
       { es: 'Todavía estoy trabajando.', en: 'I\'m still working.', blank: 'Todavía' },
     ],
@@ -2541,7 +2552,7 @@ export const curriculum: CurriculumLesson[] = [
       { es: 'Dame la llave, por favor.', en: 'Give me the key, please.', blank: 'Dame' },
       { es: 'Dime qué pasó.', en: 'Tell me what happened.', blank: 'Dime' },
       { es: 'Espera un momento.', en: 'Wait a moment.', blank: 'Espera' },
-      { es: '¡Cuidado con el perro!', en: 'Careful with the dog!', blank: 'Cuidado' },
+      { es: '¡Cuidado con el perro!', en: 'Careful with the dog!', blank: 'Cuidado', wordId: 'cuidado' },
     ],
     builds: [
       { es: 'Ven aquí por favor', en: 'Come here please' },
@@ -2693,7 +2704,7 @@ export const curriculum: CurriculumLesson[] = [
     ],
     sentences: [
       { es: 'Me gustaría vivir en España.', en: 'I\'d like to live in Spain.', blank: 'Me gustaría' },
-      { es: '¿Podrías hablar más lento?', en: 'Could you speak more slowly?', blank: 'Podrías' },
+      { es: '¿Podrías hablar más lento?', en: 'Could you speak more slowly?', blank: 'Podrías', wordId: 'podrias' },
       { es: 'Sería fantástico.', en: 'It would be fantastic.', blank: 'Sería' },
       { es: 'Deberías dormir más.', en: 'You should sleep more.', blank: 'Deberías' },
       { es: 'Quizás mañana.', en: 'Maybe tomorrow.', blank: 'Quizás' },
@@ -2921,7 +2932,7 @@ export const curriculum: CurriculumLesson[] = [
       v('no-hables', 'no hables', 'don\'t speak (negative command)', 'noh AH-blehs', '¡No hables tan rápido!', 'Don\'t speak so fast!', ['dont speak']),
       v('no-comas', 'no comas', 'don\'t eat (negative command)', 'noh KOH-mahs', '¡No comas eso!', 'Don\'t eat that!', ['dont eat']),
       v('no-vengas', 'no vengas', 'don\'t come (negative command)', 'noh BEHN-gahs', 'No vengas tarde.', 'Don\'t come late.', ['dont come']),
-      v('rico-rich', 'rico', 'rich', 'RREE-koh', 'Si fuera rico, viajaría por el mundo.', 'If I were rich, I\'d travel the world.', ['wealthy']),
+      v('rico-rich', 'rico', 'rich', 'RREE-koh', 'Si fuera rico, viajaría por el mundo.', 'If I were rich, I\'d travel the world.', ['wealthy', 'delicious']),
       v('el-mundo', 'el mundo', 'the world', 'ehl MOON-doh', 'Quiero viajar por el mundo.', 'I want to travel the world.', ['the world']),
     ],
     sentences: [
@@ -3089,10 +3100,10 @@ export const curriculum: CurriculumLesson[] = [
     ],
     sentences: [
       { es: '¿Estás libre mañana?', en: 'Are you free tomorrow?', blank: 'libre' },
-      { es: '¿Quedamos el viernes?', en: 'Shall we meet up on Friday?', blank: 'Quedamos' },
-      { es: 'Te mando la dirección.', en: 'I\'ll send you the address.', blank: 'mando' },
-      { es: '¡Nos vemos pronto!', en: 'See you soon!', blank: 'Nos vemos' },
-      { es: 'Vale, nos vemos a las nueve.', en: 'Okay, see you at nine.', blank: 'Vale' },
+      { es: '¿Quedamos el viernes?', en: 'Shall we meet up on Friday?', blank: 'Quedamos', wordId: 'quedar' },
+      { es: 'Te mando la dirección.', en: 'I\'ll send you the address.', blank: 'mando', wordId: 'mandar' },
+      { es: '¡Nos vemos pronto!', en: 'See you soon!', blank: 'Nos vemos', wordId: 'nos-vemos' },
+      { es: 'Vale, nos vemos a las nueve.', en: 'Okay, see you at nine.', blank: 'Vale', wordId: 'vale' },
     ],
     builds: [
       { es: '¿Estás libre el sábado?', en: 'Are you free on Saturday?' },
@@ -3297,7 +3308,7 @@ export const curriculum: CurriculumLesson[] = [
       v('por-fin', 'por fin', 'at last', 'por FEEN', '¡Por fin llegaste!', 'You finally arrived!', ['finally']),
       v('paso-v', 'pasó', 'it happened', 'pah-SOH', '¿Qué pasó anoche?', 'What happened last night?', ['happened', 'it happened']),
       v('inolvidable', 'inolvidable', 'unforgettable', 'een-ohl-bee-DAH-bleh', 'Fue un viaje inolvidable.', 'It was an unforgettable trip.'),
-      v('vecino', 'el vecino', 'neighbour', 'beh-SEE-noh', 'Mi vecino es muy simpático.', 'My neighbour is very nice.', ['the neighbour', 'neighbor']),
+      v('mientras-tanto', 'mientras tanto', 'meanwhile', 'MYEHN-trahs TAHN-toh', 'Mientras tanto, yo esperaba fuera.', 'Meanwhile, I was waiting outside.', ['in the meantime']),
       v('error', 'el error', 'mistake', 'eh-RROR', 'Fue un error pequeño.', 'It was a small mistake.', ['the mistake', 'the error']),
       v('recuerdo', 'el recuerdo', 'memory', 'rreh-KWEHR-doh', 'Tengo buenos recuerdos de España.', 'I have good memories of Spain.', ['the memory', 'souvenir']),
       v('simpatico', 'simpático', 'nice (person)', 'seem-PAH-tee-koh', 'Tu amigo es muy simpático.', 'Your friend is very nice.', ['friendly', 'nice']),
@@ -3459,7 +3470,7 @@ export const curriculum: CurriculumLesson[] = [
       v('me-alegro', 'me alegro', 'I\'m glad', 'meh ah-LEH-groh', 'Me alegro de verte.', 'I\'m glad to see you.', ['im glad', 'im happy']),
     ],
     sentences: [
-      { es: 'Es que no tengo tiempo.', en: 'The thing is, I don\'t have time.', blank: 'Es que' },
+      { es: 'Es que no tengo tiempo.', en: 'The thing is, I don\'t have time.', blank: 'Es que', wordId: 'es-que' },
       { es: 'Tranquilo, no pasa nada.', en: 'Relax, it\'s fine.', blank: 'no pasa nada' },
       { es: '¿Hablas español? Más o menos.', en: 'Do you speak Spanish? More or less.', blank: 'Más o menos' },
       { es: '¿De verdad? ¡Qué bien!', en: 'Really? How great!', blank: 'De verdad' },

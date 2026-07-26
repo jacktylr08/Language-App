@@ -1,4 +1,5 @@
 import { auth } from '@/services/auth';
+import jwt from 'jsonwebtoken';
 
 describe('Authentication Service', () => {
   describe('Password Hashing', () => {
@@ -71,7 +72,6 @@ describe('Authentication Service', () => {
 
     it('should reject expired token', async () => {
       // Create a token with very short expiry for testing
-      const jwt = require('jsonwebtoken');
       const expiredToken = jwt.sign(
         { userId: 'test', email: 'test@example.com', type: 'access' },
         process.env.JWT_SECRET || 'dev-secret-key-change-in-production',

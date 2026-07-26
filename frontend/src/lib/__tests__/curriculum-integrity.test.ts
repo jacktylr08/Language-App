@@ -23,6 +23,35 @@ describe('fill-in-the-blank sentences', () => {
     expect(broken).toEqual([]);
   });
 
+  it('every blank names a word that exists in its own lesson', () => {
+    // A wordId pointing at a word from a DIFFERENT lesson would send the
+    // result to the wrong FSRS card just as surely as the old guess did.
+    const broken = curriculum.flatMap((lesson) =>
+      lesson.sentences
+        .filter((s) => s.wordId && !lesson.vocab.some((w) => w.id === s.wordId))
+        .map((s) => `${lesson.slug}: wordId "${s.wordId}" is not in this lesson's vocab`)
+    );
+    expect(broken).toEqual([]);
+  });
+
+  it('every blank resolves to a word, so no result is recorded against the wrong one', () => {
+    // The engine used to fall back to lessonVocab[0] when its substring guess
+    // failed — 26 of 246 sentences (11%), mostly conjugated forms like
+    // "Trabajo" against the infinitive "trabajar", all landing on whichever
+    // word happened to be listed first.
+    const unresolved = curriculum.flatMap((lesson) =>
+      lesson.sentences
+        .filter((s) => {
+          if (s.wordId) return false;
+          return !lesson.vocab.some((w) =>
+            s.blank.toLowerCase().includes(w.es.replace(/^(el|la|yo|tú|él|ella|nosotros)\s+/i, '').toLowerCase())
+          );
+        })
+        .map((s) => `${lesson.slug}: "${s.blank}" needs an explicit wordId`)
+    );
+    expect(unresolved).toEqual([]);
+  });
+
   it('no blank is empty or whitespace-only', () => {
     const empty = curriculum.flatMap((lesson) =>
       lesson.sentences.filter((s) => !s.blank.trim()).map(() => lesson.slug)
@@ -69,19 +98,12 @@ describe('vocabulary', () => {
     expect(collisions).toEqual([]);
   });
 
-  /**
-   * Same Spanish AND same English under two ids is a genuine duplicate: the
-   * learner's history for the word is split across two FSRS cards, so a word
-   * they've drilled to mastery reappears as brand new.
-   *
-   * Three of these predate this test. They're listed rather than fixed here
-   * because merging ids has to carry existing learner progress forward, which
-   * is a data migration, not a content edit. The point of the list is that it
-   * can only ever shrink — a new duplicate fails this test.
-   */
-  const KNOWN_DUPLICATES = ['el regalo|gift', 'el vecino|neighbour', 'el billete|ticket'];
-
-  it('does not introduce new duplicate words', () => {
+  it('teaches no word twice under two ids', () => {
+    // Same Spanish AND same English under two ids splits the learner's memory
+    // of the word across two FSRS cards, so something drilled to mastery
+    // reappears as brand new. Three of these existed (el regalo, el vecino,
+    // el billete) — each was re-teaching in a later lesson a word an earlier
+    // one had already covered, wasting the slot as well as the history.
     const byPair = new Map<string, string[]>();
     for (const v of allVocab) {
       const key = `${v.es.toLowerCase()}|${v.en.toLowerCase()}`;
@@ -89,10 +111,37 @@ describe('vocabulary', () => {
     }
     const duplicates = [...byPair.entries()]
       .filter(([, ids]) => ids.length > 1)
-      .map(([pair]) => pair)
-      .filter((pair) => !KNOWN_DUPLICATES.includes(pair));
+      .map(([pair, ids]) => `${pair} (${ids.join(', ')})`);
 
     expect(duplicates).toEqual([]);
+  });
+
+  it('accepts every meaning of a word that has more than one', () => {
+    // "rico" is both delicious and rich — two legitimate entries sharing a
+    // surface form, NOT a duplicate. But a recall exercise shows the Spanish
+    // and grades the typed English, so unless each entry also accepts the
+    // other's meaning, a learner who answers "rich" for "rico" is marked
+    // wrong for being right.
+    const bySurface = new Map<string, typeof allVocab>();
+    for (const v of allVocab) {
+      const key = v.es.toLowerCase();
+      bySurface.set(key, [...(bySurface.get(key) ?? []), v]);
+    }
+
+    const unfair: string[] = [];
+    for (const [surface, entries] of bySurface) {
+      if (entries.length < 2) continue;
+      for (const v of entries) {
+        const accepted = [v.en, ...(v.enAlt ?? [])].map((e) => e.toLowerCase());
+        for (const other of entries) {
+          if (other.id === v.id) continue;
+          if (!accepted.includes(other.en.toLowerCase())) {
+            unfair.push(`"${surface}" (${v.id}) rejects "${other.en}", which ${other.id} says it means`);
+          }
+        }
+      }
+    }
+    expect(unfair).toEqual([]);
   });
 
   it('every word has the fields the exercise engine renders', () => {

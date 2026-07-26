@@ -20,6 +20,44 @@ function setNow(iso: string) {
   jest.setSystemTime(new Date(iso));
 }
 
+describe('"mastered" means retained, not just drilled', () => {
+  function word(overrides: Partial<ProgressState['words'][string]> = {}) {
+    return { strength: 5, correct: 5, wrong: 0, lastSeen: '2026-01-01', nextReview: '', ...overrides };
+  }
+  const withWords = (words: ProgressState['words']): ProgressState => ({
+    streak: 0, bestStreak: 0, lastActiveDay: '', activeDays: [], lessons: {}, words,
+  });
+
+  it('does not count a word drilled to strength 5 within one lesson', () => {
+    // A lesson asks about each of its words 3-4 times, so strength alone was
+    // reachable in a single sitting — twenty minutes after first meeting it.
+    expect(masteredWordCount(withWords({ hola: word({ correct: 5 }) }))).toBe(0);
+  });
+
+  it('counts it once there is a real history behind it', () => {
+    expect(masteredWordCount(withWords({ hola: word({ correct: 9 }) }))).toBe(1);
+  });
+
+  it('counts a word FSRS considers durable regardless of attempt count', () => {
+    // The FSRS path is the real definition; the legacy one is only there so
+    // existing counts don't collapse.
+    const fsrs = { due: '', stability: 30, difficulty: 5, elapsed_days: 0, scheduled_days: 30,
+                   learning_steps: 0, reps: 3, lapses: 0, state: 2 };
+    expect(masteredWordCount(withWords({ hola: word({ strength: 2, correct: 3, fsrs }) }))).toBe(1);
+  });
+
+  it('never drops a word out of the count just because it was reviewed again', () => {
+    // Regression guard: the obvious "not seen for N days" version of this
+    // rule would make the number FALL when a learner practises, which is the
+    // exact shape of the earlier "all my progress is gone" report.
+    const mastered = withWords({ hola: word({ correct: 12, lastSeen: '2020-01-01' }) });
+    const before = masteredWordCount(mastered);
+    mastered.words.hola.lastSeen = new Date().toLocaleDateString('en-CA');
+    mastered.words.hola.correct += 1;
+    expect(masteredWordCount(mastered)).toBeGreaterThanOrEqual(before);
+  });
+});
+
 describe('day boundaries follow the learner, not UTC', () => {
   // Regression: every day boundary in the app (streak chain, activity strip,
   // whether a word is due) came from toISOString(), i.e. the UTC date. An

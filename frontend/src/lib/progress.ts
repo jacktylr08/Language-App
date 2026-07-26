@@ -421,11 +421,28 @@ export function knownWordCount(state: ProgressState): number {
   ).length;
 }
 
+/**
+ * The legacy `strength >= 5` path also needs a real history behind it.
+ * Strength goes up one per correct answer, and a lesson asks about each of
+ * its own words three or four times, so on its own a word could be
+ * "mastered" twenty minutes after the learner first met it — the opposite of
+ * what the word claims.
+ *
+ * Deliberately total ATTEMPTS rather than "not seen for N days": attempts
+ * only ever increase, so this can't make anybody's count fall. A recency
+ * test would drop a genuinely mastered word out of the total the moment the
+ * learner reviewed it, which is the regression that caused the "all my
+ * progress is gone" panic in the first place.
+ */
+const MASTERED_MIN_ATTEMPTS = 8;
+
 export function masteredWordCount(state: ProgressState): number {
   return Object.values(state.words).filter(
     (w) =>
       (w.fsrs && w.fsrs.state === State.Review && w.fsrs.stability >= MASTERED_STABILITY_DAYS) ||
-      w.strength >= 5
+      // Still a union with the legacy path so nobody's count collapses — it
+      // just isn't reachable inside a single sitting any more.
+      (w.strength >= 5 && w.correct + w.wrong >= MASTERED_MIN_ATTEMPTS)
   ).length;
 }
 

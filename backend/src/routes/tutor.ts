@@ -6,16 +6,18 @@ import { tutorService } from '@/services/tutor-service';
 import { synthesizeSpeech } from '@/services/voice-service';
 import { createRealtimeClientSecret, REALTIME_VOICES } from '@/services/openai-service';
 import { assessPronunciation } from '@/services/pronunciation-service';
+import { chargeRealtimeSession } from '@/services/spend-guard';
 import { isValidWav } from '@/utils/wav';
 import { logger } from '@/utils/logger';
+import { errorMessage, httpStatus, responseBody, isNotConfigured } from '@/utils/errors';
 
 const router = Router();
 
-const strList = (v: any): string[] | undefined =>
-  Array.isArray(v) ? v.filter((x: any) => typeof x === 'string' && x.trim()) : undefined;
+const strList = (v: unknown): string[] | undefined =>
+  Array.isArray(v) ? v.filter((x: unknown): x is string => typeof x === 'string' && !!x.trim()) : undefined;
 
 /** The course language's English name (e.g. "Spanish"). Only Spanish exists today, but every prompt-building call takes this rather than hardcoding it. */
-const langOf = (v: any): string | undefined =>
+const langOf = (v: unknown): string | undefined =>
   typeof v === 'string' && v.trim() ? v.trim().slice(0, 40) : undefined;
 
 interface ChatMessage {
@@ -27,16 +29,16 @@ interface ChatMessage {
  * Keep only well-formed user/assistant turns and cap history length so a
  * runaway client can't blow up token usage.
  */
-function sanitizeMessages(messages: any[]): ChatMessage[] {
-  return messages
+function sanitizeMessages(messages: unknown[]): ChatMessage[] {
+  return (messages as Partial<ChatMessage>[])
     .filter(
-      (m: any) =>
+      (m): m is ChatMessage =>
         m &&
         (m.role === 'user' || m.role === 'assistant') &&
         typeof m.content === 'string' &&
         m.content.trim().length > 0
     )
-    .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 2000) }))
+    .map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }))
     .slice(-30);
 }
 
@@ -86,14 +88,14 @@ router.post('/chat', verifyToken, tutorChatLimiter, async (req: AuthRequest, res
     });
 
     res.json({ reply });
-  } catch (err: any) {
-    const message = err instanceof Error ? err.message : 'Failed to reach the tutor';
+  } catch (err: unknown) {
+    const message = errorMessage(err, 'Failed to reach the tutor');
     // A missing key is a configuration state, not a crash — surface it as 503.
-    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
+    if (isNotConfigured(err, 'tutor_not_configured')) {
       res.status(503).json({ error: message, code: 'tutor_not_configured' });
       return;
     }
-    logger.error('Tutor chat error:', err?.response?.status ?? '', message);
+    logger.error('Tutor chat error:', httpStatus(err) ?? '', message);
     res.status(500).json({ error: message });
   }
 });
@@ -129,13 +131,13 @@ router.post('/reflect', verifyToken, tutorReflectLimiter, async (req: AuthReques
 
     const updated = await tutorService.reflect(clean, previous, langOf(language) || 'Spanish');
     res.json({ profile: updated });
-  } catch (err: any) {
-    const message = err instanceof Error ? err.message : 'Failed to update the learner profile';
-    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
+  } catch (err: unknown) {
+    const message = errorMessage(err, 'Failed to update the learner profile');
+    if (isNotConfigured(err, 'tutor_not_configured')) {
       res.status(503).json({ error: message, code: 'tutor_not_configured' });
       return;
     }
-    logger.error('Tutor reflect error:', err?.response?.status ?? '', message);
+    logger.error('Tutor reflect error:', httpStatus(err) ?? '', message);
     res.status(500).json({ error: message });
   }
 });
@@ -175,11 +177,28 @@ router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequ
       typeof b.voice === 'string' && (REALTIME_VOICES as readonly string[]).includes(b.voice)
         ? b.voice
         : undefined;
+
+    // Charged BEFORE the token is minted — the client secret is what costs
+    // money, whether or not the learner goes on to talk. 429 rather than 503
+    // so the client treats it as "try later", not "not configured".
+    const budget = await chargeRealtimeSession(req.userId ?? 'unknown');
+    if (!budget.allowed) {
+      res.status(429).json({
+        error:
+          budget.scope === 'user'
+            ? "You've used up today's voice calls. Text chat is still available, and calls reset tomorrow."
+            : 'Voice calls are temporarily unavailable. Text chat still works — please try again later.',
+        code: 'realtime_budget_exhausted',
+        scope: budget.scope,
+      });
+      return;
+    }
+
     const session = await createRealtimeClientSecret({ instructions, voice });
     res.json(session);
-  } catch (err: any) {
-    const message = err instanceof Error ? err.message : 'Failed to start the voice session';
-    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
+  } catch (err: unknown) {
+    const message = errorMessage(err, 'Failed to start the voice session');
+    if (isNotConfigured(err, 'tutor_not_configured')) {
       res.status(503).json({ error: message, code: 'tutor_not_configured' });
       return;
     }
@@ -187,8 +206,8 @@ router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequ
     // diagnosable, without leaking it to the client.
     logger.error(
       'Realtime session error:',
-      err?.response?.status ?? '',
-      JSON.stringify(err?.response?.data ?? message)
+      httpStatus(err) ?? '',
+      JSON.stringify(responseBody(err) ?? message)
     );
     res.status(502).json({ error: 'Could not start the voice session.' });
   }
@@ -218,13 +237,13 @@ router.post('/speak', verifyToken, tutorSpeakLimiter, async (req: AuthRequest, r
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
     res.send(audio);
-  } catch (err: any) {
-    if (err?.code === 'voice_not_configured') {
-      res.status(503).json({ error: err.message, code: 'voice_not_configured' });
+  } catch (err: unknown) {
+    if (isNotConfigured(err, 'voice_not_configured')) {
+      res.status(503).json({ error: errorMessage(err), code: 'voice_not_configured' });
       return;
     }
     // Don't log the raw arraybuffer error body — just the status.
-    logger.error('Tutor speak error:', err?.response?.status ?? '', err?.message ?? err);
+    logger.error('Tutor speak error:', httpStatus(err) ?? '', errorMessage(err));
     res.status(502).json({ error: 'The voice service failed.' });
   }
 });
@@ -260,13 +279,13 @@ router.post('/grade-writing', verifyToken, tutorWritingLimiter, async (req: Auth
     });
 
     res.json(result);
-  } catch (err: any) {
-    const message = err instanceof Error ? err.message : 'Failed to grade the answer';
-    if (err?.code === 'tutor_not_configured' || message.includes('not configured')) {
+  } catch (err: unknown) {
+    const message = errorMessage(err, 'Failed to grade the answer');
+    if (isNotConfigured(err, 'tutor_not_configured')) {
       res.status(503).json({ error: message, code: 'tutor_not_configured' });
       return;
     }
-    logger.error('Writing grading error:', err?.response?.status ?? '', message);
+    logger.error('Writing grading error:', httpStatus(err) ?? '', message);
     res.status(500).json({ error: message });
   }
 });
@@ -317,16 +336,16 @@ router.post(
 
       const result = await assessPronunciation(req.body, referenceText.slice(0, 200), language);
       res.json(result);
-    } catch (err: any) {
-      const message = err instanceof Error ? err.message : 'Failed to assess pronunciation';
-      if (err?.code === 'pronunciation_not_configured') {
+    } catch (err: unknown) {
+      const message = errorMessage(err, 'Failed to assess pronunciation');
+      if (isNotConfigured(err, 'pronunciation_not_configured')) {
         res.status(503).json({ error: message, code: 'pronunciation_not_configured' });
         return;
       }
       logger.error(
         'Pronunciation assessment error:',
-        err?.response?.status ?? '',
-        JSON.stringify(err?.response?.data ?? message)
+        httpStatus(err) ?? '',
+        JSON.stringify(responseBody(err) ?? message)
       );
       res.status(502).json({ error: 'Could not assess pronunciation.' });
     }

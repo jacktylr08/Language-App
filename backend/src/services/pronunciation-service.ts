@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { codedError } from '@/utils/errors';
 
 /**
  * Phoneme-level pronunciation scoring via Azure Speech's Pronunciation
@@ -20,14 +21,23 @@ function ensureConfigured(): { key: string; region: string } {
   const key = process.env.AZURE_SPEECH_KEY;
   const region = process.env.AZURE_SPEECH_REGION;
   if (!key || !region) {
-    const err = new Error(
+    throw codedError(
       'Pronunciation scoring is not configured (AZURE_SPEECH_KEY / AZURE_SPEECH_REGION are not set). ' +
-        'Create an Azure Speech resource and set both in your environment to enable it.'
+        'Create an Azure Speech resource and set both in your environment to enable it.',
+      'pronunciation_not_configured'
     );
-    (err as any).code = 'pronunciation_not_configured';
-    throw err;
   }
   return { key, region };
+}
+
+/**
+ * One word in Azure's assessment response. Declared here rather than typed
+ * `any` at the call site — the property casing is Azure's and easy to get
+ * subtly wrong, so it's worth writing down once.
+ */
+interface AzureWord {
+  Word?: string;
+  PronunciationAssessment?: { AccuracyScore?: number; ErrorType?: string };
 }
 
 export interface WordAssessment {
@@ -97,7 +107,7 @@ export async function assessPronunciation(
 
   const pa = nbest.PronunciationAssessment ?? {};
   const words: WordAssessment[] = Array.isArray(nbest.Words)
-    ? nbest.Words.map((w: any) => ({
+    ? (nbest.Words as AzureWord[]).map((w) => ({
         word: String(w.Word ?? ''),
         accuracyScore: Number(w.PronunciationAssessment?.AccuracyScore ?? 0),
         errorType: (w.PronunciationAssessment?.ErrorType || 'None') as WordAssessment['errorType'],

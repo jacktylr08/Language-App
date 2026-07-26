@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { codedError, statusCode } from '@/utils/errors';
 
 /**
  * Web Push (practice reminders). Needs a VAPID key pair — generate one with
@@ -18,12 +19,11 @@ let configured = false;
 function ensureConfigured(): void {
   if (configured) return;
   if (!pushConfigured()) {
-    const err = new Error(
+    throw codedError(
       'Push notifications are not configured (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set). ' +
-        'Generate a key pair with `npx web-push generate-vapid-keys` and set them in your environment to enable it.'
+        'Generate a key pair with `npx web-push generate-vapid-keys` and set them in your environment to enable it.',
+      'push_not_configured'
     );
-    (err as any).code = 'push_not_configured';
-    throw err;
   }
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT || 'mailto:support@example.com',
@@ -64,8 +64,11 @@ export async function sendPushNotification(
       JSON.stringify(payload)
     );
     return { expired: false };
-  } catch (err: any) {
-    if (err?.statusCode === 404 || err?.statusCode === 410) {
+  } catch (err: unknown) {
+    // 404/410 mean the browser has discarded this subscription — the caller
+    // prunes it rather than retrying forever.
+    const status = statusCode(err);
+    if (status === 404 || status === 410) {
       return { expired: true };
     }
     throw err;

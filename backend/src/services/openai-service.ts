@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { codedError } from '@/utils/errors';
 
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_REALTIME_SECRET_URL = 'https://api.openai.com/v1/realtime/client_secrets';
@@ -27,12 +28,11 @@ export async function openaiChat(
 ): Promise<string> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
-    const err = new Error(
+    throw codedError(
       'AI tutor is not configured (OPENAI_API_KEY is not set). ' +
-        'Set the key in your environment to enable it.'
+        'Set the key in your environment to enable it.',
+      'tutor_not_configured'
     );
-    (err as any).code = 'tutor_not_configured';
-    throw err;
   }
 
   const model = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
@@ -108,9 +108,10 @@ export async function createRealtimeClientSecret(
 ): Promise<RealtimeSessionResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
-    const err = new Error('AI tutor is not configured (OPENAI_API_KEY is not set).');
-    (err as any).code = 'tutor_not_configured';
-    throw err;
+    throw codedError(
+      'AI tutor is not configured (OPENAI_API_KEY is not set).',
+      'tutor_not_configured'
+    );
   }
 
   const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini';

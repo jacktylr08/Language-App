@@ -1,7 +1,9 @@
 import { Router, Response } from 'express';
 import { verifyToken, AuthRequest } from '@/middleware/auth';
+import { stateLimiter } from '@/middleware/rate-limit';
 import { knexInstance } from '@/config/database';
 import { logger } from '@/utils/logger';
+import { errorMessage } from '@/utils/errors';
 
 const router = Router();
 
@@ -32,7 +34,7 @@ const HISTORY_LIMIT = 20;
  * deliberate force-write, used only for a first push where there's nothing
  * to conflict with.
  */
-router.get('/', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', verifyToken, stateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const row = await knexInstance('user_state').where({ user_id: req.userId }).first();
     res.json({
@@ -40,13 +42,13 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response): Promise<vo
       updatedAt: row?.updated_at ?? null,
       version: row?.version ?? 0,
     });
-  } catch (err: any) {
-    logger.error('State GET error:', err?.message ?? err);
+  } catch (err: unknown) {
+    logger.error('State GET error:', errorMessage(err));
     res.status(500).json({ error: 'Failed to load your data' });
   }
 });
 
-router.put('/', verifyToken, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/', verifyToken, stateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { data, baseVersion } = req.body ?? {};
     if (data === null || typeof data !== 'object' || Array.isArray(data)) {
@@ -124,8 +126,8 @@ router.put('/', verifyToken, async (req: AuthRequest, res: Response): Promise<vo
     }
 
     res.json({ ok: true, updatedAt: new Date().toISOString(), version: result.version });
-  } catch (err: any) {
-    logger.error('State PUT error:', err?.message ?? err);
+  } catch (err: unknown) {
+    logger.error('State PUT error:', errorMessage(err));
     res.status(500).json({ error: 'Failed to save your data' });
   }
 });

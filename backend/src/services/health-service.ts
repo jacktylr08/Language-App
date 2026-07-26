@@ -1,6 +1,7 @@
 import { knexInstance } from '@/config/database';
 import { redisClient } from '@/config/redis';
 import { logger } from '@/utils/logger';
+import { realtimeUsageToday } from '@/services/spend-guard';
 
 // How long the DB ping is allowed to take before we treat it as unreachable
 // — kept short so the health check itself stays fast even when the DB is
@@ -12,6 +13,13 @@ export interface HealthStatus {
   timestamp: string;
   db: 'ok' | 'unreachable';
   redis: 'ok' | 'unavailable';
+  /**
+   * Today's realtime-voice usage against the global daily budget. Reported
+   * here because there was previously NO way to see what the app was
+   * spending short of an OpenAI statement. Null when Redis is down (the
+   * counter lives there) — absence of a number, not a zero.
+   */
+  realtime?: { used: number; limit: number } | null;
 }
 
 async function isDatabaseReachable(): Promise<boolean> {
@@ -47,5 +55,6 @@ export async function getHealthStatus(): Promise<HealthStatus> {
     timestamp: new Date().toISOString(),
     db: dbOk ? 'ok' : 'unreachable',
     redis: redisOk ? 'ok' : 'unavailable',
+    realtime: await realtimeUsageToday(),
   };
 }

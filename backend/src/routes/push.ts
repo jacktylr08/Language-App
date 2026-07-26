@@ -4,6 +4,7 @@ import { pushLimiter } from '@/middleware/rate-limit';
 import { knexInstance } from '@/config/database';
 import { getVapidPublicKey, pushConfigured } from '@/services/push-service';
 import { logger } from '@/utils/logger';
+import { errorMessage } from '@/utils/errors';
 
 const router = Router();
 
@@ -46,8 +47,8 @@ router.post('/subscribe', pushLimiter, verifyToken, async (req: AuthRequest, res
       .merge({ user_id: req.userId, p256dh, auth });
 
     res.json({ ok: true });
-  } catch (err: any) {
-    logger.error('Push subscribe error:', err?.message ?? err);
+  } catch (err: unknown) {
+    logger.error('Push subscribe error:', errorMessage(err));
     res.status(500).json({ error: 'Could not save your subscription' });
   }
 });
@@ -61,8 +62,8 @@ router.post('/unsubscribe', pushLimiter, verifyToken, async (req: AuthRequest, r
     }
     await knexInstance('push_subscriptions').where({ user_id: req.userId, endpoint }).delete();
     res.json({ ok: true });
-  } catch (err: any) {
-    logger.error('Push unsubscribe error:', err?.message ?? err);
+  } catch (err: unknown) {
+    logger.error('Push unsubscribe error:', errorMessage(err));
     res.status(500).json({ error: 'Could not remove your subscription' });
   }
 });

@@ -146,15 +146,24 @@ function speak(word: VocabItem): Exercise {
 }
 
 function fillBlank(
-  sentence: { es: string; en: string; blank: string },
+  sentence: { es: string; en: string; blank: string; wordId?: string },
   lessonVocab: VocabItem[],
   pool: VocabItem[]
 ): Exercise | null {
-  // Anchor to the vocab word the blank tests, if we can find it
-  const anchor =
-    lessonVocab.find((w) => sentence.blank.toLowerCase().includes(w.es.replace(/^(el|la|yo|tú|él|ella|nosotros)\s+/i, '').toLowerCase())) ||
-    lessonVocab[0];
+  // An explicit wordId wins. Failing that, match the blank against the
+  // lesson's vocab — but if nothing matches, DON'T fall back to
+  // lessonVocab[0]: that recorded the result against whichever word happened
+  // to be listed first, so a learner could lose FSRS ground on a word the
+  // exercise never mentioned. Better to run the exercise untracked.
+  const named = sentence.wordId ? lessonVocab.find((w) => w.id === sentence.wordId) : undefined;
+  const guessed = lessonVocab.find((w) =>
+    sentence.blank
+      .toLowerCase()
+      .includes(w.es.replace(/^(el|la|yo|tú|él|ella|nosotros)\s+/i, '').toLowerCase())
+  );
+  const anchor = named ?? guessed ?? lessonVocab[0];
   if (!anchor) return null;
+  const tracked = !!(named ?? guessed);
   const seen = new Set([sentence.blank.toLowerCase()]);
   const distractors: string[] = [];
   for (const w of pickDistractors(anchor, pool, 8)) {
@@ -169,6 +178,7 @@ function fillBlank(
     word: anchor,
     sentence,
     options: shuffle([sentence.blank, ...distractors]),
+    noWordTracking: !tracked,
   };
 }
 

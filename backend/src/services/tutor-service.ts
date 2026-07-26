@@ -312,14 +312,16 @@ Be specific and actionable — these notes decide what the tutor drills next tim
       json: true,
     });
 
-    let parsed: any;
+    // JSON.parse returns an arbitrary shape from a language model — unknown
+    // is the truth, and every read below is guarded.
+    let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(raw) as Record<string, unknown>;
     } catch {
       throw new Error('Could not parse learner profile from the model');
     }
 
-    const cleanList = (v: any): string[] =>
+    const cleanList = (v: unknown): string[] =>
       Array.isArray(v)
         ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => String(x).slice(0, 140)).slice(0, 6)
         : [];
@@ -372,9 +374,11 @@ Return ONLY the JSON object.`;
       { maxTokens: 300, temperature: 0.3, json: true }
     );
 
-    let parsed: any;
+    // JSON.parse returns an arbitrary shape from a language model — unknown
+    // is the truth, and every read below is guarded.
+    let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(raw) as Record<string, unknown>;
     } catch {
       throw new Error('Could not parse writing feedback from the model');
     }

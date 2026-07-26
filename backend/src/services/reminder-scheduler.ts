@@ -1,6 +1,7 @@
 import { knexInstance } from '@/config/database';
 import { pushConfigured, sendPushNotification } from './push-service';
 import { logger } from '@/utils/logger';
+import { errorMessage } from '@/utils/errors';
 
 // Checking every 15 minutes is plenty for a once-a-day reminder — this isn't
 // a precision scheduler, just enough resolution to catch the target hour.
@@ -65,8 +66,8 @@ async function sendStreakReminders(): Promise<void> {
       } else {
         sent += 1;
       }
-    } catch (err: any) {
-      logger.error(`Reminder push failed for subscription ${row.sub_id}:`, err?.message ?? err);
+    } catch (err: unknown) {
+      logger.error(`Reminder push failed for subscription ${row.sub_id}:`, errorMessage(err));
     }
   }
 
@@ -95,8 +96,8 @@ export function startReminderScheduler(): void {
       lastSentDate = today;
       try {
         await sendStreakReminders();
-      } catch (err: any) {
-        logger.error('Reminder sweep failed:', err?.message ?? err);
+      } catch (err: unknown) {
+        logger.error('Reminder sweep failed:', errorMessage(err));
       }
     }
   };
