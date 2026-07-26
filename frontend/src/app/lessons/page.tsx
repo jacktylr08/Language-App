@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useSyncedState } from '@/lib/hooks';
 import { AbilitiesPanel } from '@/components/AbilitiesPanel';
 import { getCurriculum, phaseForWeek } from '@/lib/curriculum';
 import {
@@ -64,10 +64,14 @@ export default function LessonsPage() {
   // once progress has loaded, below.
   const [expandedOverride, setExpandedOverride] = useState<Record<number, boolean> | null>(null);
 
+  // Re-reads whenever synced state lands, so this shows the account's real
+  // progress from the server rather than whatever the local cache happened to
+  // hold when the component mounted.
+  const syncTick = useSyncedState();
   useEffect(() => {
     setProgress(loadProgress());
     setTutorCtx(buildTutorContext());
-  }, []);
+  }, [syncTick]);
 
   if (authLoading || !progress) {
     return (

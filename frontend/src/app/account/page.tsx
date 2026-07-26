@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useSyncedState } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { getAuth, clearAuth } from '@/lib/auth';
-import { clearLocalLearnerState } from '@/lib/sync';
+import { clearLocalLearnerState, flushSync } from '@/lib/sync';
 import { TutorProfilePanel } from '@/components/TutorProfilePanel';
 import { CourseChip } from '@/components/CourseChip';
 import {
@@ -51,12 +51,16 @@ export default function AccountPage() {
   // Profe's voice
   const [tutorVoice, setTutorVoice] = useState('cedar');
 
+  // Sign out (async — flushes pending progress first)
+  const [signingOut, setSigningOut] = useState(false);
+
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  const syncTick = useSyncedState();
   useEffect(() => {
     setProgress(loadProgress());
     setTutorVoice(loadTutorVoice());
@@ -79,7 +83,8 @@ export default function AccountPage() {
       .catch(() => {
         /* keep the locally-seeded profile if the call fails */
       });
-  }, []);
+    // syncTick: re-read once the account's server-side state has landed.
+  }, [syncTick]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +118,17 @@ export default function AccountPage() {
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    // Push anything still sitting in the sync debounce BEFORE wiping local
+    // state — otherwise finishing a lesson and immediately signing out
+    // destroys it. Progress lives on the server, so signing out is safe:
+    // signing back in anywhere pulls it all down again.
+    setSigningOut(true);
+    try {
+      await flushSync();
+    } catch {
+      /* best effort — never trap someone in the app because the network is down */
+    }
     // Not just the auth token — every bit of this account's local learner
     // state, so a different account signing in on this same device next
     // never gets its progress silently merged with what's left behind here.
@@ -445,9 +460,10 @@ export default function AccountPage() {
             </div>
             <button
               onClick={handleSignOut}
-              className="btn-3d shrink-0 px-5 py-2.5 rounded-2xl border-2 border-stone-200 dark:border-stone-700 font-extrabold text-ink-soft dark:text-stone-300 hover:border-terra-400 hover:text-terra-500 transition-colors"
+              disabled={signingOut}
+              className="btn-3d shrink-0 px-5 py-2.5 rounded-2xl border-2 border-stone-200 dark:border-stone-700 font-extrabold text-ink-soft dark:text-stone-300 hover:border-terra-400 hover:text-terra-500 transition-colors disabled:opacity-60"
             >
-              Sign out
+              {signingOut ? 'Saving…' : 'Sign out'}
             </button>
           </div>
         </section>

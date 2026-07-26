@@ -212,6 +212,19 @@ describe('refresh token rotation', () => {
     await expect(auth.rotateRefreshToken(refreshToken)).rejects.toThrow(/invalid refresh token/i);
   });
 
+  it('regression: two refresh tokens issued in the same second are still distinct', async () => {
+    // The refresh payload is otherwise fully determined by
+    // userId/email/type/tokenVersion plus a one-second-resolution iat/exp, so
+    // without a unique jti two issuances inside the same second are
+    // byte-identical — and the second insert violates the token_hash unique
+    // constraint. That broke "register then log straight in", logging in
+    // twice quickly, and two tabs refreshing at once.
+    const a = auth.generateTokens('user-1', 'user@example.com', 0);
+    const b = auth.generateTokens('user-1', 'user@example.com', 0);
+
+    expect(a.refreshToken).not.toBe(b.refreshToken);
+  });
+
   it('revokeRefreshToken marks the matching, not-yet-revoked record as revoked', async () => {
     await auth.revokeRefreshToken('some-refresh-token');
 

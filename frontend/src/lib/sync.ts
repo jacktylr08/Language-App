@@ -11,7 +11,7 @@
  * wipe it.
  */
 import { api } from './api';
-import { isAuthenticated } from './auth';
+import { getAuth, isAuthenticated } from './auth';
 import { progressKeyFor, tutorProfileKeyFor, ONBOARDING_KEY, LEARNER_GOAL_KEY, ACTIVE_LANGUAGE_KEY } from './keys';
 import { LANGUAGES, getActiveLanguageId } from './languages';
 import type { ProgressState } from './progress';
@@ -203,6 +203,31 @@ function applyBlob(blob: SyncBlob): void {
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pulledThisSession = false;
+/** In-flight (or completed) pull for this page-load, so callers can await it. */
+let pullPromise: Promise<void> | null = null;
+/** Version the last successful pull/push saw — sent back so the server can reject a stale write. */
+let knownVersion: number | null = null;
+/** A push currently in flight, so flush() can wait for it rather than racing it. */
+let inFlightPush: Promise<void> | null = null;
+/** Set when a push failed and still needs to happen. */
+let pendingRetry = false;
+
+/** Fired whenever local state changes from a sync, so mounted views can re-read. */
+export const SYNC_EVENT = 'aprende-sync';
+
+export type SyncStatus = 'idle' | 'loading' | 'ready' | 'error';
+let status: SyncStatus = 'idle';
+
+export function getSyncStatus(): SyncStatus {
+  return status;
+}
+
+function setStatus(next: SyncStatus): void {
+  status = next;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: { status: next } }));
+  }
+}
 
 /**
  * Wipes every piece of local learner state (progress, tutor memory,
@@ -225,30 +250,91 @@ export function clearLocalLearnerState(): void {
   // Which language an account is studying is itself per-account data — the
   // next account on this device should default fresh, not inherit this one's.
   localStorage.removeItem(ACTIVE_LANGUAGE_KEY);
+
+  // Reset the whole sync session too. Leaving pulledThisSession/knownVersion
+  // set would let the NEXT account's first write inherit this account's
+  // version and be treated as an up-to-date push of an empty device.
   pulledThisSession = false;
+  pullPromise = null;
+  knownVersion = null;
+  pendingRetry = false;
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+  status = 'idle';
+}
+
+/**
+ * The page-unload flush can't go through the axios client — it needs fetch's
+ * `keepalive`, so it builds the request itself and therefore needs the base
+ * URL and token directly. Kept in step with lib/api.ts's own default.
+ */
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://hospitable-insight-production-550c.up.railway.app/api/v1';
+
+function getAuthToken(): string | null {
+  return getAuth()?.accessToken ?? null;
+}
+
+function hasAnythingToSave(blob: SyncBlob): boolean {
+  return (
+    Object.keys(blob.progress?.lessons ?? {}).length > 0 ||
+    Object.keys(blob.progress?.words ?? {}).length > 0 ||
+    !!blob.tutorProfile
+  );
 }
 
 async function pushNow(): Promise<void> {
   if (!isAuthenticated()) return;
   const blob = localBlob();
 
-  // Never let an empty device overwrite a full account. PUT /state replaces
-  // the stored blob outright, so pushing "no progress" before this session
-  // has pulled would destroy the server's copy — the one backup that can
-  // restore a learner whose localStorage was cleared. A device with nothing
-  // to say has nothing worth saying; wait until syncOnLoad has merged the
-  // real state in first.
-  const hasAnythingToSave =
-    Object.keys(blob.progress?.lessons ?? {}).length > 0 ||
-    Object.keys(blob.progress?.words ?? {}).length > 0 ||
-    !!blob.tutorProfile;
-  if (!pulledThisSession && !hasAnythingToSave) return;
+  // Never let an empty device overwrite a full account. A device with nothing
+  // to say has nothing worth saying; wait until the pull has merged the real
+  // state in first.
+  if (!pulledThisSession && !hasAnythingToSave(blob)) return;
 
   try {
-    await api.put('/state', { data: blob });
-  } catch {
-    /* offline or endpoint not ready — local state is untouched, retry later */
+    const res = await api.put('/state', {
+      data: blob,
+      // Tells the server what this write was based on. Omitted only when we
+      // have never seen a version (first ever push), where there is nothing
+      // to conflict with.
+      ...(knownVersion !== null ? { baseVersion: knownVersion } : {}),
+    });
+    knownVersion = res.data?.version ?? knownVersion;
+    pendingRetry = false;
+  } catch (err: any) {
+    // 409: another device saved since we pulled. Merge theirs into ours —
+    // the merge is a union, so this can only ever ADD — and write again.
+    // Without this the slower device would erase the other's progress.
+    if (err?.response?.status === 409) {
+      const remote: SyncBlob = err.response.data?.data ?? {};
+      const merged = mergeBlob(localBlob(), remote);
+      applyBlob(merged);
+      knownVersion = err.response.data?.version ?? null;
+      notifyChanged();
+      try {
+        const res = await api.put('/state', { data: localBlob(), baseVersion: knownVersion });
+        knownVersion = res.data?.version ?? knownVersion;
+        pendingRetry = false;
+        return;
+      } catch {
+        pendingRetry = true;
+        return;
+      }
+    }
+    // Offline or server trouble — local state is untouched and still the
+    // newest thing we have. Mark it so we try again rather than dropping it.
+    pendingRetry = true;
   }
+}
+
+/** Coalesces concurrent pushes so two callers can't race the same write. */
+function pushSerialized(): Promise<void> {
+  inFlightPush = (inFlightPush ?? Promise.resolve()).then(pushNow, pushNow);
+  return inFlightPush;
 }
 
 /** Debounced push — call after any local state change. */
@@ -257,29 +343,122 @@ export function scheduleSync(delayMs = 1500): void {
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     pushTimer = null;
-    void pushNow();
+    void pushSerialized();
   }, delayMs);
 }
 
 /**
- * Pull the account's state, merge it into what's on this device, save the
- * union locally, and push the union back so the server holds everything too.
- * Runs at most once per page-load session.
+ * Push anything outstanding RIGHT NOW and wait for it to land.
+ *
+ * The debounce above means a learner who finishes a lesson and immediately
+ * signs out, closes the tab, or has their session end can lose that write.
+ * Anything destructive to local state must await this first.
  */
-export async function syncOnLoad(): Promise<void> {
-  if (typeof window === 'undefined' || !isAuthenticated() || pulledThisSession) return;
-  pulledThisSession = true;
-  try {
-    const res = await api.get('/state');
-    const remote: SyncBlob = res.data?.data ?? {};
-    const merged = mergeBlob(localBlob(), remote);
-    applyBlob(merged);
-    // Notify listeners (e.g. the lessons page) that local state changed.
-    window.dispatchEvent(new CustomEvent('aprende-sync'));
-    await pushNow();
-  } catch {
-    pulledThisSession = false; // allow a retry on the next navigation
+export async function flushSync(): Promise<void> {
+  if (typeof window === 'undefined' || !isAuthenticated()) return;
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
   }
+  await pushSerialized();
+}
+
+function notifyChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: { status } }));
+  }
+}
+
+/**
+ * Pull the account's state from the server, merge it into whatever this
+ * device has, and save the union both locally and back to the server.
+ *
+ * The server is the source of truth: a learner signing in on a new device —
+ * or the same device after signing out — gets their progress back from here.
+ * localStorage is only a fast local cache of it. Runs at most once per
+ * page-load; concurrent callers share the same promise so every caller can
+ * await the same pull.
+ */
+export function syncOnLoad(): Promise<void> {
+  if (typeof window === 'undefined' || !isAuthenticated()) return Promise.resolve();
+  if (pullPromise) return pullPromise;
+
+  setStatus('loading');
+  pullPromise = (async () => {
+    try {
+      const res = await api.get('/state');
+      const remote: SyncBlob = res.data?.data ?? {};
+      knownVersion = res.data?.version ?? null;
+
+      const merged = mergeBlob(localBlob(), remote);
+      applyBlob(merged);
+      pulledThisSession = true;
+      setStatus('ready');
+
+      // Only push back if this device actually contributed something the
+      // server didn't already have. Compared against the remote run through
+      // the same normalization, not the raw response — otherwise the shape
+      // differences alone (absent vs null) make every sign-in look like a
+      // change, writing a new version and a history snapshot each time until
+      // the rollback history is nothing but duplicates of the same state.
+      const canonicalRemote = mergeBlob({}, remote);
+      if (JSON.stringify(merged) !== JSON.stringify(canonicalRemote)) {
+        await pushSerialized();
+      }
+    } catch {
+      // Couldn't reach the server. Local state is untouched, so the app still
+      // works offline from cache — but this session has NOT confirmed it holds
+      // the account's real state, so pushNow stays conservative.
+      pulledThisSession = false;
+      pullPromise = null; // let a later navigation retry
+      setStatus('error');
+    }
+  })();
+
+  return pullPromise;
+}
+
+/**
+ * Best-effort flush when the page is going away (tab close, backgrounding on
+ * mobile). `keepalive` lets the request outlive the document, which a normal
+ * fetch does not — without it, closing the tab right after a lesson loses it.
+ */
+function flushOnHide(): void {
+  if (typeof window === 'undefined' || !isAuthenticated()) return;
+  if (!pushTimer && !pendingRetry) return;
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+
+  const auth = getAuthToken();
+  if (!auth) return;
+  try {
+    void fetch(`${API_BASE}/state`, {
+      method: 'PUT',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}` },
+      body: JSON.stringify({
+        data: localBlob(),
+        ...(knownVersion !== null ? { baseVersion: knownVersion } : {}),
+      }),
+    });
+  } catch {
+    /* nothing more we can do at this point */
+  }
+}
+
+export function startSyncLifecycle(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onHide = () => {
+    if (document.visibilityState === 'hidden') flushOnHide();
+  };
+  window.addEventListener('pagehide', flushOnHide);
+  document.addEventListener('visibilitychange', onHide);
+  return () => {
+    window.removeEventListener('pagehide', flushOnHide);
+    document.removeEventListener('visibilitychange', onHide);
+  };
 }
 
 /** Mark onboarding complete and sync it. */

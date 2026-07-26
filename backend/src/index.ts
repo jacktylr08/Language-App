@@ -42,6 +42,13 @@ if (!corsOrigins?.length) {
 
 // Middleware
 app.use(cors(corsOrigins?.length ? { origin: corsOrigins } : undefined));
+// body-parser defaults to 100KB, which sat silently BELOW the 512KB ceiling
+// routes/state.ts advertises — so a learner with enough history (tutor
+// transcripts alone can run to a couple of hundred KB) would quietly stop
+// being able to save, with a generic 500 rather than the intended 413. Keep
+// this comfortably above MAX_STATE_BYTES so the route's own check is the one
+// that decides. Everything else stays on the small default.
+app.use('/api/v1/state', express.json({ limit: '1mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

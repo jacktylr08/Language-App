@@ -94,8 +94,16 @@ export const auth = {
       { expiresIn: JWT_EXPIRY }
     );
 
+    // `jti` makes every refresh token unique even when two are issued in the
+    // same second. Without it the payload is fully determined by
+    // userId/email/type/tokenVersion plus a one-second-resolution iat/exp, so
+    // two issuances inside the same second produce byte-identical tokens —
+    // and the second insert into refresh_tokens fails the token_hash unique
+    // constraint. In practice that broke registering and then immediately
+    // logging in, logging in twice quickly, and two tabs refreshing at once,
+    // all of which surface to the learner as "login is broken".
     const refreshToken = jwt.sign(
-      { userId, email, type: 'refresh', tokenVersion },
+      { userId, email, type: 'refresh', tokenVersion, jti: crypto.randomUUID() },
       JWT_SECRET,
       { expiresIn: JWT_REFRESH_EXPIRY }
     );

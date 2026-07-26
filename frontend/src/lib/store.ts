@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { AuthState, getAuth, setAuth, clearAuth as clearAuthStorage } from './auth';
-import { clearLocalLearnerState } from './sync';
+import { clearLocalLearnerState, flushSync } from './sync';
 import { LAST_USER_ID_KEY } from './keys';
 
 /**
@@ -37,7 +37,7 @@ interface AuthStore {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   getCurrentUser: () => Promise<void>;
   hydrate: () => void;
@@ -133,7 +133,15 @@ export const useAuth = create<AuthStore>((set) => {
       }
     },
 
-    logout: () => {
+    // Async so callers can await the flush. Anything not yet pushed (the
+    // sync debounce is 1.5s) would otherwise be destroyed by the wipe below
+    // — losing the last thing the learner did before signing out.
+    logout: async () => {
+      try {
+        await flushSync();
+      } catch {
+        /* best effort — never block sign-out on the network */
+      }
       clearAuthStorage();
       clearLocalLearnerState();
       set({ user: null, accessToken: null });
