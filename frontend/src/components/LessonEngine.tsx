@@ -28,10 +28,13 @@ import {
   type PronunciationResult,
 } from '@/lib/pronunciation';
 import { api } from '@/lib/api';
+import { primeAudio } from '@/lib/feedback';
+import { Icon, type IconName } from '@/components/icons/Icon';
 import { PronunciationScoreCard } from '@/components/PronunciationScoreCard';
 import { useLessonSession } from './lesson-engine/useLessonSession';
 import { TopExitBar } from './lesson-engine/TopExitBar';
 import { StatCard } from './lesson-engine/StatCard';
+import { CompletionScreen } from './lesson-engine/CompletionScreen';
 import { TeachCard } from './lesson-engine/TeachCard';
 import { GrammarSlideCard } from './lesson-engine/GrammarSlideCard';
 import { DialogueCard } from './lesson-engine/DialogueCard';
@@ -48,6 +51,15 @@ interface LessonEngineProps {
    * 'mistakes' drills only the words the learner has got wrong.
    */
   mode?: 'lesson' | 'practice' | 'mistakes';
+}
+
+/** A lesson theme's icon; falls back to a neutral sparkle. */
+function themeIcon(theme?: string): IconName {
+  const map: Record<string, IconName> = {
+    phonetics: 'sound', verbs: 'verbs', family: 'family', nouns: 'objects',
+    adjectives: 'palette', review: 'refresh', grammar: 'grammar', conversation: 'chat',
+  };
+  return (theme && map[theme]) || 'sparkle';
 }
 
 const ACCENT_CHARS = ['á', 'é', 'í', 'ó', 'ú', 'ñ', '¿', '¡'];
@@ -423,7 +435,11 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
             <div className="mx-auto mb-6 w-24 h-24 rounded-[28px] bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-5xl shadow-glow ring-1 ring-black/5 animate-pop">
-              <span className="drop-shadow-sm">{lesson?.emoji || (mode === 'mistakes' ? '🩹' : '⚡')}</span>
+              <Icon
+                name={mode === 'mistakes' ? 'bandage' : mode === 'practice' ? 'review' : themeIcon(lesson?.theme)}
+                size={40}
+                className="drop-shadow-sm"
+              />
             </div>
             <h1 className="font-display text-4xl font-black text-ink dark:text-white mb-3 leading-tight">
               {mode === 'mistakes' ? 'Fix your mistakes' : mode === 'practice' ? 'Smart Practice' : lesson?.title}
@@ -449,13 +465,20 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   {(lesson.builds ?? []).length > 0 && (
                     <li>🔨 Build {lesson.builds!.length} full sentences yourself</li>
                   )}
-                  {lesson.vocab.length >= 3 && <li>✍️ Write your own sentence, marked by Profe</li>}
+                  {lesson.vocab.length >= 3 && (
+                    <li className="flex items-center gap-2">
+                      <Icon name="pencil" size={15} className="shrink-0 text-ink-soft" />
+                      Write your own sentence, marked by Profe
+                    </li>
+                  )}
                 </ul>
               </div>
             )}
             <div className="rounded-2xl bg-saffron-400/10 border border-saffron-400/30 p-4 mb-8 text-left">
               <p className="text-sm text-saffron-600 dark:text-saffron-300">
-                <span className="font-bold">💡 Tip:</span>{' '}
+                <span className="inline-flex items-center gap-1.5 font-bold">
+                  <Icon name="sparkle" size={15} /> Tip:
+                </span>{' '}
                 {mode === 'mistakes'
                   ? 'Getting a word wrong, then nailing it soon after, is exactly how it sticks for good.'
                   : mode === 'practice'
@@ -469,7 +492,13 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                  idea why the lesson opened mid-flow, so the position is
                  stated and starting over stays one tap away. */
               <>
-                <button onClick={resume} className="btn-primary w-full py-4 text-lg">
+                <button
+                  onClick={() => {
+                    primeAudio();
+                    resume();
+                  }}
+                  className="btn-primary w-full py-4 text-lg"
+                >
                   RESUME · {resumable.index} / {resumable.total}
                 </button>
                 <button
@@ -479,19 +508,28 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   Start again from the beginning
                 </button>
                 <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
-                  You left off part-way · 🔥 {currentStreak(p)} day streak
+                  You left off part-way ·{' '}
+                  <Icon name="flame" size={14} className="inline align-[-2px] text-terra-500" />{' '}
+                  {currentStreak(p)} day streak
                 </p>
               </>
             ) : (
               <>
                 <button
-                  onClick={() => setStarted(true)}
+                  onClick={() => {
+                    // Must happen inside a genuine gesture, or the first
+                    // correct answer plays into a suspended context.
+                    primeAudio();
+                    setStarted(true);
+                  }}
                   className="btn-primary w-full py-4 text-lg"
                 >
                   {mode === 'mistakes' ? 'FIX THESE' : mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
                 </button>
                 <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
-                  {total} exercises · 🔥 {currentStreak(p)} day streak
+                  {total} exercises ·{' '}
+                  <Icon name="flame" size={14} className="inline align-[-2px] text-terra-500" />{' '}
+                  {currentStreak(p)} day streak
                 </p>
               </>
             )}
@@ -501,46 +539,19 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     );
   }
 
-  // Completion screen
+  // Completion screen — staged, so finishing feels like an occasion rather
+  // than a page. See CompletionScreen for why the beats are spaced.
   if (finished) {
     const accuracy = stats.answered > 0 ? Math.round((stats.firstTryCorrect / stats.answered) * 100) : 100;
-    const p = loadProgress();
     return (
-      <div className="min-h-screen bg-paper dark:bg-paper-dark flex items-center justify-center px-6">
-        <div className="max-w-md w-full text-center">
-          <div className="text-7xl mb-4 animate-bounce-slow">
-            {accuracy >= 95 ? '🏆' : accuracy >= 80 ? '🎉' : '💪'}
-          </div>
-          <h1 className="font-display text-5xl font-black text-ink dark:text-white mb-3">
-            {accuracy >= 95 ? '¡Perfecto!' : accuracy >= 80 ? '¡Muy bien!' : '¡Bien hecho!'}
-          </h1>
-          <p className="text-ink-soft dark:text-stone-400 mb-8">
-            {mode === 'practice' ? 'Practice session complete' : `${lesson?.title} complete`}
-          </p>
-
-          <div className="grid grid-cols-2 gap-3 mb-8">
-            <StatCard label="Accuracy" value={`${accuracy}%`} color="text-brand-500" delay="0ms" />
-            <StatCard label="Best combo" value={`${stats.bestCombo}x`} color="text-terra-500" delay="150ms" />
-          </div>
-
-          <div className="surface p-4 mb-8 flex items-center justify-center gap-3">
-            <span className="text-3xl">🔥</span>
-            <div className="text-left">
-              <p className="font-extrabold text-stone-900 dark:text-white text-lg">
-                {currentStreak(p)} day streak
-              </p>
-              <p className="text-xs text-stone-500 dark:text-stone-400">Come back tomorrow to keep it alive</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => router.push('/lessons')}
-            className="btn-primary w-full py-4 text-lg"
-          >
-            CONTINUE
-          </button>
-        </div>
-      </div>
+      <CompletionScreen
+        accuracy={accuracy}
+        stats={stats}
+        streak={currentStreak(loadProgress())}
+        title={lesson?.title ?? null}
+        mode={mode}
+        onContinue={() => router.push('/lessons')}
+      />
     );
   }
 
@@ -555,7 +566,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-2xl leading-none p-1"
           aria-label="Quit lesson"
         >
-          ✕
+          <Icon name="close" size={22} />
         </button>
         <div className="flex-1 h-3.5 bg-stone-200/80 dark:bg-stone-800 rounded-full overflow-hidden shadow-inner">
           <div
@@ -569,7 +580,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           }`}
           key={combo}
         >
-          🔥 {combo}
+          <Icon name="flame" size={15} /> {combo}
         </div>
       </div>
 
@@ -750,7 +761,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             </p>
             <button onClick={() => speak(current.word.es)} className="text-center mb-1 group mx-auto">
               <p className="font-display text-4xl font-black text-ink dark:text-white group-hover:text-brand-500 transition-colors">
-                🔊 {current.word.es}
+                <Icon name="speaker" size={26} className="inline align-[-3px] mr-1.5" />
+                {current.word.es}
               </p>
             </button>
             <p className="text-center text-stone-500 dark:text-stone-400 italic mb-8">{current.word.pron}</p>
@@ -809,7 +821,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               className="text-center mb-1 group"
             >
               <span className="font-display text-4xl font-black text-ink dark:text-white group-hover:text-brand-500 transition-colors">
-                🔊 {current.word.es}
+                <Icon name="speaker" size={26} className="inline align-[-3px] mr-1.5" />
+                {current.word.es}
               </span>
             </button>
             <p className="text-stone-500 dark:text-stone-400 italic mb-1">{current.word.pron}</p>
@@ -880,7 +893,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
         {current.type === 'write_answer' && current.writingPrompt && (
           <div className="flex-1 flex flex-col justify-center">
             <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
-              ✍️ Write it yourself
+              <Icon name="pencil" size={15} className="inline align-[-2px] mr-1" /> Write it yourself
             </p>
             <p className="font-display text-center text-2xl font-black text-ink dark:text-white mb-4 leading-snug">
               {current.writingPrompt.instruction}
@@ -951,7 +964,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                     : 'bg-terra-500/15 text-terra-500'
                 }`}
               >
-                {feedback.kind === 'correct' ? '✓' : '✕'}
+                <Icon name={feedback.kind === 'correct' ? 'check' : 'close'} size={26} />
               </span>
               <div>
                 <p
@@ -963,7 +976,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                 >
                   {feedback.kind === 'correct'
                     ? combo >= 3
-                      ? `¡Excelente! ${combo} in a row 🔥`
+                      ? `¡Excelente! ${combo} in a row`
                       : '¡Correcto!'
                     : 'Not quite'}
                 </p>
@@ -978,7 +991,8 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                     </p>
                     {feedback.note && (
                       <p className="mt-1.5 bg-white/60 dark:bg-black/20 rounded-lg px-3 py-2 leading-snug">
-                        💡 {feedback.note}
+                        <Icon name="sparkle" size={15} className="inline align-[-2px] mr-1" />
+                        {feedback.note}
                       </p>
                     )}
                     <p className="text-xs mt-1 opacity-80">

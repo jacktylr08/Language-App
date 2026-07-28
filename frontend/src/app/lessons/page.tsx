@@ -20,6 +20,10 @@ import { combinedMistakeCount } from '@/lib/learner-insights';
 import { buildTutorContext } from '@/lib/tutor-context';
 import { CourseChip } from '@/components/CourseChip';
 import { SCENARIOS } from '@/lib/scenarios';
+import { DashboardSkeleton } from '@/components/Skeleton';
+import { Icon, type IconName } from '@/components/icons/Icon';
+import { Profe } from '@/components/Profe';
+import { BrandLockup } from '@/components/icons/BrandMark';
 
 /** A cadence line so the tutor card reflects an actual relationship, not a static pitch. */
 function cadenceLabel(days: number | undefined): string {
@@ -29,6 +33,18 @@ function cadenceLabel(days: number | undefined): string {
   if (days < 7) return `${days} days since you last talked`;
   return "It's been a while — Profe's ready when you are";
 }
+
+/** Each lesson theme's icon, from the shared set. */
+const themeIcons: Record<string, IconName> = {
+  phonetics: 'sound',
+  verbs: 'verbs',
+  family: 'family',
+  nouns: 'objects',
+  adjectives: 'palette',
+  review: 'refresh',
+  grammar: 'grammar',
+  conversation: 'chat',
+};
 
 const themeAccents: Record<string, string> = {
   phonetics: 'from-stone-400 to-stone-600',
@@ -41,20 +57,25 @@ const themeAccents: Record<string, string> = {
   conversation: 'from-pink-400 to-rose-500',
 };
 
-const practiceLinks = [
+const practiceLinks: ReadonlyArray<{
+  href: string;
+  icon: IconName;
+  label: string;
+  description: string;
+}> = [
   {
     href: '/practice/listen',
-    emoji: '🎧',
+    icon: 'headphones',
     label: 'Listen & Repeat',
     description: 'Hands-free vocab review, eyes off the screen.',
   },
   {
     href: '/read',
-    emoji: '📖',
+    icon: 'read',
     label: 'Read in Spanish',
     description: 'Short passages — tap any word instead of a full translation.',
   },
-] as const;
+];
 
 export default function LessonsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
@@ -76,9 +97,7 @@ export default function LessonsPage() {
 
   if (authLoading || !progress) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <DashboardSkeleton />
     );
   }
 
@@ -209,9 +228,7 @@ export default function LessonsPage() {
           href="/practice"
           className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-saffron-500 via-saffron-400 to-terra-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
         >
-          <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
-            ⚡
-          </div>
+          <Icon name="review" size={104} className="absolute -right-3 -top-5 opacity-15 text-white" />
           <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
             Due today
           </p>
@@ -234,9 +251,13 @@ export default function LessonsPage() {
           href={`/lessons/${nextLesson.slug}`}
           className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
         >
-          <div className="absolute -right-4 -top-6 text-[80px] opacity-15 select-none" aria-hidden>
-            {nextLesson.emoji}
-          </div>
+          {/* The lesson's own theme, drawn — a low-opacity emoji on a green
+              gradient just muddies. */}
+          <Icon
+            name={themeIcons[nextLesson.theme] ?? 'sparkle'}
+            size={104}
+            className="absolute -right-3 -top-5 opacity-20 text-white"
+          />
           <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
             {lessonsDone > 0 ? 'Pick up where you left off' : 'Start here'}
           </p>
@@ -273,9 +294,9 @@ export default function LessonsPage() {
         href="/tutor"
         className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-terra-500 via-terra-400 to-saffron-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
       >
-        <div className="absolute -right-5 -top-7 text-[92px] opacity-15 -rotate-12 select-none" aria-hidden>
-          🧑‍🏫
-        </div>
+        {/* Profe himself, not a stand-in emoji — this is the card that's
+            supposed to feel like a person waiting for you. */}
+        <Profe mood="idle" size={104} className="absolute -right-3 -bottom-4 opacity-90 drop-shadow-sm" />
         {tutorCtx?.lastSessionNote ? (
           <>
             <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
@@ -317,7 +338,7 @@ export default function LessonsPage() {
               href="/practice"
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-3 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors"
             >
-              <span className="text-xl shrink-0" aria-hidden>⚡</span>
+              <Icon name="review" size={20} className="shrink-0 text-brand-500" />
               <span className="flex-1 min-w-0">
                 <span className="block text-[13px] font-bold text-ink dark:text-stone-200">
                   Smart Practice
@@ -326,7 +347,7 @@ export default function LessonsPage() {
                   Nothing due — keep your weakest words sharp.
                 </span>
               </span>
-              <span className="text-stone-300 dark:text-stone-600 shrink-0" aria-hidden>→</span>
+              <Icon name="arrow-right" size={16} className="text-stone-300 dark:text-stone-600 shrink-0" />
             </Link>
           )}
           {mistakes > 0 && (
@@ -334,7 +355,7 @@ export default function LessonsPage() {
               href="/practice?mode=mistakes"
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-3 bg-terra-500/10 hover:bg-terra-500/15 transition-colors"
             >
-              <span className="text-xl shrink-0" aria-hidden>🩹</span>
+              <Icon name="bandage" size={20} className="shrink-0 text-terra-500" />
               <span className="flex-1 min-w-0">
                 <span className="block text-[13px] font-bold text-terra-600 dark:text-terra-400">
                   Fix your mistakes
@@ -343,7 +364,7 @@ export default function LessonsPage() {
                   {mistakes} {mistakes === 1 ? 'word' : 'words'} to nail
                 </span>
               </span>
-              <span className="text-terra-500 shrink-0" aria-hidden>→</span>
+              <Icon name="arrow-right" size={16} className="text-terra-500 shrink-0" />
             </Link>
           )}
           {practiceLinks.map((p) => (
@@ -352,7 +373,7 @@ export default function LessonsPage() {
               href={p.href}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-3 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors"
             >
-              <span className="text-xl shrink-0" aria-hidden>{p.emoji}</span>
+              <Icon name={p.icon} size={20} className="shrink-0 text-ink-soft dark:text-stone-400" />
               <span className="flex-1 min-w-0">
                 <span className="block text-[13px] font-bold text-ink dark:text-stone-200">
                   {p.label}
@@ -361,7 +382,7 @@ export default function LessonsPage() {
                   {p.description}
                 </span>
               </span>
-              <span className="text-stone-300 dark:text-stone-600 shrink-0" aria-hidden>→</span>
+              <Icon name="arrow-right" size={16} className="text-stone-300 dark:text-stone-600 shrink-0" />
             </Link>
           ))}
         </div>
@@ -394,8 +415,8 @@ export default function LessonsPage() {
       <nav className="sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
         <div className="max-w-5xl mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Link href="/" className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
-              Fluenta
+            <Link href="/" aria-label="Fluenta home">
+              <BrandLockup />
             </Link>
             <CourseChip />
           </div>
@@ -408,7 +429,7 @@ export default function LessonsPage() {
               }`}
               title="Day streak"
             >
-              🔥 {streak}
+              <Icon name="flame" size={15} /> {streak}
             </span>
             <Link
               href="/account"
@@ -552,7 +573,11 @@ export default function LessonsPage() {
                                             : 'from-stone-300 to-stone-400 dark:from-stone-700 dark:to-stone-800'
                                         } shadow-inner ring-1 ring-black/5`}
                                       >
-                                        <span className="drop-shadow-sm">{unlocked ? lesson.emoji : '🔒'}</span>
+                                        <Icon
+                                          name={unlocked ? themeIcons[lesson.theme] ?? 'sparkle' : 'lock'}
+                                          size={22}
+                                          className="drop-shadow-sm"
+                                        />
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="font-extrabold text-ink dark:text-white truncate text-[15px]">

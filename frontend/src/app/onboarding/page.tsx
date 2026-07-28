@@ -21,6 +21,8 @@ import {
 } from '@/lib/placement';
 import { placeLearnerAtWeek } from '@/lib/progress';
 import { phaseForWeek } from '@/lib/curriculum';
+import { TasteOfSpanish } from '@/components/onboarding/TasteOfSpanish';
+import { PageSkeleton } from '@/components/Skeleton';
 
 const GOAL_OPTIONS = Object.entries(GOAL_LABELS) as Array<[LearnerGoal, string]>;
 const TOTAL_STEPS = 4;
@@ -47,14 +49,7 @@ export default function OnboardingPage() {
   const [startWeek, setStartWeek] = useState<number | null>(null);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto"></div>
-          <p className="mt-4 text-stone-600 dark:text-stone-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   const beginQuiz = () => {
@@ -131,9 +126,11 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl surface !rounded-[28px] p-8">
-        {/* Progress bar */}
-        <div className="mb-8">
+      <div className={`w-full surface !rounded-[28px] p-8 ${step === 0 ? 'max-w-md' : 'max-w-2xl'}`}>
+        {/* Progress bar — hidden on the first screen, which is a taste of the
+            app rather than a form step. "Step 1 of 4" above a demo frames it
+            as paperwork. */}
+        <div className={`mb-8 ${step === 0 ? 'hidden' : ''}`}>
           <div className="flex justify-between mb-2">
             <span className="text-sm font-medium text-stone-600 dark:text-stone-400">
               Step {step + 1} of {TOTAL_STEPS}
@@ -149,22 +146,7 @@ export default function OnboardingPage() {
 
         {/* Step content */}
         <div className="mb-8 min-h-64">
-          {step === 0 && (
-            <div className="text-center">
-              <h1 className="font-display text-4xl font-black text-ink dark:text-white mb-4">
-                Welcome, {user?.email}!
-              </h1>
-              <p className="text-lg text-stone-600 dark:text-stone-400 mb-6">
-                Let's set up your Spanish learning journey.
-              </p>
-              <div className="rounded-2xl bg-brand-500/10 border border-brand-500/20 p-6">
-                <p className="text-stone-700 dark:text-stone-300">
-                  This app teaches you Spanish through comprehensible input, spaced repetition, and
-                  real conversation with a personal AI tutor. No gamification, just genuine learning.
-                </p>
-              </div>
-            </div>
-          )}
+          {step === 0 && <TasteOfSpanish onSolved={() => setStep(1)} />}
 
           {step === 1 && !quizProgress && (
             <div>
@@ -333,8 +315,8 @@ export default function OnboardingPage() {
           })()}
         </div>
 
-        {/* Navigation */}
-        <div className="flex gap-4">
+        {/* Navigation — the first screen drives itself. */}
+        <div className={`flex gap-4 ${step === 0 ? 'hidden' : ''}`}>
           <button
             onClick={handlePrevious}
             disabled={step === 0}

@@ -16,6 +16,11 @@ export const TUTOR_VOICE_KEY = 'aprende-tutor-voice-v1';
 export const LAST_USER_ID_KEY = 'aprende-last-user-id';
 // The account's chosen course language (see lib/languages.ts).
 export const ACTIVE_LANGUAGE_KEY = 'aprende-active-language';
+// Sound and haptic feedback preferences (see lib/feedback.ts). Device-local:
+// whether you want sound on is a property of the phone you're holding — and
+// of where you are — not of the account.
+export const SOUND_KEY = 'aprende-sound-v1';
+export const HAPTICS_KEY = 'aprende-haptics-v1';
 // An interrupted lesson's position, so it can be resumed rather than
 // restarted (see lib/lesson-resume.ts). Deliberately device-local and NOT
 // synced — a half-finished lesson belongs to the phone you left it on.

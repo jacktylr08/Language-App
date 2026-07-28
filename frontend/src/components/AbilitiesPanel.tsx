@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAbilities, type Ability } from '@/lib/abilities';
+import { Icon } from '@/components/icons/Icon';
 
 /**
  * "What you can do in Spanish" — progress measured as real, practical abilities
@@ -40,18 +41,14 @@ export function AbilitiesPanel() {
       <ul className="space-y-2.5">
         {canDo.map((a) => (
           <li key={a.week} className="flex gap-2.5">
-            <span className="shrink-0 mt-0.5 text-brand-500" aria-hidden>
-              ✓
-            </span>
+            <Icon name="check" size={17} className="shrink-0 mt-0.5 text-brand-500" />
             <span className="text-sm text-ink dark:text-stone-100 leading-snug">{a.statement}</span>
           </li>
         ))}
 
         {learning.map((a) => (
           <li key={a.week} className="flex gap-2.5">
-            <span className="shrink-0 mt-0.5" aria-hidden>
-              ◐
-            </span>
+            <Icon name="target" size={17} className="shrink-0 mt-0.5 text-saffron-500" />
             <span className="text-sm leading-snug">
               <span className="text-ink dark:text-stone-100">{a.statement}</span>
               <span className="ml-1.5 text-[11px] font-bold uppercase tracking-wide text-saffron-600 dark:text-saffron-400">
@@ -63,9 +60,7 @@ export function AbilitiesPanel() {
 
         {next && (
           <li className="flex gap-2.5 opacity-50">
-            <span className="shrink-0 mt-0.5" aria-hidden>
-              🔒
-            </span>
+            <Icon name="lock" size={16} className="shrink-0 mt-1 text-stone-400 dark:text-stone-600" />
             <span className="text-sm leading-snug text-ink-soft dark:text-stone-400">
               {next.statement}
               <span className="ml-1.5 text-[11px] font-semibold uppercase tracking-wide">next</span>

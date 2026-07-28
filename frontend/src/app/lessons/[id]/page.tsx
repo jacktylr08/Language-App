@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { getLessonBySlug } from '@/lib/curriculum';
 import { LessonEngine } from '@/components/LessonEngine';
+import { LessonSkeleton } from '@/components/Skeleton';
 
 export default function LessonPage() {
   const params = useParams();
@@ -14,9 +15,7 @@ export default function LessonPage() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-paper dark:bg-paper-dark">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <LessonSkeleton />
     );
   }
 

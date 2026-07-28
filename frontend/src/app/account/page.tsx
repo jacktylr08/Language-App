@@ -19,7 +19,9 @@ import {
 import { getCurriculum } from '@/lib/curriculum';
 import { pushSupported, getExistingSubscription, enablePushReminders, disablePushReminders } from '@/lib/push';
 import { TUTOR_VOICES, loadTutorVoice, saveTutorVoice } from '@/lib/tutor-voice';
+import { FeedbackToggles } from '@/components/FeedbackToggles';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { SettingsSkeleton } from '@/components/Skeleton';
 
 interface Profile {
   email: string;
@@ -189,9 +191,7 @@ export default function AccountPage() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <SettingsSkeleton />
     );
   }
 
@@ -353,13 +353,21 @@ export default function AccountPage() {
         <section className="surface p-6 mb-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <h2 className="font-extrabold text-ink dark:text-white">🎨 Appearance</h2>
+              <h2 className="font-extrabold text-ink dark:text-white">Appearance</h2>
               <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5">
                 Auto follows your device's setting.
               </p>
             </div>
             <ThemeToggle />
           </div>
+        </section>
+
+        {/* Sound & haptics — the first thing anyone reaches for on a train */}
+        <section className="surface p-6 mb-6">
+          <h2 className="font-display text-2xl font-black text-ink dark:text-white mb-4">
+            Sound &amp; feel
+          </h2>
+          <FeedbackToggles />
         </section>
 
         {/* Change password */}

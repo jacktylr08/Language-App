@@ -4,15 +4,14 @@ import Link from 'next/link';
 import { useRequireAuth } from '@/lib/hooks';
 import { loadProgress, weekReachedFor } from '@/lib/progress';
 import { READINGS } from '@/lib/readings';
+import { ReadingListSkeleton } from '@/components/Skeleton';
 
 export default function ReadingListPage() {
   const { isLoading } = useRequireAuth();
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <ReadingListSkeleton />
     );
   }
 

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { LessonEngine } from '@/components/LessonEngine';
+import { LessonSkeleton } from '@/components/Skeleton';
 
 function PracticeInner() {
   const { isLoading: authLoading } = useRequireAuth();
@@ -12,9 +13,7 @@ function PracticeInner() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-paper dark:bg-paper-dark">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <LessonSkeleton />
     );
   }
 
@@ -25,9 +24,7 @@ export default function PracticePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-paper dark:bg-paper-dark">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-        </div>
+        <LessonSkeleton />
       }
     >
       <PracticeInner />

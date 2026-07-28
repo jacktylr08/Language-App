@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { isAuthenticated } from '@/lib/auth';
 import { dueWordCount } from '@/lib/progress';
 import { useSyncedState } from '@/lib/hooks';
+import { Icon, type IconName } from '@/components/icons/Icon';
 
 /**
  * Persistent navigation.
@@ -22,13 +23,13 @@ import { useSyncedState } from '@/lib/hooks';
  * route to it whatsoever.
  */
 
-const TABS = [
-  { href: '/lessons', label: 'Learn', icon: '📚' },
-  { href: '/practice', label: 'Review', icon: '⚡' },
-  { href: '/tutor', label: 'Tutor', icon: '🧑‍🏫' },
-  { href: '/read', label: 'Read', icon: '📖' },
-  { href: '/account', label: 'You', icon: '⚙️' },
-] as const;
+const TABS: ReadonlyArray<{ href: string; label: string; icon: IconName }> = [
+  { href: '/lessons', label: 'Learn', icon: 'learn' },
+  { href: '/practice', label: 'Review', icon: 'review' },
+  { href: '/tutor', label: 'Tutor', icon: 'chat' },
+  { href: '/read', label: 'Read', icon: 'read' },
+  { href: '/account', label: 'You', icon: 'account' },
+];
 
 /**
  * Routes that own the whole screen. A lesson in progress is a focused,
@@ -82,9 +83,7 @@ export function BottomNav() {
                     : 'text-stone-400 dark:text-stone-500 hover:text-ink dark:hover:text-stone-300'
                 }`}
               >
-                <span className="text-xl leading-none" aria-hidden>
-                  {tab.icon}
-                </span>
+                <Icon name={tab.icon} size={22} filled={active && tab.icon !== 'account'} />
                 <span className="text-[10px] font-extrabold tracking-wide">{tab.label}</span>
                 {tab.href === '/practice' && due > 0 && (
                   <span

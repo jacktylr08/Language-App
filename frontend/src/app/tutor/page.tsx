@@ -8,6 +8,7 @@ import { SessionReport } from '@/components/SessionReport';
 import { buildTutorContext, buildScenarioContext } from '@/lib/tutor-context';
 import { reflectAndSave, markEvaluationDone, type LearnerProfile } from '@/lib/tutor-memory';
 import { getScenario } from '@/lib/scenarios';
+import { PageSkeleton } from '@/components/Skeleton';
 
 type Phase = 'call' | 'reflecting' | { kind: 'report'; profile: LearnerProfile };
 
@@ -59,17 +60,13 @@ function TutorPageInner() {
 
   if (isLoading || !ctx) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <PageSkeleton />
     );
   }
 
   if (phase === 'reflecting') {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <PageSkeleton />
     );
   }
 
@@ -91,9 +88,7 @@ export default function TutorPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-        </div>
+        <PageSkeleton />
       }
     >
       <TutorPageInner />

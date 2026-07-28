@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { CourseChip } from '@/components/CourseChip';
+import { BrandLockup } from '@/components/icons/BrandMark';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
 import { getCurriculum, getAllVocab } from '@/lib/curriculum';
 import { EXERCISE_TYPE_COUNT } from '@/lib/exercise-engine';
+import { PageSkeleton } from '@/components/Skeleton';
 
 const phases = [
   { n: '01', title: 'Foundations', desc: 'Your first words, sounds and sentences.' },
@@ -43,9 +45,7 @@ export default function HomePage() {
 
   if (redirectLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <PageSkeleton />
     );
   }
 
@@ -54,9 +54,7 @@ export default function HomePage() {
       <nav className="sticky top-0 z-20 bg-paper/85 dark:bg-paper-dark/85 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
         <div className="max-w-6xl mx-auto px-6 py-3.5 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl font-black text-brand-600 dark:text-brand-400">
-              Fluenta
-            </h1>
+            <BrandLockup />
             <CourseChip />
           </div>
           <div className="flex gap-3 items-center">

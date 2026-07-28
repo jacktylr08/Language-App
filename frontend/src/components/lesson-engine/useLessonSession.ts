@@ -4,6 +4,7 @@ import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession,
 import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult } from '@/lib/progress';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { saveCheckpoint, loadCheckpoint, clearCheckpoint } from '@/lib/lesson-resume';
+import { feedback as playFeedback } from '@/lib/feedback';
 import type { Feedback } from './types';
 
 export interface SessionStats {
@@ -101,6 +102,10 @@ export function useLessonSession({ lesson, mode, srAvailable, allVocab }: UseLes
         if (current.type === 'speak') recordPronunciationResult(current.word.id, correct);
       }
 
+      // A clean answer and a scraped-through-on-the-retry answer should not
+      // sound identical — the win has to be worth something.
+      playFeedback(correct ? (firstTry ? 'correct' : 'almost') : 'wrong');
+
       if (correct) {
         const comboNext = combo + 1;
         touchStreak();
@@ -137,6 +142,7 @@ export function useLessonSession({ lesson, mode, srAvailable, allVocab }: UseLes
         completeLessonLocal(lesson.slug, accuracy);
         clearCheckpoint(lesson.slug);
       } else touchStreak(); // practice/mistakes: touch streak even if all skipped
+      playFeedback('complete');
       setFinished(true);
     } else {
       const nextIndex = index + 1;

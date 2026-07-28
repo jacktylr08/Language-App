@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { getReading } from '@/lib/readings';
 import { ReadingPassage } from '@/components/ReadingPassage';
+import { PassageSkeleton } from '@/components/Skeleton';
 
 export default function ReadingPage() {
   const router = useRouter();
@@ -14,9 +15,7 @@ export default function ReadingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500" />
-      </div>
+      <PassageSkeleton />
     );
   }
 
