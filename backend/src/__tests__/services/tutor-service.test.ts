@@ -121,3 +121,31 @@ describe('buildLiveInstructions — never ask the learner to repeat themselves',
     expect(noRepeatIdx).toBeLessThan(talkLikeIdx);
   });
 });
+
+describe('buildLiveInstructions — turn-taking on a live call', () => {
+  /**
+   * The complaint these exist for: in any room that wasn't silent, Profe
+   * stopped mid-sentence, started the same sentence again, stopped again.
+   * The client-side fix stops most spurious interruptions ever reaching him;
+   * this is the other half — when one does get through, he must not rewind.
+   */
+  const instructions = tutorService.buildLiveInstructions({ weekReached: 4 });
+
+  it('forbids restarting an interrupted sentence from the beginning', () => {
+    expect(instructions).toMatch(/DO NOT start that sentence again from the beginning/i);
+  });
+
+  it('tells him to ignore a noise rather than asking "sorry, what was that?"', () => {
+    expect(instructions).toMatch(/don't ask "sorry, what was that\?" every time/i);
+  });
+
+  it('tells him to leave a learner’s thinking pause alone', () => {
+    // A tutor who fills every silence is why people find these stressful —
+    // and a beginner assembling a sentence needs that pause most of all.
+    expect(instructions).toMatch(/LEAVE SILENCE ALONE/);
+  });
+
+  it('tells him to yield if they both start at once', () => {
+    expect(instructions).toMatch(/Never speak over them/i);
+  });
+});

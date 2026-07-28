@@ -127,11 +127,29 @@ export async function createRealtimeClientSecret(
         audio: {
           input: {
             transcription: { model: 'gpt-4o-mini-transcribe' },
-            // Server-side voice activity detection: lets the learner just talk,
-            // and lets them interrupt the tutor (barge-in) naturally. A longer
-            // silence window means a beginner isn't cut off mid-thought while
-            // they search for a word.
-            turn_detection: { type: 'server_vad', silence_duration_ms: 900 },
+            /**
+             * Strip room noise before turn detection ever sees it.
+             * `near_field` is tuned for a phone held near the face or a
+             * headset, which is how this app is used. Without it, every
+             * ambient sound is a candidate utterance.
+             */
+            noise_reduction: { type: 'near_field' },
+            /**
+             * Semantic VAD, not plain energy VAD.
+             *
+             * `server_vad` decides the learner has finished talking purely by
+             * measuring silence, which is wrong twice over for a language
+             * tutor: it cuts off a beginner who pauses to search for a word,
+             * and it treats any noise as the start of a turn. `semantic_vad`
+             * asks a model whether what it heard actually sounds like a
+             * finished thought.
+             *
+             * `eagerness: 'low'` makes it wait longer before taking the
+             * floor. For a learner assembling a sentence one word at a time,
+             * being given a moment matters far more than snappy turn-taking —
+             * a real tutor lets you finish.
+             */
+            turn_detection: { type: 'semantic_vad', eagerness: 'low' },
           },
           output: { voice },
         },

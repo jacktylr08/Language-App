@@ -30,7 +30,9 @@ jest.mock('@/lib/realtime', () => ({
 
 async function startCall() {
   render(<RealtimeCall context={null} onClose={onClose} />);
-  fireEvent.click(await screen.findByText('🎙️ Start talking'));
+  // Matched on the label, not the icon — an icon swap shouldn't break a test
+  // about the end-call grace period.
+  fireEvent.click(await screen.findByRole('button', { name: /start talking/i }));
   await waitFor(() => expect(screen.getByText('Listening — just talk')).toBeInTheDocument());
 }
 

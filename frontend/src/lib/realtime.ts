@@ -39,6 +39,25 @@ export interface EphemeralToken {
 }
 
 const CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
+
+/**
+ * How long a detected voice has to persist before we accept it as a real
+ * interruption and stop Profe mid-sentence.
+ *
+ * Voice activity detection is energy-based: a door, a TV, a car outside, or
+ * someone else in the room all register as "the user started speaking". The
+ * barge-in handler below reacts by cancelling Profe's response and
+ * truncating it — so in any room that isn't silent, he stopped, restarted,
+ * stopped again, and never finished a sentence. That's the single worst bug
+ * in the product, because a tutor you can't let finish a sentence isn't a
+ * tutor.
+ *
+ * 400ms is long enough that a click, a cough or a passing car has ended
+ * before we act, and short enough that a learner who genuinely cuts in still
+ * feels heard immediately. Real barge-in still works — it just has to be
+ * real.
+ */
+const BARGE_IN_CONFIRM_MS = 400;
 // If the handshake hasn't reached "listening" within this window, something's
 // stuck (common on flaky mobile networks/mic permission dialogs) — fail
 // cleanly instead of leaving the call hanging on "Connecting…" forever, which
@@ -70,6 +89,11 @@ export class RealtimeSession {
   private state: RealtimeState = 'connecting';
   private currentItemId: string | null = null;
   private assistantSpeechStartedAt: number | null = null;
+  /** Pending, unconfirmed interruption — see BARGE_IN_CONFIRM_MS. */
+  private bargeInTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the (possible) interruption actually began, for accurate truncation. */
+  private userSpeechStartedAt: number | null = null;
+  private pushToTalk = false;
 
   constructor(private cb: RealtimeCallbacks) {}
 
@@ -182,6 +206,38 @@ export class RealtimeSession {
     }
   }
 
+  /**
+   * A confirmed interruption: stop Profe and hand the floor over.
+   *
+   * Explicit response.cancel + conversation.item.truncate (rather than
+   * relying only on whatever the server does implicitly) so the model's own
+   * memory of the conversation matches what the learner actually heard —
+   * otherwise it carries on next turn as if it had finished a sentence it
+   * never got to say.
+   */
+  private commitBargeIn(): void {
+    if (this.closed) return;
+    if (this.state !== 'assistant_speaking' && this.state !== 'thinking') return;
+
+    this.send({ type: 'response.cancel' });
+    if (this.currentItemId && this.assistantSpeechStartedAt !== null) {
+      // Measured to when the learner actually started, not to now — the
+      // confirmation delay must not be counted as audio they heard.
+      const heardUntil = this.userSpeechStartedAt ?? Date.now();
+      const audioEndMs = Math.max(0, heardUntil - this.assistantSpeechStartedAt);
+      this.send({
+        type: 'conversation.item.truncate',
+        item_id: this.currentItemId,
+        content_index: 0,
+        audio_end_ms: audioEndMs,
+      });
+    }
+    this.assistantBuffer = '';
+    this.currentItemId = null;
+    this.assistantSpeechStartedAt = null;
+    this.setState('user_speaking');
+  }
+
   private send(event: Record<string, unknown>): void {
     if (this.dc && this.dc.readyState === 'open') {
       this.dc.send(JSON.stringify(event));
@@ -211,32 +267,35 @@ export class RealtimeSession {
 
     // The learner started/stopped speaking (server VAD).
     if (type === 'input_audio_buffer.speech_started') {
-      // Real barge-in: if Profe was mid-response, stop it immediately rather
-      // than letting it talk over the learner. Explicit response.cancel +
-      // conversation.item.truncate (rather than relying only on whatever the
-      // server does implicitly) so the model's own memory of the
-      // conversation matches what the learner actually heard — otherwise it
-      // can carry on next turn as if it had finished a sentence it never got
-      // to say.
-      if (this.state === 'assistant_speaking' || this.state === 'thinking') {
-        this.send({ type: 'response.cancel' });
-        if (this.currentItemId && this.assistantSpeechStartedAt !== null) {
-          const audioEndMs = Math.max(0, Date.now() - this.assistantSpeechStartedAt);
-          this.send({
-            type: 'conversation.item.truncate',
-            item_id: this.currentItemId,
-            content_index: 0,
-            audio_end_ms: audioEndMs,
-          });
-        }
-        this.assistantBuffer = '';
-        this.currentItemId = null;
-        this.assistantSpeechStartedAt = null;
+      this.userSpeechStartedAt = Date.now();
+
+      // Nothing to interrupt — Profe isn't talking, so react at once.
+      if (this.state !== 'assistant_speaking' && this.state !== 'thinking') {
+        this.setState('user_speaking');
+        return;
       }
-      this.setState('user_speaking');
+
+      // Profe IS mid-response. Don't tear it down yet: wait to see whether
+      // this is actually someone speaking or just a noise. Committing here is
+      // what produced the stop-restart-stop loop in any room with a TV on.
+      if (this.bargeInTimer) return;
+      this.bargeInTimer = setTimeout(() => {
+        this.bargeInTimer = null;
+        this.commitBargeIn();
+      }, BARGE_IN_CONFIRM_MS);
       return;
     }
+
     if (type === 'input_audio_buffer.speech_stopped') {
+      // The "speech" ended before we were willing to call it an interruption,
+      // so it was a blip. Cancel the pending barge-in and leave Profe talking
+      // — he never even knows it happened.
+      if (this.bargeInTimer) {
+        clearTimeout(this.bargeInTimer);
+        this.bargeInTimer = null;
+        this.userSpeechStartedAt = null;
+        return;
+      }
       this.setState('thinking');
       return;
     }
@@ -293,6 +352,59 @@ export class RealtimeSession {
     }
   }
 
+  /**
+   * Hold-to-talk, for rooms where no detection threshold will do — a café, a
+   * train, a house with other people in it. Turn detection is switched off
+   * entirely and the mic stays muted until the learner is actually holding
+   * the button, so ambient sound never reaches the model at all.
+   *
+   * This is the escape hatch, not the default: hands-free is what makes the
+   * tutor feel like a conversation, and most people in a quiet room should
+   * never need this.
+   */
+  setPushToTalk(on: boolean): void {
+    this.pushToTalk = on;
+    this.send({
+      type: 'session.update',
+      session: {
+        audio: {
+          input: {
+            // null disables automatic turn-taking; the client commits instead.
+            turn_detection: on ? null : { type: 'semantic_vad', eagerness: 'low' },
+          },
+        },
+      },
+    });
+    // Muted between utterances in push-to-talk; live otherwise.
+    this.setMuted(on);
+  }
+
+  isPushToTalk(): boolean {
+    return this.pushToTalk;
+  }
+
+  /** Learner pressed the talk button. */
+  beginUtterance(): void {
+    if (!this.pushToTalk) return;
+    // Whatever Profe was saying, the learner has decided to speak.
+    if (this.state === 'assistant_speaking' || this.state === 'thinking') {
+      this.userSpeechStartedAt = Date.now();
+      this.commitBargeIn();
+    }
+    this.send({ type: 'input_audio_buffer.clear' });
+    this.setMuted(false);
+    this.setState('user_speaking');
+  }
+
+  /** Learner released the talk button — send what they said. */
+  endUtterance(): void {
+    if (!this.pushToTalk) return;
+    this.setMuted(true);
+    this.send({ type: 'input_audio_buffer.commit' });
+    this.send({ type: 'response.create' });
+    this.setState('thinking');
+  }
+
   getTranscript(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return [...this.transcript];
   }
@@ -301,6 +413,10 @@ export class RealtimeSession {
     if (this.closed) return;
     this.closed = true;
     this.connecting = false;
+    if (this.bargeInTimer) {
+      clearTimeout(this.bargeInTimer);
+      this.bargeInTimer = null;
+    }
     try {
       this.dc?.close();
     } catch {

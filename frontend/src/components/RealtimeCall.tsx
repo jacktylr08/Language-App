@@ -9,6 +9,8 @@ import {
 } from '@/lib/realtime';
 import type { TutorContext } from '@/lib/tutor-context';
 import { loadTutorVoice } from '@/lib/tutor-voice';
+import { Profe, type ProfeMood } from '@/components/Profe';
+import { Icon } from '@/components/icons/Icon';
 
 interface RealtimeCallProps {
   context: TutorContext | null;
@@ -196,6 +198,22 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [started]);
 
+  /**
+   * Hold-to-talk. The default is hands-free, which is what makes this feel
+   * like a conversation — but in a café, on a train, or in a house with other
+   * people in it, no detection threshold is good enough, and being cut off
+   * mid-sentence by a passing bus is worse than pressing a button.
+   */
+  const [pushToTalk, setPushToTalk] = useState(false);
+  const togglePushToTalk = () => {
+    setPushToTalk((on) => {
+      sessionRef.current?.setPushToTalk(!on);
+      // Leaving push-to-talk shouldn't strand the mic muted.
+      if (on) setMuted(false);
+      return !on;
+    });
+  };
+
   const toggleMute = () => {
     setMuted((m) => {
       sessionRef.current?.setMuted(!m);
@@ -205,6 +223,22 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
 
   const active = state === 'user_speaking' || state === 'listening';
   const speaking = state === 'assistant_speaking';
+
+  /**
+   * The call state, as a face. Turn-taking is the thing learners get
+   * confused by on a voice call — knowing at a glance whether Profe is
+   * waiting for you, working, or talking is worth more than any label.
+   */
+  const profeMood: ProfeMood =
+    state === 'assistant_speaking'
+      ? 'speaking'
+      : state === 'thinking'
+      ? 'thinking'
+      : state === 'user_speaking'
+      ? 'listening'
+      : state === 'listening'
+      ? 'listening'
+      : 'idle';
   const hasError = !!error && error !== 'unsupported';
 
   // Brief transitional screen while we give a final transcription a moment
@@ -227,13 +261,11 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
             href="/lessons"
             className="text-ink-soft dark:text-stone-300 hover:text-ink dark:hover:text-white font-semibold text-sm inline-flex items-center gap-1.5"
           >
-            <span aria-hidden>←</span> Lessons
+            <Icon name="arrow-left" size={16} /> Lessons
           </a>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow flex items-center justify-center text-5xl mb-8">
-            🧑‍🏫
-          </div>
+          <Profe mood="idle" size={132} className="mb-6" />
           <h1 className="font-display text-3xl font-black text-ink dark:text-white">
             {context?.evaluation ? 'Time for a little check-in' : 'Talk with Profe'}
           </h1>
@@ -246,7 +278,7 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
             onClick={startCall}
             className="mt-9 h-16 px-10 rounded-full bg-gradient-to-r from-brand-500 to-brand-600 text-white font-extrabold text-lg shadow-glow hover:brightness-105 transition-all inline-flex items-center gap-3"
           >
-            🎙️ Start talking
+            <Icon name="mic" size={22} /> Start talking
           </button>
           <p className="text-xs text-ink-soft/70 dark:text-stone-500 mt-4">
             You’ll be asked to allow your microphone.
@@ -299,16 +331,20 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
                   speaking ? 'w-56 h-56 animate-ping' : active ? 'w-48 h-48 animate-pulse' : 'w-40 h-40'
                 }`}
               />
+              {/* Profe himself, reacting. Seeing whether he's listening,
+                  thinking or talking is most of what makes the turn-taking
+                  legible — a coloured orb tells you nothing about who has
+                  the floor. */}
               <div
-                className={`relative w-32 h-32 rounded-full bg-gradient-to-br shadow-glow flex items-center justify-center text-5xl transition-all duration-300 ${
+                className={`relative w-36 h-36 rounded-full bg-gradient-to-br shadow-glow flex items-end justify-center overflow-hidden transition-all duration-300 ${
                   speaking
-                    ? 'from-brand-400 to-brand-600 scale-110'
+                    ? 'from-brand-300 to-brand-500 scale-110'
                     : active
-                    ? 'from-terra-400 to-saffron-500 scale-105'
-                    : 'from-stone-300 to-stone-400 dark:from-stone-600 dark:to-stone-700'
+                    ? 'from-saffron-300 to-terra-400 scale-105'
+                    : 'from-stone-200 to-stone-300 dark:from-stone-700 dark:to-stone-800'
                 }`}
               >
-                🧑‍🏫
+                <Profe mood={profeMood} size={132} className="translate-y-2" />
               </div>
             </div>
 
@@ -362,9 +398,23 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
         )}
       </div>
 
+      {/* Mode switch — deliberately understated. Hands-free is the good
+          experience and should stay the default; this is the escape hatch for
+          a noisy room, offered rather than pushed. */}
+      {!notConfigured && error !== 'unsupported' && !hasError && (
+        <div className="shrink-0 text-center">
+          <button
+            onClick={togglePushToTalk}
+            className="text-xs font-bold text-ink-soft dark:text-stone-400 underline underline-offset-4 hover:text-ink dark:hover:text-stone-200"
+          >
+            {pushToTalk ? 'Switch back to hands-free' : 'Somewhere noisy? Use hold-to-talk'}
+          </button>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="shrink-0 px-6 pb-10 pt-4 flex items-center justify-center gap-6">
-        {!notConfigured && error !== 'unsupported' && !hasError && (
+        {!notConfigured && error !== 'unsupported' && !hasError && !pushToTalk && (
           <button
             onClick={toggleMute}
             title={muted ? 'Unmute your mic' : 'Mute your mic'}
@@ -375,14 +425,25 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
                 : 'bg-white dark:bg-stone-800 text-ink dark:text-white'
             }`}
           >
-            {muted ? '🔇' : '🎤'}
+            <Icon name="mic" size={20} className={muted ? 'opacity-40' : ''} />
+          </button>
+        )}
+        {/* Hold-to-talk, when hands-free can't win against the room. */}
+        {pushToTalk && !notConfigured && error !== 'unsupported' && !hasError && (
+          <button
+            onPointerDown={() => sessionRef.current?.beginUtterance()}
+            onPointerUp={() => sessionRef.current?.endUtterance()}
+            onPointerLeave={() => sessionRef.current?.endUtterance()}
+            className="h-16 px-10 rounded-full bg-gradient-to-r from-brand-500 to-brand-600 text-white font-extrabold shadow-glow active:scale-95 transition-transform inline-flex items-center gap-2 select-none touch-none"
+          >
+            <Icon name="mic" size={20} /> Hold to talk
           </button>
         )}
         <button
           onClick={() => end.current()}
           className="h-14 px-8 rounded-full bg-terra-500 hover:bg-terra-600 text-white font-extrabold text-lg shadow-glow transition-colors inline-flex items-center gap-2"
         >
-          <span className="text-xl" aria-hidden>✕</span>
+          <Icon name="close" size={20} />
           End call
         </button>
       </div>
