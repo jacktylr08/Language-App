@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/store';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
 import { CourseChip } from '@/components/CourseChip';
+import { endGuest } from '@/lib/guest';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -49,6 +50,7 @@ export default function RegisterPage() {
 
     try {
       await register(email, password);
+      endGuest();
       router.push('/onboarding');
     } catch (err: any) {
       setFormError(err.response?.data?.error || 'Registration failed');

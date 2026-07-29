@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './store';
 import { isAuthenticated } from './auth';
+import { isGuest } from './guest';
 import { getSyncStatus, startSyncLifecycle, syncOnLoad, SYNC_EVENT } from './sync';
 
 /**
@@ -30,6 +31,13 @@ export function useRequireAuth() {
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated()) {
+      // A guest is a legitimate learner who simply has no account yet —
+      // everything runs locally and nothing syncs. Bouncing them to /login
+      // is what made it impossible to try the app at all.
+      if (isGuest()) {
+        setStateLoaded(true);
+        return;
+      }
       router.push('/login');
       return;
     }
@@ -47,7 +55,7 @@ export function useRequireAuth() {
 
   return {
     user,
-    isLoading: isLoading || (isAuthenticated() && !stateLoaded),
+    isLoading: isLoading || ((isAuthenticated() || isGuest()) && !stateLoaded),
     /** 'error' means we're showing cached local data, not confirmed server state. */
     syncStatus: getSyncStatus(),
   };

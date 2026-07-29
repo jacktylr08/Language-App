@@ -5,6 +5,9 @@ import { Confetti } from '@/components/Confetti';
 import { Profe } from '@/components/Profe';
 import { Icon } from '@/components/icons/Icon';
 import { StatCard } from './StatCard';
+import { GuestSavePrompt } from '@/components/GuestSavePrompt';
+import { isGuest, GUEST_LESSON_LIMIT } from '@/lib/guest';
+import { loadProgress, knownWordCount } from '@/lib/progress';
 import type { SessionStats } from './useLessonSession';
 
 /**
@@ -61,6 +64,11 @@ export function CompletionScreen({
   // A near-perfect run and a scrape-through should not be congratulated
   // identically — the praise has to mean something or it stops landing.
   const tier = accuracy >= 95 ? 'perfect' : accuracy >= 80 ? 'good' : 'solid';
+
+  const guest = isGuest();
+  const lessonsDone = guest
+    ? Object.values(loadProgress().lessons).filter((l) => l.completed).length
+    : 0;
 
   const headline = { perfect: '¡Perfecto!', good: '¡Muy bien!', solid: '¡Bien hecho!' }[tier];
   const fromProfe = {
@@ -125,7 +133,21 @@ export function CompletionScreen({
           </div>
         </Beat>
 
-        <Beat at={1300}>
+        {/* A guest has something to lose by now — this is the moment to ask,
+            and the only moment where "keep this" beats "sign up to begin". */}
+        {guest && (
+          <Beat at={1300}>
+            <div className="mb-5">
+              <GuestSavePrompt
+                wordsLearned={knownWordCount(loadProgress())}
+                streak={streak}
+                urgent={lessonsDone >= GUEST_LESSON_LIMIT}
+              />
+            </div>
+          </Beat>
+        )}
+
+        <Beat at={guest ? 1600 : 1300}>
           <button onClick={onContinue} className="btn-primary w-full py-4 text-lg">
             Continue
           </button>

@@ -24,6 +24,8 @@ import { DashboardSkeleton } from '@/components/Skeleton';
 import { Icon, type IconName } from '@/components/icons/Icon';
 import { Profe } from '@/components/Profe';
 import { BrandLockup } from '@/components/icons/BrandMark';
+import { GuestSavePrompt } from '@/components/GuestSavePrompt';
+import { isGuest, GUEST_LESSON_LIMIT } from '@/lib/guest';
 
 /** A cadence line so the tutor card reflects an actual relationship, not a static pitch. */
 function cadenceLabel(days: number | undefined): string {
@@ -106,6 +108,7 @@ export default function LessonsPage() {
   const wordsKnown = knownWordCount(progress);
   const mistakes = combinedMistakeCount();
   const due = dueWordCount(progress);
+  const guest = isGuest();
   // "Done" (real completions) stays separate from "placed out of at
   // onboarding" (skipped) — the journey stat below should be honest about
   // which is which, even though both count toward being unlocked/reached.
@@ -165,6 +168,16 @@ export default function LessonsPage() {
 
   const sidebar = (
     <div className="space-y-4">
+      {/* A guest's progress lives only in this browser, and they should know
+          that before they've built up something they'd be upset to lose. */}
+      {guest && (
+        <GuestSavePrompt
+          wordsLearned={wordsKnown}
+          streak={streak}
+          urgent={lessonsDone >= GUEST_LESSON_LIMIT}
+        />
+      )}
+
       {/* Your journey — the main summary, shown first */}
       <div className="surface p-5">
         <div className="flex items-center justify-between mb-3">

@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
-const withPWA = require('next-pwa')({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-});
+// The service worker is built by scripts/build-sw.js after `next build`,
+// not by next-pwa. next-pwa (last released 2022) generated a worker that
+// threw on install and went straight to "redundant", so the app had zero
+// caches and was completely dead offline while still calling itself a PWA.
 
 const nextConfig = {
   reactStrictMode: true,
@@ -38,4 +36,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = nextConfig;

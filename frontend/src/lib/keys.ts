@@ -16,6 +16,10 @@ export const TUTOR_VOICE_KEY = 'aprende-tutor-voice-v1';
 export const LAST_USER_ID_KEY = 'aprende-last-user-id';
 // The account's chosen course language (see lib/languages.ts).
 export const ACTIVE_LANGUAGE_KEY = 'aprende-active-language';
+// Set while someone is trying the app before creating an account (see
+// lib/guest.ts). Device-local by definition — a guest has no account for it
+// to belong to.
+export const GUEST_KEY = 'aprende-guest-v1';
 // Sound and haptic feedback preferences (see lib/feedback.ts). Device-local:
 // whether you want sound on is a property of the phone you're holding — and
 // of where you are — not of the account.

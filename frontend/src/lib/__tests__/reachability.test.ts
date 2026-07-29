@@ -40,10 +40,17 @@ function linkedPaths(): Set<string> {
 describe('every route is reachable from somewhere in the app', () => {
   const linked = linkedPaths();
 
-  // Routes reached only from outside the app (a fresh visitor, an email
-  // link, or the browser's own error handling) legitimately have no inbound
-  // href. Everything else must.
-  const ENTRY_POINTS = ['/', '/login', '/register', '/onboarding'];
+  // Routes reached from outside the app's own navigation legitimately have no
+  // inbound href. Everything else must.
+  const ENTRY_POINTS = [
+    '/', // a fresh visitor
+    '/login',
+    '/register',
+    '/onboarding',
+    // Served by the service worker as the fallback when an uncached route is
+    // opened offline — nothing in the app links to it, and nothing should.
+    '/offline',
+  ];
 
   const routes = sourceFiles(path.join(SRC, 'app'))
     .filter((f) => path.basename(f) === 'page.tsx')

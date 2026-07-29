@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/store';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
 import { CourseChip } from '@/components/CourseChip';
+import { endGuest } from '@/lib/guest';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function LoginPage() {
       // Returning users go straight to their lessons. Onboarding is only for
       // brand-new accounts (see the register flow) — logging in should never
       // re-ask the introductory questions.
+      endGuest();
       router.push('/lessons');
     } catch (err: any) {
       setFormError(err.response?.data?.error || 'Login failed');
