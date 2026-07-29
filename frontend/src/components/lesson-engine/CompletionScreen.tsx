@@ -6,6 +6,8 @@ import { Profe } from '@/components/Profe';
 import { Icon } from '@/components/icons/Icon';
 import { StatCard } from './StatCard';
 import { GuestSavePrompt } from '@/components/GuestSavePrompt';
+import { ShareProgressButton } from '@/components/ShareProgressButton';
+import { getCurriculum } from '@/lib/curriculum';
 import { isGuest, GUEST_LESSON_LIMIT } from '@/lib/guest';
 import { loadProgress, knownWordCount } from '@/lib/progress';
 import type { SessionStats } from './useLessonSession';
@@ -151,6 +153,19 @@ export function CompletionScreen({
           <button onClick={onContinue} className="btn-primary w-full py-4 text-lg">
             Continue
           </button>
+          {/* Only offered to a signed-in learner with something worth showing —
+              see ShareProgressButton for why it hides itself early on. */}
+          {!guest && (
+            <ShareProgressButton
+              stats={{
+                streak,
+                wordsKnown: knownWordCount(loadProgress()),
+                lessonsDone: Object.values(loadProgress().lessons).filter((l) => l.completed).length,
+                totalLessons: getCurriculum().length,
+              }}
+              className="mt-3 w-full py-3 text-sm text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-stone-200"
+            />
+          )}
         </Beat>
       </div>
     </div>

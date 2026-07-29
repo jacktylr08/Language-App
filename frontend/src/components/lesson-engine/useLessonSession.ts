@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CurriculumLesson, VocabItem } from '@/lib/curriculum';
-import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry, recallKindFor } from '@/lib/exercise-engine';
-import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult } from '@/lib/progress';
+import { Exercise, buildLessonSession, buildReviewSession, buildMistakesSession, buildRetry, recallKindFor, splitIntoRounds } from '@/lib/exercise-engine';
+import { touchStreak, completeLessonLocal, recordWordResult, recordPronunciationResult, recordRoundsDone } from '@/lib/progress';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { saveCheckpoint, loadCheckpoint, clearCheckpoint } from '@/lib/lesson-resume';
 import { feedback as playFeedback } from '@/lib/feedback';
@@ -40,9 +40,32 @@ export function useLessonSession({ lesson, mode, srAvailable, allVocab }: UseLes
   const [finished, setFinished] = useState(false);
   /** Set when this lesson was interrupted and can be picked back up. */
   const [resumable, setResumable] = useState<{ index: number; total: number } | null>(null);
+  /**
+   * True at a round boundary, so the learner gets an honest place to stop
+   * partway through an eleven-minute lesson (see splitIntoRounds).
+   */
+  const [roundComplete, setRoundComplete] = useState(false);
 
   const current = queue[index];
   const total = queue.length;
+
+  /**
+   * Cumulative end index of each round. Derived from the LIVE queue rather
+   * than fixed up front: a missed answer re-queues a retry, which grows the
+   * queue mid-round, and a stale boundary would drop the learner at a
+   * checkpoint that no longer lines up with anything.
+   *
+   * Only lessons get rounds. Practice and mistakes sessions are already the
+   * short thing a learner reaches for when they have five minutes.
+   */
+  const roundEnds = useMemo(() => {
+    if (mode !== 'lesson') return [] as number[];
+    let acc = 0;
+    return splitIntoRounds(queue).map((r) => (acc += r.length));
+  }, [queue, mode]);
+  const roundsTotal = roundEnds.length;
+  const currentRound = roundEnds.findIndex((end) => index < end);
+  const roundNumber = currentRound === -1 ? roundsTotal : currentRound + 1;
 
   useEffect(() => {
     if (mode === 'mistakes') {
@@ -152,9 +175,19 @@ export function useLessonSession({ lesson, mode, srAvailable, allVocab }: UseLes
       // that's the single most common way a lesson gets abandoned.
       if (mode === 'lesson' && lesson) {
         saveCheckpoint({ slug: lesson.slug, queue, index: nextIndex, stats, combo });
+        // Crossed a round boundary — bank it and let them choose to stop.
+        if (roundEnds.includes(nextIndex)) {
+          const done = roundEnds.indexOf(nextIndex) + 1;
+          recordRoundsDone(lesson.slug, done, roundEnds.length);
+          playFeedback('streak');
+          setRoundComplete(true);
+        }
       }
     }
-  }, [index, total, stats, lesson, mode, queue, combo]);
+  }, [index, total, stats, lesson, mode, queue, combo, roundEnds]);
+
+  /** Carry on into the next round. */
+  const nextRound = useCallback(() => setRoundComplete(false), []);
 
   return {
     queue,
@@ -175,5 +208,9 @@ export function useLessonSession({ lesson, mode, srAvailable, allVocab }: UseLes
     resumable,
     resume,
     restart,
+    roundComplete,
+    nextRound,
+    roundNumber,
+    roundsTotal,
   };
 }

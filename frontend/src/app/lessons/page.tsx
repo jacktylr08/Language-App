@@ -570,6 +570,10 @@ export default function LessonsPage() {
                                 const isCurrent = index === currentIndex;
                                 const isSkipped = !!record?.skipped && !record?.completed;
                                 const stars = lessonStars(record);
+                                const partRounds =
+                                  !record?.completed && record?.roundsDone && record?.roundCount
+                                    ? { done: record.roundsDone, total: record.roundCount }
+                                    : null;
                                 const accent = themeAccents[lesson.theme] || themeAccents.phonetics;
 
                                 const card = (
@@ -619,6 +623,14 @@ export default function LessonsPage() {
                                           <p className="text-[12px] text-ink-soft/70 dark:text-stone-500 mt-1 italic">
                                             Placed out at signup — not actually done
                                           </p>
+                                        ) : partRounds ? (
+                                          /* Part-done lessons used to look
+                                             completely untouched, which made
+                                             stopping halfway feel like it
+                                             counted for nothing. */
+                                          <p className="text-[12px] font-bold text-brand-600 dark:text-brand-400 mt-1">
+                                            {partRounds.done} of {partRounds.total} rounds done
+                                          </p>
                                         ) : null}
                                       </div>
                                       {unlocked && (
@@ -629,7 +641,13 @@ export default function LessonsPage() {
                                               : 'bg-stone-100 dark:bg-stone-800 text-ink-soft dark:text-stone-300'
                                           }`}
                                         >
-                                          {isCurrent ? 'START' : record?.completed ? 'REDO' : isSkipped ? 'REVIEW' : 'START'}
+                                          {record?.completed
+                                            ? 'REDO'
+                                            : partRounds
+                                              ? 'RESUME'
+                                              : isSkipped
+                                                ? 'REVIEW'
+                                                : 'START'}
                                         </span>
                                       )}
                                     </div>

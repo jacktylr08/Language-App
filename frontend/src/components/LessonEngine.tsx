@@ -35,6 +35,7 @@ import { useLessonSession } from './lesson-engine/useLessonSession';
 import { TopExitBar } from './lesson-engine/TopExitBar';
 import { StatCard } from './lesson-engine/StatCard';
 import { CompletionScreen } from './lesson-engine/CompletionScreen';
+import { RoundComplete } from './lesson-engine/RoundComplete';
 import { TeachCard } from './lesson-engine/TeachCard';
 import { GrammarSlideCard } from './lesson-engine/GrammarSlideCard';
 import { DialogueCard } from './lesson-engine/DialogueCard';
@@ -98,6 +99,10 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     resumable,
     resume,
     restart,
+    roundComplete,
+    nextRound,
+    roundNumber,
+    roundsTotal,
   } = useLessonSession({ lesson, mode, srAvailable: speakingAvailable, allVocab });
 
   // Per-exercise UI state
@@ -527,7 +532,9 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
                   {mode === 'mistakes' ? 'FIX THESE' : mode === 'practice' ? 'START PRACTICE' : 'START LESSON'}
                 </button>
                 <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
-                  {total} exercises ·{' '}
+                  {roundsTotal > 1
+                    ? `${roundsTotal} rounds of about 3 minutes · `
+                    : `${total} exercises · `}
                   <Icon name="flame" size={14} className="inline align-[-2px] text-terra-500" />{' '}
                   {currentStreak(p)} day streak
                 </p>
@@ -536,6 +543,19 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // A round boundary — the honest stopping point inside a long lesson.
+  if (roundComplete) {
+    return (
+      <RoundComplete
+        roundNumber={roundNumber}
+        roundsTotal={roundsTotal}
+        stats={stats}
+        onContinue={nextRound}
+        onStop={() => router.push('/lessons')}
+      />
     );
   }
 
@@ -568,11 +588,21 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
         >
           <Icon name="close" size={22} />
         </button>
-        <div className="flex-1 h-3.5 bg-stone-200/80 dark:bg-stone-800 rounded-full overflow-hidden shadow-inner">
-          <div
-            className="h-full progress-shimmer rounded-full transition-all duration-500"
-            style={{ width: `${Math.max(progressPct, 3)}%` }}
-          />
+        <div className="flex-1">
+          <div className="h-3.5 bg-stone-200/80 dark:bg-stone-800 rounded-full overflow-hidden shadow-inner">
+            <div
+              className="h-full progress-shimmer rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(progressPct, 3)}%` }}
+            />
+          </div>
+          {/* Which round you're in. Without this the bar is the only signal,
+              and a bar that's 30% full after four minutes reads as "ages to
+              go" rather than "you're most of the way through round two". */}
+          {roundsTotal > 1 && (
+            <p className="text-[10px] font-extrabold uppercase tracking-wide text-stone-400 dark:text-stone-600 mt-1 text-center">
+              Round {roundNumber} of {roundsTotal}
+            </p>
+          )}
         </div>
         <div
           className={`flex items-center gap-1 font-extrabold text-sm rounded-full px-2.5 py-1 ${

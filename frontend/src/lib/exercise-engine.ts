@@ -248,6 +248,55 @@ function buildSentence(build: SentenceBuild, lessonSlug: string, idx: number, po
   };
 }
 
+/**
+ * How many exercises make a round. About three minutes at a realistic pace.
+ *
+ * A generated lesson runs 50–59 exercises — around eleven minutes with no
+ * stopping point in it. That's roughly triple a Duolingo lesson, and the
+ * length isn't the real problem: the absence of a place to stop is. A learner
+ * with four spare minutes can't start an eleven-minute thing, so on a busy day
+ * they don't open the app at all, and that's how a habit dies.
+ *
+ * Rounds don't shorten the lesson. They put honest finish lines inside it, so
+ * "I did a bit" becomes a real outcome instead of an abandoned session.
+ */
+const ROUND_SIZE = 13;
+
+/**
+ * Splits a session queue into rounds, preferring to break AFTER a graded
+ * exercise. Ending a round on a teach card or a grammar slide would stop the
+ * learner on "here's some information" rather than on "you got that right",
+ * which is a much weaker place to leave someone.
+ */
+export function splitIntoRounds(queue: Exercise[], size = ROUND_SIZE): Exercise[][] {
+  if (queue.length === 0) return [];
+  const UNGRADED: ReadonlySet<ExerciseType> = new Set(['teach', 'grammar_slide', 'dialogue_slide']);
+
+  const rounds: Exercise[][] = [];
+  let cursor = 0;
+  while (cursor < queue.length) {
+    let end = Math.min(cursor + size, queue.length);
+    // Nudge the boundary forward past any trailing ungraded cards, up to a
+    // few places, so the round ends on something the learner answered.
+    if (end < queue.length) {
+      let probe = end;
+      const limit = Math.min(end + 4, queue.length);
+      while (probe < limit && UNGRADED.has(queue[probe - 1].type)) probe++;
+      end = probe;
+    }
+    rounds.push(queue.slice(cursor, end));
+    cursor = end;
+  }
+
+  // A stray one-or-two-item final round is worse than a slightly long
+  // penultimate one — nobody wants a "round 5 of 5" that's two questions.
+  if (rounds.length > 1 && rounds[rounds.length - 1].length <= 3) {
+    const tail = rounds.pop()!;
+    rounds[rounds.length - 1].push(...tail);
+  }
+  return rounds;
+}
+
 /** Build the full exercise queue for a standard lesson.
  *
  * Structure mirrors a real tutoring session:

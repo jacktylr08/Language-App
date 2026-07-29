@@ -22,6 +22,7 @@ import { TUTOR_VOICES, loadTutorVoice, saveTutorVoice } from '@/lib/tutor-voice'
 import { FeedbackToggles } from '@/components/FeedbackToggles';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SettingsSkeleton } from '@/components/Skeleton';
+import { ShareProgressButton } from '@/components/ShareProgressButton';
 
 interface Profile {
   email: string;
@@ -360,6 +361,25 @@ export default function AccountPage() {
             </div>
             <ThemeToggle />
           </div>
+        </section>
+
+        {/* Something worth showing someone. */}
+        <section className="surface p-6 mb-6">
+          <h2 className="font-display text-2xl font-black text-ink dark:text-white">
+            Show off a bit
+          </h2>
+          <p className="text-sm text-ink-soft dark:text-stone-400 mt-1 mb-4">
+            A card with your streak and word count, to send to whoever needs to know.
+          </p>
+          <ShareProgressButton
+            stats={{
+              streak: currentStreak(loadProgress()),
+              wordsKnown: knownWordCount(loadProgress()),
+              lessonsDone: Object.values(loadProgress().lessons).filter((l) => l.completed).length,
+              totalLessons: getCurriculum().length,
+            }}
+            className="btn-primary px-5 py-2.5 text-sm"
+          />
         </section>
 
         {/* Sound & haptics — the first thing anyone reaches for on a train */}

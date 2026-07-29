@@ -54,6 +54,13 @@ export interface LessonRecord {
    * no fake word-strength history. See placeLearnerAtWeek.
    */
   skipped?: boolean;
+  /**
+   * How many of the lesson's rounds the learner has finished, and how many
+   * there were. Lets a part-done lesson show real progress instead of looking
+   * untouched — see recordRoundsDone.
+   */
+  roundsDone?: number;
+  roundCount?: number;
 }
 
 /** True if a lesson is behind the learner — really completed, or placed out of at onboarding. */
@@ -309,6 +316,32 @@ export function recordPronunciationResult(wordId: string, correct: boolean): voi
   if (correct) w.pronCorrect = (w.pronCorrect || 0) + 1;
   else w.pronWrong = (w.pronWrong || 0) + 1;
   state.words[wordId] = w;
+  save(state);
+}
+
+/**
+ * Banks a partly-done lesson.
+ *
+ * A lesson is 50–59 exercises and used to be all-or-nothing: stop at exercise
+ * 40 and you had, officially, done nothing. Rounds give the learner honest
+ * finish lines inside the lesson, and this is what makes them count for
+ * something visible rather than being a UI flourish.
+ *
+ * Monotonic on purpose — replaying a lesson and stopping earlier the second
+ * time must never reduce what's recorded. Also touches the streak: three
+ * minutes of real work is a day's practice.
+ */
+export function recordRoundsDone(slug: string, roundsDone: number, roundCount: number): void {
+  const state = loadProgress();
+  touchToday(state);
+  const rec: LessonRecord = state.lessons[slug] || {
+    completed: false,
+    bestAccuracy: 0,
+    timesCompleted: 0,
+  };
+  rec.roundsDone = Math.max(rec.roundsDone ?? 0, roundsDone);
+  rec.roundCount = roundCount;
+  state.lessons[slug] = rec;
   save(state);
 }
 

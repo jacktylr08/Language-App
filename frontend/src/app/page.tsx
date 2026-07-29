@@ -69,12 +69,29 @@ export default function WelcomePage() {
               }}
             />
           </div>
-          <Link
-            href="/login"
-            className="shrink-0 text-center py-3 text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
-          >
-            I already have an account
-          </Link>
+          <div className="shrink-0">
+            <Link
+              href="/login"
+              className="block text-center py-3 text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
+            >
+              I already have an account
+            </Link>
+            {/* Both app stores require these to be reachable, and a learner
+                deciding whether to talk to an AI deserves to find them. */}
+            <p className="text-center text-xs text-stone-400 dark:text-stone-600 pb-1">
+              <Link href="/privacy" className="hover:underline">
+                Privacy
+              </Link>
+              {' · '}
+              <Link href="/terms" className="hover:underline">
+                Terms
+              </Link>
+              {' · '}
+              <Link href="/support" className="hover:underline">
+                Support
+              </Link>
+            </p>
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col max-w-sm w-full mx-auto animate-rise-in">
