@@ -26,6 +26,7 @@ import { Profe } from '@/components/Profe';
 import { BrandLockup } from '@/components/icons/BrandMark';
 import { GuestSavePrompt } from '@/components/GuestSavePrompt';
 import { isGuest, GUEST_LESSON_LIMIT } from '@/lib/guest';
+import { getActiveLanguage } from '@/lib/languages';
 
 /** A cadence line so the tutor card reflects an actual relationship, not a static pitch. */
 function cadenceLabel(days: number | undefined): string {
@@ -74,7 +75,7 @@ const practiceLinks: ReadonlyArray<{
   {
     href: '/read',
     icon: 'read',
-    label: 'Read in Spanish',
+    label: 'Read for real',
     description: 'Short passages — tap any word instead of a full translation.',
   },
 ];
@@ -109,6 +110,8 @@ export default function LessonsPage() {
   const mistakes = combinedMistakeCount();
   const due = dueWordCount(progress);
   const guest = isGuest();
+  const language = getActiveLanguage();
+  const maxWeek = Math.max(...getCurriculum().map((l) => l.week));
   // "Done" (real completions) stays separate from "placed out of at
   // onboarding" (skipped) — the journey stat below should be honest about
   // which is which, even though both count toward being unlocked/reached.
@@ -466,11 +469,14 @@ export default function LessonsPage() {
             Your course
           </p>
           <h1 className="font-display text-4xl lg:text-5xl font-black text-ink dark:text-white leading-[1.05]">
-            The road to Spanish
+            The road to {language.name}
           </h1>
           <p className="text-ink-soft dark:text-stone-400 mt-2 max-w-lg">
-            Twenty-four weeks, six phases — from your first{' '}
-            <em className="font-display">hola</em> to real conversations.
+            {maxWeek} weeks, {phaseGroups.length} phases — from your first{' '}
+            {/* The language's own greeting, from the registry, so this line
+                doesn't have to be rewritten per course. */}
+            <em className="font-display">{language.greeting.replace(/[¡!]/g, '')}</em> to real
+            conversations.
           </p>
         </header>
 

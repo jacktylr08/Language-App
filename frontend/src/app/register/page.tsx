@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/store';
 import { useRedirectIfAuthenticated } from '@/lib/hooks';
-import { CourseChip } from '@/components/CourseChip';
-import { endGuest } from '@/lib/guest';
+import { PageSkeleton } from '@/components/Skeleton';
+import { AuthScreen, Field, AuthError } from '@/components/AuthScreen';
+import { endGuest, isGuest } from '@/lib/guest';
+import { getActiveLanguage } from '@/lib/languages';
+import { loadProgress, knownWordCount } from '@/lib/progress';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,36 +18,20 @@ export default function RegisterPage() {
   const [formError, setFormError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
-  if (redirectLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto"></div>
-          <p className="mt-4 text-stone-600 dark:text-stone-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (redirectLoading) return <PageSkeleton />;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     clearError();
 
-    if (!email || !password || !confirmPassword) {
-      setFormError('Please fill in all fields');
+    if (!email || !password) {
+      setFormError('Enter an email and a password.');
       return;
     }
-
     if (password.length < 8) {
-      setFormError('Password must be at least 8 characters');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setFormError('Passwords do not match');
+      setFormError('Passwords need to be at least 8 characters.');
       return;
     }
 
@@ -52,92 +39,82 @@ export default function RegisterPage() {
       await register(email, password);
       endGuest();
       router.push('/onboarding');
-    } catch (err: any) {
-      setFormError(err.response?.data?.error || 'Registration failed');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setFormError(message || 'Could not create your account. Please try again.');
     }
   };
 
+  const message = formError || error || '';
+  // Someone arriving here mid-guest-session already has something at stake;
+  // the heading should acknowledge that rather than greeting them as new.
+  const guest = isGuest();
+  const words = guest ? knownWordCount(loadProgress()) : 0;
+  const language = getActiveLanguage();
+
   return (
-    <div className="flex items-center justify-center min-h-screen px-4">
-      <div className="w-full max-w-md p-8 surface !rounded-[28px]">
-        <div className="text-center mb-8">
-          <h1 className="font-display text-4xl font-black text-brand-600 dark:text-brand-400 mb-2">
-            Start Learning Spanish
-          </h1>
-          <div className="flex justify-center mb-2">
-            <CourseChip />
-          </div>
-          <p className="text-stone-600 dark:text-stone-400">Create your account</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {(formError || error) && (
-            <div className="p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded text-sm">
-              {formError || error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
-              placeholder="you@example.com"
-              disabled={isLoading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
-              placeholder="••••••••"
-              disabled={isLoading}
-            />
-            <p className="text-xs text-stone-500 mt-1">At least 8 characters</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
-              placeholder="••••••••"
-              disabled={isLoading}
-            />
-          </div>
-
-          <button
-            type="submit"
+    <AuthScreen
+      title={guest ? 'Save your progress' : 'Create your account'}
+      subtitle={
+        guest && words > 0
+          ? `Keep the ${words} word${words === 1 ? '' : 's'} you've learned and carry on from any device.`
+          : `Free, and it takes a moment. Then ${language.name} is yours.`
+      }
+      footer={
+        <p className="text-center text-sm text-ink-soft dark:text-stone-400 py-2">
+          Already have an account?{' '}
+          <Link href="/login" className="font-bold text-brand-600 dark:text-brand-400">
+            Sign in
+          </Link>
+        </p>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <Field
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          disabled={isLoading}
+          error={!!message}
+          autoComplete="email"
+          inputMode="email"
+          enterKeyHint="next"
+          autoCapitalize="none"
+          spellCheck={false}
+          required
+        />
+        <div>
+          <Field
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
             disabled={isLoading}
-            className="btn-primary w-full py-3.5"
-          >
-            {isLoading ? 'Creating account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-stone-600 dark:text-stone-400">
-            Already have an account?{' '}
-            <Link href="/login" className="text-brand-600 hover:text-brand-500 dark:text-brand-400 font-semibold">
-              Sign in
-            </Link>
-          </p>
+            error={!!message}
+            // new-password lets the OS offer to generate and save one. A single
+            // field with this hint is better practice than a confirm field,
+            // which mostly just catches typing the same typo twice.
+            autoComplete="new-password"
+            enterKeyHint="go"
+            minLength={8}
+            required
+          />
+          {password.length > 0 && password.length < 8 && (
+            <p className="text-xs text-ink-soft dark:text-stone-500 mt-1.5">
+              {8 - password.length} more character{8 - password.length === 1 ? '' : 's'}
+            </p>
+          )}
         </div>
-      </div>
-    </div>
+
+        <AuthError message={message} />
+
+        <button type="submit" disabled={isLoading} className="btn-primary w-full py-4 text-lg">
+          {isLoading ? 'Creating your account…' : guest ? 'Save my progress' : 'Create account'}
+        </button>
+      </form>
+    </AuthScreen>
   );
 }

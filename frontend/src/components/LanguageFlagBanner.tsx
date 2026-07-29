@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { getActiveLanguage, LANGUAGE_CHANGE_EVENT, type CourseLanguage } from '@/lib/languages';
 
 const VIEW_W = 400;
@@ -19,7 +20,16 @@ const WAVE_PATH = `M0,0 L360,0 Q400,112 350,225 Q300,337 380,450 Q400,562 330,67
  * language live (and re-reads on LANGUAGE_CHANGE_EVENT) rather than a value
  * frozen at first import.
  */
+/**
+ * Screens where the course flag would be presumptuous or distracting: the
+ * welcome screen asks which language you want, so showing Spain's flag behind
+ * the question answers it for you; the auth screens are about your account,
+ * not a course.
+ */
+const NO_FLAG = ['/', '/login', '/register'];
+
 export function LanguageFlagBanner() {
+  const pathname = usePathname();
   const [language, setLanguage] = useState<CourseLanguage>(() => getActiveLanguage());
 
   useEffect(() => {
@@ -27,6 +37,8 @@ export function LanguageFlagBanner() {
     window.addEventListener(LANGUAGE_CHANGE_EVENT, refresh);
     return () => window.removeEventListener(LANGUAGE_CHANGE_EVENT, refresh);
   }, []);
+
+  if (NO_FLAG.includes(pathname)) return null;
 
   let y = 0;
   const bands = language.flagBands.map((band, i) => {

@@ -6,9 +6,12 @@ import { ThemeScript } from '@/components/ThemeScript';
 import { BottomNav } from '@/components/BottomNav';
 
 export const metadata: Metadata = {
-  title: 'Fluenta — Learn Spanish for real',
+  title: 'Fluenta — learn a language for real',
+  // Language-neutral on purpose: the product is a language app whose first
+  // finished course happens to be Spanish, and the copy shouldn't have to be
+  // rewritten when the second one lands.
   description:
-    'Interactive Spanish lessons that teach, test and adapt to you — from first words to real conversations.',
+    'Interactive lessons plus a tutor you can actually talk to — from first words to real conversations.',
   manifest: '/manifest.json',
   applicationName: 'Fluenta',
   icons: {
