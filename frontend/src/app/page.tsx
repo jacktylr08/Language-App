@@ -12,6 +12,9 @@ import { PageSkeleton } from '@/components/Skeleton';
 import { beginGuest } from '@/lib/guest';
 import { primeAudio } from '@/lib/feedback';
 import { getCurriculum } from '@/lib/curriculum';
+import { getStartingLesson } from '@/lib/course-progress';
+import { loadProgress } from '@/lib/progress';
+import { getActiveLanguage, hasLanguageChoice } from '@/lib/languages';
 
 /**
  * The welcome screen.
@@ -22,18 +25,24 @@ import { getCurriculum } from '@/lib/curriculum';
  * Fluenta is an app, and an app's first screen is a door, not a brochure:
  * brand, one question, a couple of buttons, full height, no chrome.
  *
- * So it's one screen at a time. Pick a language, then choose how to start.
- * Nothing to scroll past to reach what you came for, no nav bar competing with
- * the primary action, no footer.
+ * Two things it also has to get right, both of which it previously got wrong:
  *
- * Opening on "what do you want to learn?" is also the framing that makes this
- * a language app rather than a Spanish app — see LanguagePicker.
+ * 1. It must not promise something the next tap doesn't deliver. The headline
+ *    was "Stop tapping. Start talking." above a button reading "Start your
+ *    first lesson" — which opens a tapping lesson. Whatever you think of the
+ *    lesson, that sequence teaches a new user to discount everything else the
+ *    screen says. The pitch is now the actual loop: learn a handful of words,
+ *    then use them out loud with Profe. Both halves are true, in that order.
+ *
+ * 2. It must not sell breadth it doesn't have. Asking "what do you want to
+ *    learn?" when one course exists is a menu of one — see hasLanguageChoice.
+ *    The step comes back by itself once a second course is finished.
  */
 
 type Step = 'language' | 'start';
 
 const SELLING_POINTS: ReadonlyArray<readonly [IconName, string]> = [
-  ['chat', 'Unlimited spoken conversation'],
+  ['chat', 'Say it out loud to Profe, as much as you like'],
   ['refresh', 'Reviews timed to just before you forget'],
   ['grammar', 'Grammar explained, not just marked wrong'],
 ];
@@ -41,12 +50,26 @@ const SELLING_POINTS: ReadonlyArray<readonly [IconName, string]> = [
 export default function WelcomePage() {
   const router = useRouter();
   const { isLoading } = useRedirectIfAuthenticated();
-  const [step, setStep] = useState<Step>('language');
-  const [languageName, setLanguageName] = useState('');
+  // Straight to the pitch while there's only one course to pitch.
+  const [step, setStep] = useState<Step>(() => (hasLanguageChoice() ? 'language' : 'start'));
+  const [languageName, setLanguageName] = useState(() => getActiveLanguage().name);
 
   if (isLoading) return <PageSkeleton />;
 
-  const lessonCount = getCurriculum().length;
+  const curriculum = getCurriculum();
+  const lessonCount = curriculum.length;
+
+  const startLearning = (): void => {
+    beginGuest();
+    // Inside the gesture, or the first correct answer of their first lesson
+    // plays into a suspended AudioContext.
+    primeAudio();
+    // Resolved from the curriculum, never a hard-coded slug: this button has
+    // to stay correct across renames, reorderings, and a second language
+    // whose first lesson isn't called the same thing.
+    const first = getStartingLesson(curriculum, loadProgress());
+    router.push(first ? `/lessons/${first.slug}` : '/lessons');
+  };
 
   return (
     // Full viewport and safe-area aware: an installed app has no browser
@@ -76,43 +99,34 @@ export default function WelcomePage() {
             >
               I already have an account
             </Link>
-            {/* Both app stores require these to be reachable, and a learner
-                deciding whether to talk to an AI deserves to find them. */}
-            <p className="text-center text-xs text-stone-400 dark:text-stone-600 pb-1">
-              <Link href="/privacy" className="hover:underline">
-                Privacy
-              </Link>
-              {' · '}
-              <Link href="/terms" className="hover:underline">
-                Terms
-              </Link>
-              {' · '}
-              <Link href="/support" className="hover:underline">
-                Support
-              </Link>
-            </p>
+            <LegalLinks />
           </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col max-w-sm w-full mx-auto animate-rise-in">
-          <button
-            onClick={() => setStep('language')}
-            className="shrink-0 self-start -ml-2 p-2 text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
-            aria-label="Back to language choice"
-          >
-            <Icon name="arrow-left" size={22} />
-          </button>
+          {hasLanguageChoice() ? (
+            <button
+              onClick={() => setStep('language')}
+              className="shrink-0 self-start -ml-2 p-2 text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
+              aria-label="Back to language choice"
+            >
+              <Icon name="arrow-left" size={22} />
+            </button>
+          ) : (
+            <BrandMark size={44} className="shrink-0 rounded-[13px] shadow-card" />
+          )}
 
           <div className="flex-1 flex flex-col justify-center text-center py-4">
             <Profe mood="speaking" size={128} className="mx-auto mb-4" />
             <h1 className="font-display text-4xl font-black text-ink dark:text-white leading-[1.05]">
-              Stop tapping.
+              Learn it.
               <br />
-              <span className="text-brand-600 dark:text-brand-400">Start talking.</span>
+              <span className="text-brand-600 dark:text-brand-400">Then say it.</span>
             </h1>
             <p className="text-ink-soft dark:text-stone-400 mt-4 leading-relaxed">
-              Call Profe and just talk {languageName}. He speaks at your exact level, lets you
-              finish your sentence, and remembers what you found hard last time.
+              A {languageName} course where every lesson ends somewhere real: talking to Profe, who
+              speaks at your exact level, lets you finish your sentence, and remembers what you
+              found hard last time.
             </p>
 
             <ul className="mt-7 space-y-2.5 text-left">
@@ -138,30 +152,64 @@ export default function WelcomePage() {
           </div>
 
           <div className="shrink-0 space-y-2">
+            {/* Says what actually happens next, at the length it actually
+                takes. "Start your first lesson" under a headline about talking
+                was the mismatch; this names the first step of the loop the
+                headline just described. */}
+            <button onClick={startLearning} className="btn-primary w-full py-4 text-lg">
+              Learn your first words — 3 min
+            </button>
+            {/* An escape hatch for someone who isn't a beginner. Every guest
+                used to be dropped into lesson one regardless, so anyone who
+                already knew "hola" met a screen teaching them "hola" and
+                concluded the app was beneath them — with no visible way to
+                say so. A mandatory level question would tax the majority who
+                genuinely are starting from zero, so it's an option here
+                rather than a step, leading into the adaptive placement quiz
+                that already exists. */}
             <button
               onClick={() => {
                 beginGuest();
-                // Inside the gesture, or the first correct answer of their
-                // first lesson plays into a suspended AudioContext.
                 primeAudio();
-                router.push('/lessons/greetings-essentials');
+                router.push('/onboarding');
               }}
-              className="btn-primary w-full py-4 text-lg"
+              className="block w-full py-3 text-center text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
             >
-              Start your first lesson
+              I already know some {languageName} — check my level
             </button>
             <Link
               href="/register"
-              className="block w-full py-3 text-center text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
+              className="block w-full py-2 text-center text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-white"
             >
-              Create an account first
+              Create an account
             </Link>
             <p className="text-center text-xs text-stone-400 dark:text-stone-600">
-              Free. No account needed to start.
+              Free to start, no account needed. An account saves your progress across devices.
             </p>
+            <LegalLinks />
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** Both app stores require these to be reachable, and a learner deciding
+ *  whether to talk to an AI deserves to find them. */
+function LegalLinks() {
+  return (
+    <p className="text-center text-xs text-stone-400 dark:text-stone-600 pt-2 pb-1">
+      <Link href="/privacy" className="hover:underline">
+        Privacy
+      </Link>
+      {' · '}
+      <Link href="/terms" className="hover:underline">
+        Terms
+      </Link>
+      {' · '}
+      <Link href="/support" className="hover:underline">
+        Support
+      </Link>
+    </p>
   );
 }

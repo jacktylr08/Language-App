@@ -148,6 +148,19 @@ export function getAvailableLanguages(): CourseLanguage[] {
   return LANGUAGES.filter((l) => l.available);
 }
 
+/**
+ * Whether asking "which language?" is a real question yet.
+ *
+ * A menu with one item is not a choice, it's a step. While exactly one course
+ * is finished, the welcome flow skips the picker and opens on that language —
+ * and the moment a second course is marked available, the picker returns on
+ * its own with no code change. The registry stays the source of truth either
+ * way; this only decides whether the learner is asked.
+ */
+export function hasLanguageChoice(): boolean {
+  return getAvailableLanguages().length > 1;
+}
+
 const DEFAULT_LANGUAGE_ID = 'es';
 
 export function getLanguage(id: string): CourseLanguage {

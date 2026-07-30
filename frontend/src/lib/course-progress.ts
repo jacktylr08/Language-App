@@ -78,3 +78,28 @@ export function coursePositionFor(
 ): CoursePosition {
   return computeCoursePosition(curriculum, progress.lessons);
 }
+
+/**
+ * The lesson a "start learning" button should open.
+ *
+ * The welcome screen used to route to the literal string
+ * `/lessons/greetings-essentials`. That is curriculum identity hard-coded
+ * into a UI component, and it breaks silently in every direction the course
+ * is allowed to move: renaming the slug, reordering week one, switching the
+ * active language to one whose first lesson is called something else, or
+ * letting a placement result choose a later starting point. The button would
+ * keep rendering and land on a 404.
+ *
+ * Resolving it from the curriculum means the same button is correct for
+ * every language and every future edit to the course.
+ */
+export function getStartingLesson<T extends CourseLessonLike>(
+  curriculum: readonly T[],
+  progress: ProgressState
+): T | null {
+  if (curriculum.length === 0) return null;
+  const { currentIndex } = computeCoursePosition(curriculum, progress.lessons);
+  // -1 means the whole course is behind them; send them to the last lesson
+  // rather than nowhere, so the button is never dead.
+  return currentIndex >= 0 ? curriculum[currentIndex] : curriculum[curriculum.length - 1];
+}

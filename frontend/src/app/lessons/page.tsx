@@ -9,12 +9,13 @@ import {
   loadProgress,
   currentStreak,
   knownWordCount,
+  seenWordCount,
   lessonStars,
-  recentActivity,
   isLessonDone,
   dueWordCount,
   ProgressState,
 } from '@/lib/progress';
+import { REVIEW_SESSION_SIZE } from '@/lib/exercise-engine';
 import { coursePositionFor } from '@/lib/course-progress';
 import { combinedMistakeCount } from '@/lib/learner-insights';
 import { buildTutorContext } from '@/lib/tutor-context';
@@ -107,8 +108,15 @@ export default function LessonsPage() {
   const curriculum = getCurriculum();
   const streak = currentStreak(progress);
   const wordsKnown = knownWordCount(progress);
+  const wordsSeen = seenWordCount(progress);
   const mistakes = combinedMistakeCount();
   const due = dueWordCount(progress);
+  // A session covers at most REVIEW_SESSION_SIZE words, so that — not the
+  // full due count — is what any promise about this session has to be built
+  // from. ~24s per word is the working estimate; the floor stops a two-word
+  // queue reading "about 1 minutes".
+  const reviewNow = Math.min(due, REVIEW_SESSION_SIZE);
+  const reviewMinutes = Math.max(2, Math.round(reviewNow * 0.4));
   const guest = isGuest();
   const language = getActiveLanguage();
   const maxWeek = Math.max(...getCurriculum().map((l) => l.week));
@@ -119,8 +127,15 @@ export default function LessonsPage() {
   const lessonsSkipped = curriculum.filter(
     (l) => progress.lessons[l.slug]?.skipped && !progress.lessons[l.slug]?.completed
   ).length;
-  const coursePct = Math.round(((lessonsDone + lessonsSkipped) / curriculum.length) * 100);
-  const activity = recentActivity(progress, 14);
+  // The headline percentage counts lessons the learner actually DID. Placing
+  // out at signup moves you along the course, so it still shows up on the bar
+  // — as a separate, visibly different segment — but it must never be added
+  // into the number labelled as your progress. Someone who placed out of 20
+  // lessons was being told they were 37% of the way through a course they
+  // hadn't started.
+  const total = Math.max(curriculum.length, 1);
+  const donePct = Math.round((lessonsDone / total) * 100);
+  const skippedPct = Math.round((lessonsSkipped / total) * 100);
 
   // Unlocking / "what's next" — see lib/course-progress.ts for why this is
   // anchored on furthest-reached rather than "is the previous array item
@@ -188,18 +203,28 @@ export default function LessonsPage() {
             Your journey
           </p>
           <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400">
-            {coursePct}%
+            {donePct}%
           </span>
         </div>
-        <div className="h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-1.5">
+        {/* Two segments, not one: what you completed, then what placement
+            carried you past. Same bar, visibly different, no double-counting. */}
+        <div className="flex h-1.5 rounded-full bg-stone-200/80 dark:bg-stone-800 overflow-hidden mb-1.5">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
-            style={{ width: `${Math.max(coursePct, 2)}%` }}
+            className="h-full bg-gradient-to-r from-brand-400 to-brand-600"
+            style={{ width: `${Math.max(donePct, lessonsDone > 0 ? 2 : 0)}%` }}
           />
+          {skippedPct > 0 && (
+            <div
+              className="h-full bg-brand-500/25"
+              style={{ width: `${skippedPct}%` }}
+              title={`${lessonsSkipped} lessons placed out of`}
+            />
+          )}
         </div>
         {lessonsSkipped > 0 && (
           <p className="text-[11px] text-ink-soft/70 dark:text-stone-500 mb-4">
-            {lessonsSkipped} lesson{lessonsSkipped === 1 ? '' : 's'} placed out of at signup
+            {lessonsDone} lesson{lessonsDone === 1 ? '' : 's'} done · {lessonsSkipped} placed out of
+            at signup
           </p>
         )}
         {newlyAvailable.length > 0 && (
@@ -208,29 +233,20 @@ export default function LessonsPage() {
             earlier weeks — your completed lessons all still count.
           </p>
         )}
-        <div className={`grid grid-cols-2 gap-3 ${lessonsSkipped > 0 ? '' : 'mt-4'} mb-4`}>
-          <div>
-            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
-              {wordsKnown}
-            </p>
-            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">words known</p>
-          </div>
-          <div>
-            <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
-              {progress.bestStreak}
-            </p>
-            <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">best streak</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1" title="Last 14 days">
-          {activity.map((active, i) => (
-            <span
-              key={i}
-              className={`h-2 flex-1 rounded-full ${
-                active ? 'bg-terra-500' : 'bg-stone-200 dark:bg-stone-800'
-              }`}
-            />
-          ))}
+        {/* One number, honestly labelled. "Words known" was a claim about the
+            learner's ability that the data doesn't support — two correct
+            answers is enough to qualify, and a lesson asks about each of its
+            own words three or four times. "Learned, of met" says the same
+            thing without asserting knowledge. Best streak and the 14-day
+            strip moved out: they measure app usage, not language, and three
+            competing figures made none of them mean anything. */}
+        <div className={`${lessonsSkipped > 0 ? '' : 'mt-4'}`}>
+          <p className="font-display text-2xl font-black text-ink dark:text-white leading-none">
+            {wordsKnown}
+          </p>
+          <p className="text-xs text-ink-soft dark:text-stone-400 mt-1">
+            words learned, of {wordsSeen} met
+          </p>
         </div>
       </div>
 
@@ -249,10 +265,18 @@ export default function LessonsPage() {
             Due today
           </p>
           <p className="font-extrabold text-white text-lg mt-1 leading-tight">
-            {due} {due === 1 ? 'word' : 'words'} ready for review
+            {reviewNow === due
+              ? `${due} ${due === 1 ? 'word' : 'words'} ready for review`
+              : `${reviewNow} of ${due} words ready for review`}
           </p>
+          {/* Says what the session will actually cover. The old line quoted a
+              duration derived from min(due, 18) next to the full due count,
+              which reads as an offer to clear all of them in four minutes —
+              and then the session stops at 18. */}
           <p className="text-white/85 text-sm mt-0.5">
-            Catch these before you forget them — about {Math.max(2, Math.round(Math.min(due, 18) * 0.4))} minutes.
+            {reviewNow === due
+              ? `Catch these before you forget them — about ${reviewMinutes} minutes.`
+              : `About ${reviewMinutes} minutes. The rest stay queued for your next session.`}
           </p>
           <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white">
             Start review
@@ -261,37 +285,71 @@ export default function LessonsPage() {
         </Link>
       )}
 
-      {/* Continue — pick up where you left off, right next to the journey summary */}
+      {/* Continue. Filled and glowing ONLY when it's the recommended action —
+          i.e. when nothing is due. With a review waiting, this drops to a
+          plain outlined card. Three saturated gradient hero cards stacked on
+          top of each other (review, lesson, tutor) meant nothing on the
+          screen was actually primary, and the learner had to read all three
+          to work out what the app wanted them to do. */}
       {nextLesson ? (
-        <Link
-          href={`/lessons/${nextLesson.slug}`}
-          className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
-        >
-          {/* The lesson's own theme, drawn — a low-opacity emoji on a green
-              gradient just muddies. */}
-          <Icon
-            name={themeIcons[nextLesson.theme] ?? 'sparkle'}
-            size={104}
-            className="absolute -right-3 -top-5 opacity-20 text-white"
-          />
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
-            {lessonsDone > 0 ? 'Pick up where you left off' : 'Start here'}
-          </p>
-          <p className="font-extrabold text-white text-lg mt-1 leading-tight">{nextLesson.title}</p>
-          <p className="text-white/85 text-sm mt-0.5">
-            Week {nextLesson.week} · {lessonsDone}/{curriculum.length} lessons done
-          </p>
-          <div className="mt-3 h-1.5 rounded-full bg-white/25 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-white/90 transition-all duration-700"
-              style={{ width: `${Math.max(coursePct, 3)}%` }}
+        due === 0 ? (
+          <Link
+            href={`/lessons/${nextLesson.slug}`}
+            className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+          >
+            {/* The lesson's own theme, drawn — a low-opacity emoji on a green
+                gradient just muddies. */}
+            <Icon
+              name={themeIcons[nextLesson.theme] ?? 'sparkle'}
+              size={104}
+              className="absolute -right-3 -top-5 opacity-20 text-white"
             />
-          </div>
-          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white">
-            Continue
-            <span className="transition-transform group-hover:translate-x-1">→</span>
-          </span>
-        </Link>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+              {lessonsDone > 0 ? 'Pick up where you left off' : 'Start here'}
+            </p>
+            <p className="font-extrabold text-white text-lg mt-1 leading-tight">
+              {nextLesson.title}
+            </p>
+            <p className="text-white/85 text-sm mt-0.5">
+              Week {nextLesson.week} · {lessonsDone}/{curriculum.length} lessons done
+            </p>
+            <div className="mt-3 h-1.5 rounded-full bg-white/25 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-white/90 transition-all duration-700"
+                style={{ width: `${Math.max(donePct, 3)}%` }}
+              />
+            </div>
+            <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white">
+              Continue
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href={`/lessons/${nextLesson.slug}`}
+            className="group flex items-center gap-4 surface p-5 transition-shadow hover:shadow-card-hover"
+          >
+            <span className="shrink-0 w-11 h-11 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-600 dark:text-brand-400">
+              <Icon name={themeIcons[nextLesson.theme] ?? 'sparkle'} size={21} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[11px] font-extrabold uppercase tracking-[0.15em] text-ink-soft dark:text-stone-400">
+                {lessonsDone > 0 ? 'Then carry on' : 'Then start here'}
+              </span>
+              <span className="block font-extrabold text-ink dark:text-white truncate">
+                {nextLesson.title}
+              </span>
+              <span className="block text-xs text-ink-soft dark:text-stone-400">
+                Week {nextLesson.week} · {lessonsDone}/{curriculum.length} lessons done
+              </span>
+            </span>
+            <Icon
+              name="arrow-right"
+              size={18}
+              className="shrink-0 text-stone-300 dark:text-stone-600 transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        )
       ) : (
         <div className="surface p-5 text-center">
           <p className="text-3xl mb-1">🏆</p>
@@ -305,33 +363,41 @@ export default function LessonsPage() {
       {/* Practical "can-do" abilities — progress by what you can actually do */}
       <AbilitiesPanel />
 
-      {/* Talk to the AI tutor — reflects the actual relationship, not a static pitch */}
+      {/* Talk to Profe — reflects the actual relationship, not a static pitch.
+          Kept distinctive (his face, a terracotta tint) but no longer a third
+          full-bleed gradient competing with the recommended action. Profe is
+          what you do WITH what you learned, so he sits after it, not beside
+          it shouting equally loudly. */}
       <Link
         href="/tutor"
-        className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-terra-500 via-terra-400 to-saffron-400 p-5 shadow-glow transition-transform active:scale-[0.99]"
+        className="group relative block overflow-hidden rounded-3xl border border-terra-500/25 bg-terra-500/[0.07] dark:bg-terra-500/10 p-5 pr-24 transition-colors hover:bg-terra-500/[0.12]"
       >
-        {/* Profe himself, not a stand-in emoji — this is the card that's
-            supposed to feel like a person waiting for you. */}
-        <Profe mood="idle" size={104} className="absolute -right-3 -bottom-4 opacity-90 drop-shadow-sm" />
+        <Profe
+          mood="idle"
+          size={92}
+          className="absolute -right-2 -bottom-3 opacity-95 drop-shadow-sm"
+        />
         {tutorCtx?.lastSessionNote ? (
           <>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-terra-600 dark:text-terra-400">
               {cadenceLabel(tutorCtx.daysSinceLastSession)}
             </p>
-            <p className="font-extrabold text-white text-lg mt-1 leading-tight">Continue with Profe</p>
-            <p className="text-white/90 text-sm mt-1 leading-snug line-clamp-2">
+            <p className="font-extrabold text-ink dark:text-white text-lg mt-1 leading-tight">
+              Continue with Profe
+            </p>
+            <p className="text-ink-soft dark:text-stone-400 text-sm mt-1 leading-snug line-clamp-2">
               &ldquo;{tutorCtx.lastSessionNote}&rdquo;
             </p>
           </>
         ) : (
           <>
-            <p className="font-extrabold text-white text-lg">Talk to your tutor</p>
-            <p className="text-white/90 text-sm mt-1 leading-snug">
+            <p className="font-extrabold text-ink dark:text-white text-lg">Talk to your tutor</p>
+            <p className="text-ink-soft dark:text-stone-400 text-sm mt-1 leading-snug">
               A live voice conversation with Profe — speak naturally, get corrected, at your level.
             </p>
           </>
         )}
-        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-white/95">
+        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-terra-600 dark:text-terra-400">
           {tutorCtx?.lastSessionNote ? 'Continue the conversation' : 'Start a call'}
           <span className="transition-transform group-hover:translate-x-1">→</span>
         </span>
@@ -678,8 +744,13 @@ export default function LessonsPage() {
               <p className="font-extrabold text-ink dark:text-white">
                 {lessonsDone + lessonsSkipped} of {curriculum.length} lessons behind you
               </p>
+              {/* Was hard-coded to "24 weeks · 6 phases" and a Spanish flag,
+                  sitting directly under the computed values it was meant to
+                  describe — so it would have gone wrong the moment the course
+                  grew, and was already wrong for any other language. */}
               <p className="text-xs text-stone-400 dark:text-stone-600 mt-1 font-medium">
-                24 weeks · 6 phases · from first words to real conversations&nbsp;🇪🇸
+                {maxWeek} weeks · {phaseGroups.length} phases · from first words to real
+                conversations&nbsp;{language.flag}
               </p>
             </div>
           </div>

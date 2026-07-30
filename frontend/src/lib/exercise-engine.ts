@@ -394,11 +394,21 @@ export function buildLessonSession(lesson: CurriculumLesson, speechRecognitionAv
   return queue;
 }
 
+/**
+ * How many words one practice session will actually cover.
+ *
+ * Exported because the dashboard has to promise the same number it delivers.
+ * It used to estimate the review card's duration from `min(due, 18)` while
+ * saying "37 words ready for review", which reads as an offer to clear all
+ * 37 in four minutes. Anything quoting a session length has to quote this.
+ */
+export const REVIEW_SESSION_SIZE = 18;
+
 /** Review lessons and the practice page: adaptive queue from weakest/due words. */
 export function buildReviewSession(
   lesson: CurriculumLesson | null,
   speechRecognitionAvailable: boolean,
-  size = 18
+  size = REVIEW_SESSION_SIZE
 ): Exercise[] {
   const all = getAllVocab();
   const { due, weak } = getReviewWordIds(size);

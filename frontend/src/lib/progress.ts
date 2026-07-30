@@ -455,6 +455,22 @@ export function knownWordCount(state: ProgressState): number {
 }
 
 /**
+ * Every word the learner has actually met, right down to one they got wrong
+ * once and haven't seen since.
+ *
+ * This exists so the headline figure can stop being called "words known".
+ * Two correct answers is enough to satisfy knownWordCount, and a lesson asks
+ * about each of its own words three or four times — so "known" was being
+ * claimed twenty minutes after first contact. The number itself is a
+ * reasonable measure of learning-in-progress and it must not go down, so the
+ * fix is the wording around it: this one gives it an honest denominator, and
+ * the label says "learned" against "met" rather than asserting knowledge.
+ */
+export function seenWordCount(state: ProgressState): number {
+  return Object.keys(state.words).length;
+}
+
+/**
  * The legacy `strength >= 5` path also needs a real history behind it.
  * Strength goes up one per correct answer, and a lesson asks about each of
  * its own words three or four times, so on its own a word could be
