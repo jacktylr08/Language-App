@@ -77,6 +77,22 @@ export function weekReachedFor(state: ProgressState): number {
   return week;
 }
 
+/**
+ * How far up the support ladder a single sentence has climbed.
+ *
+ * Kept structurally separate from `words` because it measures a different
+ * thing: `words` is "do you know this item", this is "can you produce this
+ * structure unaided". A learner can be perfect on every word in a sentence
+ * and still unable to say the sentence, which is the entire reason the
+ * sentence section exists. See lib/sentence-scope.ts.
+ */
+export interface SentenceState {
+  stage: 'tiles' | 'skeleton' | 'free';
+  correct: number;
+  wrong: number;
+  lastSeen: number;
+}
+
 export interface ProgressState {
   streak: number;
   bestStreak: number;
@@ -84,6 +100,10 @@ export interface ProgressState {
   activeDays: string[]; // recent YYYY-MM-DD days (capped)
   lessons: Record<string, LessonRecord>; // slug -> record
   words: Record<string, WordState>; // vocab id -> state
+  /** sentence id -> production progress. Optional: absent for anyone who
+   *  hasn't opened the sentence section, and every reader must tolerate that
+   *  rather than assuming it exists. */
+  sentences?: Record<string, SentenceState>;
 }
 
 import { progressKeyFor } from './keys';
@@ -342,6 +362,54 @@ export function recordRoundsDone(slug: string, roundsDone: number, roundCount: n
   rec.roundsDone = Math.max(rec.roundsDone ?? 0, roundsDone);
   rec.roundCount = roundCount;
   state.lessons[slug] = rec;
+  save(state);
+}
+
+/**
+ * Records an attempt at producing one sentence.
+ *
+ * Promotion is deliberately one rung per SESSION rather than per correct
+ * answer: getting a sentence right with tiles in front of you tells you very
+ * little about whether you could produce it tomorrow, and jumping straight to
+ * unaided composition off a single assisted success is how a learner ends up
+ * staring at a blank box. Demotion on a wrong answer is likewise a single
+ * rung — dropping someone all the way back to tiles for one slip erases real
+ * progress and is the same "my progress vanished" feeling that has bitten
+ * this app before.
+ *
+ * Also touches the streak: producing sentences is unambiguously practice.
+ */
+export function recordSentenceResult(
+  id: string,
+  correct: boolean,
+  stageAttempted: SentenceState['stage']
+): void {
+  const state = loadProgress();
+  touchToday(state);
+  const sentences = state.sentences ?? {};
+  const prev: SentenceState = sentences[id] ?? {
+    stage: 'tiles',
+    correct: 0,
+    wrong: 0,
+    lastSeen: 0,
+  };
+
+  const order: Array<SentenceState['stage']> = ['tiles', 'skeleton', 'free'];
+  const at = order.indexOf(stageAttempted);
+  // Clamp against the RECORDED stage as well as the attempted one, so a stale
+  // open tab replaying an old session can't promote past where the learner
+  // actually is.
+  const recorded = order.indexOf(prev.stage);
+  const base = Math.max(0, Math.min(at, recorded));
+  const next = correct ? Math.min(base + 1, order.length - 1) : Math.max(base - 1, 0);
+
+  sentences[id] = {
+    stage: order[next],
+    correct: prev.correct + (correct ? 1 : 0),
+    wrong: prev.wrong + (correct ? 0 : 1),
+    lastSeen: Date.now(),
+  };
+  state.sentences = sentences;
   save(state);
 }
 

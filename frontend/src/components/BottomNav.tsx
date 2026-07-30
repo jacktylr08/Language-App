@@ -40,6 +40,7 @@ const FULL_SCREEN = [
   /^\/lessons\/[^/]+$/, // a lesson in progress
   /^\/practice$/, // a practice session in progress
   /^\/practice\/listen$/, // eyes-free audio mode
+  /^\/practice\/build$/, // composing a sentence — the tab bar is a mis-tap away from losing it
   /^\/read\/[^/]+$/, // a reading passage
   /^\/tutor$/, // a live voice call — a mis-tap here drops the call
   /^\/onboarding$/,

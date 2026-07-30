@@ -1,8 +1,13 @@
 node_modules/
 .next/
 out/
-build/
-dist/
+# Anchored to the repo root on purpose. Unanchored, `build/` and `dist/` match
+# a directory of that name at ANY depth — which silently swallowed the
+# src/app/practice/build route, so a real source file was invisible to
+# `git add -A` and would never have shipped. Next.js builds to .next/ and
+# out/ (both above), so these two only ever meant the root anyway.
+/build/
+/dist/
 *.log
 .env
 .env.local

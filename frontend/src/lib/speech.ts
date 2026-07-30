@@ -341,7 +341,8 @@ export function normalizeLoose(text: string): string {
 
 export type MatchQuality = 'exact' | 'accents' | 'close' | 'wrong';
 
-function levenshtein(a: string, b: string): number {
+/** Exported for the sentence checker, which needs per-word edit distance. */
+export function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
   const dp: number[] = Array.from({ length: n + 1 }, (_, j) => j);

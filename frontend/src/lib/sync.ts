@@ -116,10 +116,24 @@ export function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressSta
     const ra = lessons[slug];
     lessons[slug] = ra
       ? {
+          // Spread first so fields added to LessonRecord later survive this
+          // merge by default. Listing fields explicitly meant every new one
+          // was silently DROPPED whenever both sides had touched the same
+          // lesson: `skipped` (so a learner placed ahead at onboarding lost
+          // that on their second device, changing what was unlocked and what
+          // level the tutor taught at) and `roundsDone`/`roundCount` (so a
+          // part-finished lesson reverted to looking untouched) were both
+          // being lost this way. Explicit rules below still win where one
+          // exists — the spread only decides the default.
+          ...ra,
+          ...rb,
           completed: ra.completed || rb.completed,
+          skipped: ra.skipped || rb.skipped,
           bestAccuracy: Math.max(ra.bestAccuracy, rb.bestAccuracy),
           timesCompleted: Math.max(ra.timesCompleted, rb.timesCompleted),
           lastCompleted: later(ra.lastCompleted, rb.lastCompleted) || undefined,
+          roundsDone: Math.max(ra.roundsDone ?? 0, rb.roundsDone ?? 0) || undefined,
+          roundCount: Math.max(ra.roundCount ?? 0, rb.roundCount ?? 0) || undefined,
         }
       : rb;
   }
@@ -142,6 +156,25 @@ export function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressSta
       : wb;
   }
 
+  // Sentence production ladder. Merged by taking the HIGHER rung: the stage
+  // records a capability ("can produce this unaided"), and a device that has
+  // simply seen less of the learner's history must never drag that back down.
+  const sentences: NonNullable<ProgressState['sentences']> = { ...(a.sentences || {}) };
+  for (const [id, sb] of Object.entries(b.sentences || {})) {
+    const sa = sentences[id];
+    if (!sa) {
+      sentences[id] = sb;
+      continue;
+    }
+    const rank = (s: string): number => ['tiles', 'skeleton', 'free'].indexOf(s);
+    sentences[id] = {
+      stage: rank(sb.stage) > rank(sa.stage) ? sb.stage : sa.stage,
+      correct: Math.max(sa.correct, sb.correct),
+      wrong: Math.max(sa.wrong, sb.wrong),
+      lastSeen: Math.max(sa.lastSeen, sb.lastSeen),
+    };
+  }
+
   const activeDays = Array.from(new Set([...(a.activeDays || []), ...(b.activeDays || [])]))
     .sort()
     .slice(-60);
@@ -153,6 +186,9 @@ export function mergeProgress(a?: ProgressState, b?: ProgressState): ProgressSta
     activeDays,
     lessons,
     words,
+    // Omitted entirely when neither side has any, so a learner who has never
+    // opened the section doesn't carry an empty object around.
+    ...(Object.keys(sentences).length ? { sentences } : {}),
   };
 }
 

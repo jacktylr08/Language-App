@@ -100,6 +100,70 @@ function profile(overrides: Partial<LearnerProfile> = {}): LearnerProfile {
   };
 }
 
+describe('mergeProgress — fields the merge used to silently drop', () => {
+  /**
+   * The merge rebuilt each lesson record from an explicit field list, so any
+   * field added to LessonRecord afterwards was discarded whenever BOTH sides
+   * had touched the same lesson. That lost `skipped` (a learner placed ahead
+   * at onboarding reverted to not-placed on their second device, changing what
+   * was unlocked and what level the tutor taught at) and `roundsDone` /
+   * `roundCount` (a part-finished lesson reverted to looking untouched).
+   */
+  it('keeps placement (`skipped`) when both sides know the lesson', () => {
+    const a = progress({
+      lessons: { greetings: { completed: false, skipped: true, bestAccuracy: 0, timesCompleted: 0 } },
+    });
+    const b = progress({
+      lessons: { greetings: { completed: false, bestAccuracy: 0, timesCompleted: 0 } },
+    });
+    expect(mergeProgress(a, b)!.lessons.greetings.skipped).toBe(true);
+    // Symmetric — merge order must not decide whether progress survives.
+    expect(mergeProgress(b, a)!.lessons.greetings.skipped).toBe(true);
+  });
+
+  it('keeps the furthest round progress rather than discarding it', () => {
+    const a = progress({
+      lessons: { greetings: { completed: false, bestAccuracy: 0, timesCompleted: 0, roundsDone: 3, roundCount: 4 } },
+    });
+    const b = progress({
+      lessons: { greetings: { completed: false, bestAccuracy: 0, timesCompleted: 0, roundsDone: 1, roundCount: 4 } },
+    });
+    const merged = mergeProgress(a, b)!.lessons.greetings;
+    expect(merged.roundsDone).toBe(3);
+    expect(merged.roundCount).toBe(4);
+  });
+
+  it('merges the sentence ladder by taking the higher rung', () => {
+    // The stage records a capability. A device that has seen less of the
+    // learner's history must never drag it back down.
+    const a = progress({
+      sentences: { 's1': { stage: 'free', correct: 3, wrong: 0, lastSeen: 200 } },
+    });
+    const b = progress({
+      sentences: { 's1': { stage: 'tiles', correct: 1, wrong: 2, lastSeen: 100 } },
+    });
+    const merged = mergeProgress(a, b)!.sentences!['s1'];
+    expect(merged.stage).toBe('free');
+    expect(merged.correct).toBe(3);
+    expect(merged.wrong).toBe(2);
+    expect(mergeProgress(b, a)!.sentences!['s1'].stage).toBe('free');
+  });
+
+  it('carries a sentence only one side has ever seen', () => {
+    const a = progress({});
+    const b = progress({
+      sentences: { 's9': { stage: 'skeleton', correct: 1, wrong: 0, lastSeen: 5 } },
+    });
+    expect(mergeProgress(a, b)!.sentences!['s9'].stage).toBe('skeleton');
+  });
+
+  it('omits the sentences map entirely when neither side has one', () => {
+    // A learner who has never opened the section shouldn't carry an empty
+    // object around in every sync payload.
+    expect(mergeProgress(progress({}), progress({}))!.sentences).toBeUndefined();
+  });
+});
+
 describe('mergeProfile', () => {
   it('returns whichever side exists when the other is null/undefined', () => {
     const a = profile({ summary: 'a' });

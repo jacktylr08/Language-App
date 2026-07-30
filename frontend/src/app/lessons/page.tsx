@@ -68,6 +68,12 @@ const practiceLinks: ReadonlyArray<{
   description: string;
 }> = [
   {
+    href: '/practice/build',
+    icon: 'pencil',
+    label: 'Build sentences',
+    description: 'Go from knowing words to actually saying something.',
+  },
+  {
     href: '/practice/listen',
     icon: 'headphones',
     label: 'Listen & Repeat',
