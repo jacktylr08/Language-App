@@ -9,7 +9,7 @@ import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { checkSentence, buildSkeleton, buildTiles, type SentenceResult } from '@/lib/sentence-check';
 import { sentenceWords, getSentenceBank } from '@/lib/sentence-bank';
 import { recordSentenceResult } from '@/lib/progress';
-import type { ScopedSentence, SentenceStage } from '@/lib/sentence-scope';
+import { nextStage, type ScopedSentence, type SentenceStage } from '@/lib/sentence-scope';
 
 /**
  * Saying something, one rung at a time.
@@ -62,7 +62,11 @@ function useDistractorPool(): string[] {
   }, []);
 }
 
-export function SentenceBuilder({ queue, onDone, onExit }: SentenceBuilderProps) {
+export function SentenceBuilder({ queue: initialQueue, onDone, onExit }: SentenceBuilderProps) {
+  // The queue grows during the session — see the re-queue in `advance`. Held
+  // in state rather than read straight from the prop because climbing a rung
+  // inserts the same sentence again further along.
+  const [queue, setQueue] = useState<ScopedSentence[]>(initialQueue);
   const [index, setIndex] = useState(0);
   const [result, setResult] = useState<SentenceResult | null>(null);
   // Tracked separately from the result because the feedback for "I gave up"
@@ -134,9 +138,37 @@ export function SentenceBuilder({ queue, onDone, onExit }: SentenceBuilderProps)
 
   const advance = useCallback(() => {
     setCelebrate(false);
-    if (index + 1 >= queue.length) onDone(stats);
+
+    // Climb the ladder inside this session.
+    //
+    // Without this the higher rungs were effectively unreachable: a promoted
+    // sentence was stamped as just-seen and wouldn't be offered again for
+    // hours, while every untouched sentence starts at `tiles` — so a session
+    // was always, entirely, "Build it". Re-queueing the same sentence a few
+    // slots later with less support is also simply how you'd teach this: build
+    // it from tiles, then fill the gaps, then say the whole thing from
+    // nothing, with other sentences in between so it isn't parroting.
+    const justAnswered = queue[index];
+    const promoted = result?.correct && !gaveUp ? nextStage(justAnswered.stage) : null;
+    // Capped so a good run can't turn a ten-sentence session into a marathon —
+    // every correct answer would otherwise add another item, twice over.
+    const room = queue.length < initialQueue.length * 2;
+    let grew = false;
+    if (promoted && room) {
+      // Far enough ahead that the answer isn't still on screen in their head,
+      // close enough to land in this session.
+      const at = Math.min(queue.length, index + 3);
+      setQueue([
+        ...queue.slice(0, at),
+        { ...justAnswered, stage: promoted, fresh: false },
+        ...queue.slice(at),
+      ]);
+      grew = true;
+    }
+
+    if (!grew && index + 1 >= queue.length) onDone(stats);
     else setIndex(index + 1);
-  }, [index, queue.length, onDone, stats]);
+  }, [index, queue, onDone, stats, result, gaveUp]);
 
   if (!current) return null;
 

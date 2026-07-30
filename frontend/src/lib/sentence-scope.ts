@@ -97,33 +97,87 @@ export function sentencesInScope(progress: ProgressState = loadProgress()): Bank
  */
 export const SESSION_SIZE = 10;
 
-/** Don't re-ask a sentence within this window unless there's nothing else. */
-const COOLDOWN_MS = 6 * 60 * 60 * 1000;
+/**
+ * Long enough not to re-ask something in the session you just finished, short
+ * enough that coming back the same evening still advances the ladder.
+ *
+ * This was six hours, which quietly broke the entire feature. A sentence
+ * answered correctly is promoted and stamped with `lastSeen`, so a six-hour
+ * lock meant every in-flight sentence was invisible for the rest of the day
+ * while the hundreds of untouched ones were all, by definition, at `tiles`.
+ * The result: every session was 100% "Build it", and the skeleton and free
+ * rungs were unreachable in any realistic sitting. The ladder existed in the
+ * data model and never once appeared on screen.
+ */
+const COOLDOWN_MS = 20 * 60 * 1000;
+
+/** Fisher-Yates, with an injectable source so tests are deterministic. */
+function shuffle<T>(items: T[], rng: () => number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Picks from every lesson in turn rather than draining the oldest first.
+ *
+ * "Everything I've covered" means the whole range should show up, not the
+ * first lesson over and over. Sorting new material oldest-first did exactly
+ * that: a learner twenty lessons in kept being handed week-one sentences and
+ * never saw the material they'd just worked through. Round-robin across the
+ * completed lessons puts the learner's whole history in every session.
+ */
+function spreadAcrossLessons(items: ScopedSentence[], rng: () => number): ScopedSentence[] {
+  const byLesson = new Map<string, ScopedSentence[]>();
+  for (const s of items) {
+    const list = byLesson.get(s.slug);
+    if (list) list.push(s);
+    else byLesson.set(s.slug, [s]);
+  }
+  // Shuffle within each lesson so repeat sessions don't replay one fixed order.
+  const queues = Array.from(byLesson.values()).map((list) => shuffle(list, rng));
+  const out: ScopedSentence[] = [];
+  let any = true;
+  while (any) {
+    any = false;
+    for (const q of queues) {
+      const next = q.shift();
+      if (next) {
+        out.push(next);
+        any = true;
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * Builds a session.
  *
- * The ordering rules, in priority order, exist to make this feel like it's
- * covering the learner's whole course rather than drilling last Tuesday:
+ * Two things this has to get right, both of which the first version got wrong:
  *
- *  1. Sentences already in flight (met before, not yet at `free`) come first —
- *     an unfinished ladder is the whole point, and leaving rungs half-climbed
- *     while introducing endless new sentences would teach nothing.
- *  2. Then genuinely new sentences, oldest lesson first — so the material the
- *     learner is least likely to still have fresh gets produced, not just the
- *     lesson they finished ten minutes ago.
- *  3. Anything at `free` that they've got right is a long-term review and only
- *     fills leftover space.
+ *  - VARIETY. Selection used a fully deterministic sort, so leaving a session
+ *    without finishing handed back the identical ten sentences next time, and
+ *    even completing one just walked down the same fixed list. Everything is
+ *    now shuffled and spread across lessons.
  *
- * Within each band, shorter sentences first: a four-word sentence is a
- * genuinely easier production target than a nine-word one, and opening a
- * session with the hardest thing in it is how people decide they can't do
- * this.
+ *  - A MIX OF RUNGS. Fresh sentences are always at `tiles`, and there are
+ *    hundreds of them, so filling a session by priority meant tiles crowded
+ *    out everything else forever. In-flight sentences (the ones with a ladder
+ *    half-climbed) are now taken FIRST and up to a guaranteed share of the
+ *    session, so skeleton and free actually appear.
+ *
+ * Ordering within the session is deliberately gentle: shorter sentences and
+ * lower rungs first, so it opens on something winnable.
  */
 export function buildSentenceSession(
   progress: ProgressState = loadProgress(),
   size = SESSION_SIZE,
-  now = Date.now()
+  now = Date.now(),
+  rng: () => number = Math.random
 ): ScopedSentence[] {
   const scope = sentencesInScope(progress);
   const states = progress.sentences ?? {};
@@ -138,23 +192,56 @@ export function buildSentenceSession(
       fresh.push({ ...s, stage: 'tiles', fresh: true });
       continue;
     }
-    // Just practised — skip unless the session can't be filled without it.
-    const cold = now - st.lastSeen > COOLDOWN_MS;
+    // Just practised — don't repeat it in the very next session.
+    if (now - st.lastSeen <= COOLDOWN_MS) continue;
     const entry: ScopedSentence = { ...s, stage: st.stage, fresh: false };
-    if (st.stage !== 'free') {
-      if (cold) inFlight.push(entry);
-    } else if (cold) {
-      mastered.push(entry);
-    }
+    if (st.stage !== 'free') inFlight.push(entry);
+    else mastered.push(entry);
   }
 
-  const byLength = (a: BankSentence, b: BankSentence): number => a.words - b.words;
-  inFlight.sort(byLength);
-  fresh.sort((a, b) => a.week - b.week || byLength(a, b));
-  // Longest-ago first among long-term reviews.
-  mastered.sort((a, b) => (states[a.id]?.lastSeen ?? 0) - (states[b.id]?.lastSeen ?? 0));
+  const rank = (s: ScopedSentence): number => STAGES.indexOf(s.stage);
+  // Least-recently-practised first, so the ladder advances broadly rather than
+  // hammering whichever sentence happens to sort first.
+  const inFlightOrdered = shuffle(inFlight, rng).sort(
+    (a, b) => (states[a.id]?.lastSeen ?? 0) - (states[b.id]?.lastSeen ?? 0)
+  );
+  const freshOrdered = spreadAcrossLessons(fresh, rng);
+  const masteredOrdered = shuffle(mastered, rng).sort(
+    (a, b) => (states[a.id]?.lastSeen ?? 0) - (states[b.id]?.lastSeen ?? 0)
+  );
 
-  return [...inFlight, ...fresh, ...mastered].slice(0, size);
+  // Each pool gets a reserved share of the session, so no one of them can
+  // crowd the others out. Leftovers from an under-filled pool spill to the
+  // others, so a session is always full if there's material for it at all.
+  //
+  // The `free` pool needs a reservation as much as the others do: without one
+  // it only ever filled leftover slots, and since there are hundreds of
+  // untouched sentences there were never any leftovers — so a sentence the
+  // learner had worked all the way up to unaided production was then never
+  // seen again, which is both the wrong pedagogy and exactly the "it only
+  // does the build it round" complaint.
+  const pools: Array<[ScopedSentence[], number]> = [
+    [inFlightOrdered, 0.4],
+    [freshOrdered, 0.4],
+    [masteredOrdered, 0.2],
+  ];
+  const picked: ScopedSentence[] = [];
+  const have = new Set<string>();
+  const take = (list: ScopedSentence[], n: number): void => {
+    for (const s of list) {
+      if (n <= 0 || picked.length >= size) return;
+      if (have.has(s.id)) continue;
+      picked.push(s);
+      have.add(s.id);
+      n--;
+    }
+  };
+  for (const [list, share] of pools) take(list, Math.round(size * share));
+  // Backfill in the same priority order.
+  for (const [list] of pools) take(list, size - picked.length);
+
+  // Open on the easiest thing in the set.
+  return picked.sort((a, b) => rank(a) - rank(b) || a.words - b.words).slice(0, size);
 }
 
 /** Whether there's enough material for the section to be worth opening. */

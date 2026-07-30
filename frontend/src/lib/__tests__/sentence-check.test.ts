@@ -115,6 +115,24 @@ describe('skeletons', () => {
     }
   });
 
+  it('leaves a real frame standing, even on a short sentence', () => {
+    // "Mucho gusto, Marta" is three content words. Blanking half of them left
+    // "___ ___ Marta", which is the free stage wearing a disguise — there was
+    // no frame left to complete.
+    for (const s of ['Mucho gusto, Marta', 'Hasta luego', 'Buenos días, señor']) {
+      const sk = buildSkeleton(s);
+      const gaps = sk.slots.filter((x) => x.gap).length;
+      const shown = sk.slots.length - gaps;
+      expect(shown).toBeGreaterThanOrEqual(gaps);
+    }
+  });
+
+  it('never blanks more than about a third of a longer sentence', () => {
+    const sk = buildSkeleton('El banco está en la calle Mayor esta mañana');
+    const gaps = sk.slots.filter((x) => x.gap).length;
+    expect(gaps).toBeLessThanOrEqual(Math.ceil(sk.slots.length / 3));
+  });
+
   it('blanks content words, keeping the grammatical frame visible', () => {
     // The learner already has the shape; what they can't do is supply the
     // meaning-bearing words. Blanking articles would test nothing.

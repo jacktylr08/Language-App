@@ -108,11 +108,15 @@ describe('nothing less — scope reaches across the whole history', () => {
     expect(weeks.size).toBeGreaterThanOrEqual(1);
   });
 
-  it('offers new sentences oldest-lesson-first', () => {
+  it('keeps early lessons in play without confining the session to them', () => {
+    // This used to assert strict oldest-lesson-first ordering, which WAS the
+    // bug: a learner several lessons in got a session made entirely of week
+    // one and never saw the material they'd just finished. The real
+    // requirement is that the whole covered range stays reachable.
     for (const l of ordered.slice(0, 8)) completeLessonLocal(l.slug, 90);
     const session = buildSentenceSession();
-    const weeks = session.map((s) => s.week);
-    expect(weeks).toEqual([...weeks].sort((a, b) => a - b));
+    const weeks = new Set(session.map((s) => s.week));
+    expect(weeks.size).toBeGreaterThan(1);
   });
 
   it('includes every completed lesson that has material, given enough sessions', () => {
@@ -184,6 +188,103 @@ describe('the support ladder', () => {
   });
 });
 
+describe('variety and rung mix — the two things the first version got wrong', () => {
+  /**
+   * Reported after shipping: "it's basically the same 10 questions over and
+   * over and it only does the build it round." Both were real, and both were
+   * invisible to the original tests because they only ever asserted on a
+   * single session in isolation.
+   */
+  it('does not hand back an identical session every time', () => {
+    for (const l of ordered.slice(0, 10)) completeLessonLocal(l.slug, 90);
+    const p = loadProgress();
+    const a = buildSentenceSession(p).map((s) => s.id);
+    const b = buildSentenceSession(p).map((s) => s.id);
+    const c = buildSentenceSession(p).map((s) => s.id);
+    // Leaving a session without answering used to return the exact same ten.
+    expect(a.join() === b.join() && b.join() === c.join()).toBe(false);
+  });
+
+  it('spreads new material across every completed lesson, not just the oldest', () => {
+    for (const l of ordered.slice(0, 10)) completeLessonLocal(l.slug, 90);
+    const slugs = new Set(buildSentenceSession().map((s) => s.slug));
+    // Oldest-first ordering meant a 10-sentence session came entirely from
+    // lesson one, so someone ten lessons in never saw their recent work.
+    expect(slugs.size).toBeGreaterThan(3);
+  });
+
+  it('surfaces higher rungs instead of drowning them in fresh tiles', () => {
+    for (const l of ordered.slice(0, 10)) completeLessonLocal(l.slug, 90);
+    // Put a handful of sentences part-way up the ladder.
+    const inFlightIds = buildSentenceSession(loadProgress(), 6).map((s) => s.id);
+    for (const id of inFlightIds) recordSentenceResult(id, true, 'tiles');
+
+    // Past the short cooldown, but with hundreds of untouched sentences still
+    // available — the situation where tiles used to crowd everything out.
+    const later = Date.now() + 60 * 60 * 1000;
+    const session = buildSentenceSession(loadProgress(), 10, later);
+    const stages = new Set(session.map((s) => s.stage));
+    expect(stages.has('skeleton')).toBe(true);
+    expect(session.filter((s) => s.stage === 'skeleton').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('offers all three rungs in one session once the learner has material at each', () => {
+    // The complaint in one assertion. Fresh sentences are always at `tiles`
+    // and there are hundreds of them, so without reserved shares both higher
+    // rungs are unreachable — including `free`, which previously only filled
+    // leftover slots that never existed.
+    for (const l of ordered.slice(0, 6)) completeLessonLocal(l.slug, 90);
+    const ids = sentencesInScope()
+      .slice(0, 8)
+      .map((s) => s.id);
+    ids.forEach((id, i) => {
+      recordSentenceResult(id, true, 'tiles');
+      if (i % 2 === 0) recordSentenceResult(id, true, 'skeleton');
+    });
+
+    const later = Date.now() + 60 * 60 * 1000;
+    const stages = new Set(buildSentenceSession(loadProgress(), 10, later).map((s) => s.stage));
+    expect(stages.has('tiles')).toBe(true);
+    expect(stages.has('skeleton')).toBe(true);
+    expect(stages.has('free')).toBe(true);
+  });
+
+  it('still returns a full session when nothing is in flight yet', () => {
+    for (const l of ordered.slice(0, 10)) completeLessonLocal(l.slug, 90);
+    expect(buildSentenceSession(loadProgress(), 10).length).toBe(10);
+  });
+
+  it('still returns a full session when everything available is in flight', () => {
+    // Only the first lesson, so the pool is small and mostly on the ladder.
+    completeLessonLocal(ordered[0].slug, 90);
+    const all = sentencesInScope();
+    for (const s of all) recordSentenceResult(s.id, true, 'tiles');
+    const later = Date.now() + 60 * 60 * 1000;
+    const session = buildSentenceSession(loadProgress(), 5, later);
+    expect(session.length).toBe(Math.min(5, all.length));
+  });
+
+  it('opens the session on the lowest rung available', () => {
+    for (const l of ordered.slice(0, 10)) completeLessonLocal(l.slug, 90);
+    const ids = buildSentenceSession(loadProgress(), 6).map((s) => s.id);
+    for (const id of ids) recordSentenceResult(id, true, 'tiles');
+    const later = Date.now() + 60 * 60 * 1000;
+    const session = buildSentenceSession(loadProgress(), 10, later);
+    const ranks = session.map((s) => ['tiles', 'skeleton', 'free'].indexOf(s.stage));
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+  });
+
+  it('lets a sentence practised earlier today come back the same evening', () => {
+    // The six-hour lock meant the ladder could not advance within a day.
+    for (const l of ordered.slice(0, 3)) completeLessonLocal(l.slug, 90);
+    const first = buildSentenceSession()[0];
+    recordSentenceResult(first.id, true, 'tiles');
+    const inHalfAnHour = Date.now() + 30 * 60 * 1000;
+    const session = buildSentenceSession(loadProgress(), 10, inHalfAnHour);
+    expect(session.some((s) => s.id === first.id && s.stage === 'skeleton')).toBe(true);
+  });
+});
+
 describe('session composition', () => {
   it('does not immediately repeat a sentence just practised', () => {
     for (const l of ordered.slice(0, 6)) completeLessonLocal(l.slug, 90);
@@ -192,15 +293,19 @@ describe('session composition', () => {
     expect(buildSentenceSession().some((s) => s.id === first.id)).toBe(false);
   });
 
-  it('brings a cooled-down in-flight sentence back ahead of new material', () => {
+  it('brings a cooled-down in-flight sentence back, at its next rung', () => {
     for (const l of ordered.slice(0, 6)) completeLessonLocal(l.slug, 90);
     const first = buildSentenceSession()[0];
     recordSentenceResult(first.id, true, 'tiles');
     // Well past the cooldown.
     const later = Date.now() + 48 * 60 * 60 * 1000;
     const session = buildSentenceSession(loadProgress(), 10, later);
-    expect(session[0].id).toBe(first.id);
-    expect(session[0].stage).toBe('skeleton');
+    // Guaranteed a place, rather than guaranteed to be first — the session is
+    // ordered easiest-rung-first so it opens on something winnable, which
+    // puts any remaining `tiles` sentences ahead of it.
+    const entry = session.find((s) => s.id === first.id);
+    expect(entry).toBeDefined();
+    expect(entry!.stage).toBe('skeleton');
   });
 
   it('caps the session at the requested size', () => {

@@ -195,10 +195,16 @@ export function buildSkeleton(target: string): Skeleton {
     .map((w, i) => ({ w, i }))
     .filter(({ w }) => !FUNCTION_WORDS.has(looseWord(w)));
 
-  // Blank roughly half the content words, never fewer than one and never the
-  // entire sentence — a skeleton with no words left is just the free stage
-  // with extra steps, and one with no gaps is a reading exercise.
-  const target_gaps = Math.max(1, Math.round(contentIdx.length / 2));
+  // Roughly a third of the SENTENCE, not half the content words.
+  //
+  // Half-the-content-words looks equivalent and isn't: in a short sentence
+  // almost every word is a content word, so "Mucho gusto, Marta" had two of
+  // its three words blanked and the learner was shown "___ ___ Marta" — the
+  // free stage with a name attached, not a frame to complete. Measuring
+  // against the whole sentence keeps a real skeleton visible at every length,
+  // and at least one content word always survives as an anchor.
+  const maxGaps = contentIdx.length > 1 ? contentIdx.length - 1 : 1;
+  const target_gaps = Math.max(1, Math.min(Math.round(words.length / 3), maxGaps));
   // Evenly spaced across the sentence rather than clustered at the start, so
   // the learner has to hold the whole structure rather than one region.
   const step = contentIdx.length / target_gaps;
