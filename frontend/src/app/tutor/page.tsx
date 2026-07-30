@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '@/lib/hooks';
 import { RealtimeCall } from '@/components/RealtimeCall';
 import { SessionReport } from '@/components/SessionReport';
-import { buildTutorContext, buildScenarioContext } from '@/lib/tutor-context';
+import { buildTutorContext, buildScenarioContext, buildHandoffContext } from '@/lib/tutor-context';
+import { handoffFor } from '@/lib/lesson-handoff';
+import { getCurriculum } from '@/lib/curriculum';
 import { reflectAndSave, markEvaluationDone, type LearnerProfile } from '@/lib/tutor-memory';
 import { getScenario } from '@/lib/scenarios';
 import { PageSkeleton } from '@/components/Skeleton';
@@ -22,20 +24,32 @@ function TutorPageInner() {
   const params = useSearchParams();
   const slug = params.get('lesson') || undefined;
   const scenario = getScenario(params.get('scenario'));
+  // Set only by the hand-off straight off the end of a lesson — see
+  // lib/lesson-handoff.ts. It changes what Profe does with the first ten
+  // seconds, which is the whole difference between a learner talking and a
+  // learner staring at a call screen.
+  const justFinished = params.get('just') === '1';
   const [phase, setPhase] = useState<Phase>('call');
 
   // Built client-side from the learner's progress + memory once authed.
   // A scenario (if picked) replaces the curriculum-driven plan/focus but
   // keeps every other constraint (level ceiling, known vocab, memory).
-  const ctx = useMemo(
-    () =>
-      typeof window === 'undefined' || isLoading
-        ? null
-        : scenario
-        ? buildScenarioContext(scenario)
-        : buildTutorContext(slug),
-    [isLoading, slug, scenario]
-  );
+  const ctx = useMemo(() => {
+    if (typeof window === 'undefined' || isLoading) return null;
+    if (justFinished && slug) {
+      const lesson = getCurriculum().find((l) => l.slug === slug);
+      const handoff = handoffFor(lesson);
+      if (lesson && handoff) {
+        return buildHandoffContext(
+          slug,
+          handoff.task,
+          lesson.vocab.map((v) => v.es),
+          handoff.scenario
+        );
+      }
+    }
+    return scenario ? buildScenarioContext(scenario) : buildTutorContext(slug);
+  }, [isLoading, slug, scenario, justFinished]);
 
   // The call ended — distil it into the tutor's memory, then show the
   // learner what came out of it (reflect() already computes concrete

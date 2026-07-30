@@ -65,6 +65,26 @@ function themeIcon(theme?: string): IconName {
 
 const ACCENT_CHARS = ['á', 'é', 'í', 'ó', 'ú', 'ñ', '¿', '¡'];
 
+/**
+ * The way out of a typing exercise you can't answer.
+ *
+ * Deliberately quiet — a plain text button under the primary one. It has to be
+ * obviously available (the whole point is that being stuck shouldn't end the
+ * lesson) without competing with actually trying, which is where the learning
+ * happens. Sized to the 44px tap target so it isn't a fiddly escape hatch.
+ */
+function IDontKnowButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="mt-2 w-full py-3 text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-stone-200 disabled:opacity-50 transition-colors"
+    >
+      I don&rsquo;t know — show me
+    </button>
+  );
+}
+
 export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
   const router = useRouter();
   const srAvailable = useMemo(() => speechRecognitionSupported(), []);
@@ -222,6 +242,25 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     if (quality === 'exact' || quality === 'accents') grade(true, current.word.en);
     else if (quality === 'close') grade(true, current.word.en, `Almost — it's: ${current.word.en}`);
     else grade(false, current.word.en);
+  };
+
+  /**
+   * "I don't know."
+   *
+   * A typing exercise with no way out is a dead end: if the word won't come,
+   * the only moves are to guess something you know is wrong, or to abandon the
+   * lesson. Guessing wrong is worse than admitting it — it pollutes the
+   * scheduler with a failure the learner didn't mean, and it teaches them the
+   * app punishes honesty.
+   *
+   * It grades as incorrect on purpose. Not knowing the word IS the state FSRS
+   * needs to hear about, and it's exactly the signal that should bring the
+   * word back soon. What changes is that the learner gets shown the answer and
+   * moves on in one tap instead of being stuck.
+   */
+  const skipTyped = (answer: string) => {
+    if (feedback || !current) return;
+    grade(false, answer, "No problem — that's what the reviews are for.");
   };
 
   const submitWriting = async () => {
@@ -569,6 +608,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
         stats={stats}
         streak={currentStreak(loadProgress())}
         title={lesson?.title ?? null}
+        lesson={lesson}
         mode={mode}
         onContinue={() => router.push('/lessons')}
       />
@@ -773,13 +813,16 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               ))}
             </div>
             {!feedback && (
-              <button
-                onClick={submitTyped}
-                disabled={!typed.trim()}
-                className="mt-6 btn-primary w-full py-4"
-              >
-                CHECK
-              </button>
+              <>
+                <button
+                  onClick={submitTyped}
+                  disabled={!typed.trim()}
+                  className="mt-6 btn-primary w-full py-4"
+                >
+                  CHECK
+                </button>
+                <IDontKnowButton onClick={() => skipTyped(current.word.es)} />
+              </>
             )}
           </div>
         )}
@@ -810,13 +853,16 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               className="w-full text-xl px-5 py-4 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark-soft text-ink dark:text-white shadow-card dark:shadow-card-dark focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
             />
             {!feedback && (
-              <button
-                onClick={submitTypedEn}
-                disabled={!typed.trim()}
-                className="mt-6 btn-primary w-full py-4"
-              >
-                CHECK
-              </button>
+              <>
+                <button
+                  onClick={submitTypedEn}
+                  disabled={!typed.trim()}
+                  className="mt-6 btn-primary w-full py-4"
+                >
+                  CHECK
+                </button>
+                <IDontKnowButton onClick={() => skipTyped(current.word.en)} />
+              </>
             )}
           </div>
         )}
@@ -950,13 +996,28 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               className="w-full text-lg px-5 py-4 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark-soft text-ink dark:text-white shadow-card dark:shadow-card-dark focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all resize-none"
             />
             {!feedback && (
-              <button
-                onClick={submitWriting}
-                disabled={!writingText.trim() || gradingWriting}
-                className="mt-6 btn-primary w-full py-4"
-              >
-                {gradingWriting ? 'Checking…' : 'CHECK'}
-              </button>
+              <>
+                <button
+                  onClick={submitWriting}
+                  disabled={!writingText.trim() || gradingWriting}
+                  className="mt-6 btn-primary w-full py-4"
+                >
+                  {gradingWriting ? 'Checking…' : 'CHECK'}
+                </button>
+                {/* Free composition is the exercise most likely to stall
+                    someone completely — there's no single word to half-recall,
+                    so "I can't start this" is a real state. */}
+                <IDontKnowButton
+                  disabled={gradingWriting}
+                  onClick={() =>
+                    skipTyped(
+                      current.writingPrompt
+                        ? `Try using: ${current.writingPrompt.suggested.join(', ')}`
+                        : ''
+                    )
+                  }
+                />
+              </>
             )}
           </div>
         )}

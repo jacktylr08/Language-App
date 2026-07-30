@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Confetti } from '@/components/Confetti';
 import { Profe } from '@/components/Profe';
 import { Icon } from '@/components/icons/Icon';
 import { StatCard } from './StatCard';
 import { GuestSavePrompt } from '@/components/GuestSavePrompt';
 import { ShareProgressButton } from '@/components/ShareProgressButton';
-import { getCurriculum } from '@/lib/curriculum';
+import { getCurriculum, type CurriculumLesson } from '@/lib/curriculum';
 import { isGuest, GUEST_LESSON_LIMIT } from '@/lib/guest';
 import { loadProgress, knownWordCount } from '@/lib/progress';
+import { handoffFor, handoffHref } from '@/lib/lesson-handoff';
 import type { SessionStats } from './useLessonSession';
 
 /**
@@ -33,6 +35,8 @@ interface CompletionScreenProps {
   streak: number;
   /** Lesson title, or null for a practice/mistakes session. */
   title: string | null;
+  /** The lesson itself, so the screen can offer a conversation that uses it. */
+  lesson?: CurriculumLesson | null;
   mode: 'lesson' | 'practice' | 'mistakes';
   onContinue: () => void;
 }
@@ -60,12 +64,17 @@ export function CompletionScreen({
   stats,
   streak,
   title,
+  lesson,
   mode,
   onContinue,
 }: CompletionScreenProps) {
   // A near-perfect run and a scrape-through should not be congratulated
   // identically — the praise has to mean something or it stops landing.
   const tier = accuracy >= 95 ? 'perfect' : accuracy >= 80 ? 'good' : 'solid';
+
+  // Only after a real lesson — a practice or mistakes session has no single
+  // topic to carry into a conversation.
+  const handoff = mode === 'lesson' ? handoffFor(lesson) : null;
 
   const guest = isGuest();
   const lessonsDone = guest
@@ -150,9 +159,44 @@ export function CompletionScreen({
         )}
 
         <Beat at={guest ? 1600 : 1300}>
-          <button onClick={onContinue} className="btn-primary w-full py-4 text-lg">
-            Continue
-          </button>
+          {/* The point of the whole app, offered at the only moment it's
+              obviously worth taking: the words are still warm and there's a
+              concrete, two-minute thing to do with them. Before this, finishing
+              a lesson returned you to a dashboard where a tutor card waited to
+              discuss nothing in particular, and most learners never crossed
+              that gap — so they never saw what makes this different from
+              tapping through vocabulary in any other app.
+
+              It's the primary action, and "Back to your course" is the quiet
+              one. Not a hard sell: a learner who wants to bank the win and
+              leave is one tap away, and handoff is null for lessons that have
+              nothing worth saying out loud. */}
+          {handoff && lesson ? (
+            <>
+              <Link
+                href={handoffHref(lesson, handoff)}
+                className="btn-primary w-full py-4 text-lg flex flex-col items-center gap-0.5"
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name="chat" size={19} />
+                  Use it with Profe — {handoff.minutes} min
+                </span>
+                <span className="text-[13px] font-semibold opacity-85 normal-case">
+                  {handoff.task}
+                </span>
+              </Link>
+              <button
+                onClick={onContinue}
+                className="mt-2 w-full py-3 text-sm font-bold text-ink-soft dark:text-stone-400 hover:text-ink dark:hover:text-stone-200 transition-colors"
+              >
+                Back to your course
+              </button>
+            </>
+          ) : (
+            <button onClick={onContinue} className="btn-primary w-full py-4 text-lg">
+              Continue
+            </button>
+          )}
           {/* Only offered to a signed-in learner with something worth showing —
               see ShareProgressButton for why it hides itself early on. */}
           {!guest && (

@@ -261,3 +261,41 @@ export function buildScenarioContext(scenario: Scenario): TutorContext {
     plan: `SCENARIO PRACTICE — ${scenario.prompt} Stay within everything they've already learned (the level and known-vocabulary limits above still apply in full) — if the scenario naturally needs something beyond that, simplify it rather than introduce new material. Keep it a flowing conversation, not a checklist.`,
   };
 }
+
+/**
+ * The context for a call opened straight off the back of finishing a lesson.
+ *
+ * Different from the ordinary lesson-focused context in one way that matters:
+ * the learner finished this ninety seconds ago and pressed a button offering a
+ * two-minute conversation. That sets expectations the tutor has to meet.
+ *
+ * It must open by giving them something to say. A learner who has never had a
+ * conversation in the language, arriving at a screen that says "start
+ * talking", says nothing — so Profe speaks first, with a question narrow
+ * enough to be answerable using the handful of words they've just met. And it
+ * must stay short: this was sold as two minutes, and a tutor who launches into
+ * a fifteen-minute lesson has broken the same promise the welcome screen used
+ * to break.
+ */
+export function buildHandoffContext(
+  focusSlug: string,
+  task: string,
+  targetWords: string[],
+  scenario?: Scenario
+): TutorContext {
+  const base = scenario ? buildScenarioContext(scenario) : buildTutorContext(focusSlug);
+  const words = targetWords.slice(0, 6).join(', ');
+
+  return {
+    ...base,
+    plan:
+      `JUST FINISHED A LESSON — the learner completed "${base.focus}" moments ago and came straight here to use it. ` +
+      `Their task, as the app described it to them: "${task}". ` +
+      (words ? `Words they have just this minute learned: ${words}. Give them openings to use these. ` : '') +
+      `OPEN THE CONVERSATION YOURSELF with one short, concrete, easily-answerable question that invites exactly that — do not wait for them to start, and do not open with "what would you like to talk about". ` +
+      `Keep this SHORT: aim for roughly two minutes and four or five exchanges. They were promised a quick go, not a lesson. ` +
+      `Praise a genuine use of the new material specifically when it happens. ` +
+      `When it feels complete, tell them warmly that they have just used it for real and can end the call. ` +
+      (scenario ? '' : `Stay entirely within what they already know — nothing beyond week ${base.weekReached}.`),
+  };
+}
