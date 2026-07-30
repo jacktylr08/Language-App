@@ -286,16 +286,22 @@ export function buildHandoffContext(
   const base = scenario ? buildScenarioContext(scenario) : buildTutorContext(focusSlug);
   const words = targetWords.slice(0, 6).join(', ');
 
+  // Ordered essential-first: the plan is truncated at a fixed character
+  // budget server-side (see routes/tutor.ts), and a long lesson title or task
+  // description could otherwise push the instruction to actually OPEN the
+  // conversation — the entire point of a handoff, since a beginner arriving
+  // at "start talking" says nothing — past the cut. The vocabulary ceiling is
+  // deliberately last: it's already stated as a hard rule elsewhere in the
+  // full instructions (see weekLine in buildLiveInstructions), so losing this
+  // restates-it clause to truncation is redundant, not silent.
   return {
     ...base,
     plan:
-      `JUST FINISHED A LESSON — the learner completed "${base.focus}" moments ago and came straight here to use it. ` +
-      `Their task, as the app described it to them: "${task}". ` +
-      (words ? `Words they have just this minute learned: ${words}. Give them openings to use these. ` : '') +
-      `OPEN THE CONVERSATION YOURSELF with one short, concrete, easily-answerable question that invites exactly that — do not wait for them to start, and do not open with "what would you like to talk about". ` +
-      `Keep this SHORT: aim for roughly two minutes and four or five exchanges. They were promised a quick go, not a lesson. ` +
-      `Praise a genuine use of the new material specifically when it happens. ` +
-      `When it feels complete, tell them warmly that they have just used it for real and can end the call. ` +
-      (scenario ? '' : `Stay entirely within what they already know — nothing beyond week ${base.weekReached}.`),
+      `JUST FINISHED A LESSON ("${base.focus}") and came straight here to use it — task: "${task}". ` +
+      (words ? `Words just learned: ${words}. ` : '') +
+      `OPEN THE CONVERSATION YOURSELF with one short, easily-answerable question using this — don't wait for them to start, don't open with "what would you like to talk about". ` +
+      `Keep it to about two minutes, four or five exchanges — they were promised a quick go, not a lesson. ` +
+      `Praise a genuine use of the new words when it happens; when it feels complete, warmly tell them they can end the call. ` +
+      (scenario ? '' : `(Ceiling restated: nothing beyond week ${base.weekReached}.)`),
   };
 }

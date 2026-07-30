@@ -122,6 +122,56 @@ describe('buildLiveInstructions — never ask the learner to repeat themselves',
   });
 });
 
+describe('buildLiveInstructions — conversation shape', () => {
+  /**
+   * A learner reported the exact failure this guards against: "where are you
+   * from?" → "England" → "what do you like about England?" → "the weather" →
+   * "why do you like the weather?" — a chain of disconnected questions that
+   * never builds anything, with one-word answers accepted forever.
+   */
+  const instructions = tutorService.buildLiveInstructions({ weekReached: 4 });
+
+  it('explicitly bans the interview pattern', () => {
+    expect(instructions).toMatch(/DON'T INTERVIEW THEM/);
+    expect(instructions).toMatch(/BANNED/);
+  });
+
+  it('requires contributing something, not just extracting answers', () => {
+    expect(instructions).toMatch(/ADD something/);
+    expect(instructions).toMatch(/model sentence/i);
+  });
+
+  it('requires staying on one thread instead of pivoting every turn', () => {
+    expect(instructions).toMatch(/SAME thread/);
+  });
+
+  it('puts the interview ban in its own early paragraph, not buried in a bullet list', () => {
+    const idx = instructions.indexOf("DON'T INTERVIEW THEM");
+    const talkLikeIdx = instructions.indexOf('Talk like a real person');
+    expect(idx).toBeGreaterThan(-1);
+    expect(idx).toBeLessThan(talkLikeIdx);
+  });
+
+  it('tells the tutor to notice and respond to struggle rather than plough on', () => {
+    expect(instructions).toMatch(/NOTICE WHEN THEY'RE STRUGGLING/);
+    expect(instructions).toMatch(/simplify/i);
+  });
+
+  it('requires beginners to actually produce the target language, not just discuss it in English', () => {
+    const beginner = tutorService.buildLiveInstructions({ weekReached: 1 });
+    expect(beginner).toMatch(/get them SAYING Spanish, not just discussing it/);
+  });
+
+  it('applies the same conversation-shape guidance to the text chat', async () => {
+    mockedOpenaiChat.mockReset();
+    mockedOpenaiChat.mockResolvedValue('hola');
+    await tutorService.chat([{ role: 'user', content: 'hi' }], { weekReached: 4 });
+    const systemPrompt = mockedOpenaiChat.mock.calls[0][0];
+    expect(systemPrompt).toMatch(/DON'T INTERVIEW THEM/);
+    expect(systemPrompt).toMatch(/NOTICE WHEN THEY'RE STRUGGLING/);
+  });
+});
+
 describe('buildLiveInstructions — turn-taking on a live call', () => {
   /**
    * The complaint these exist for: in any room that wasn't silent, Profe

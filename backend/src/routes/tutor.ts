@@ -82,7 +82,7 @@ router.post('/chat', verifyToken, tutorChatLimiter, async (req: AuthRequest, res
       strengths: strList(strengths),
       profileSummary: typeof profileSummary === 'string' ? profileSummary.slice(0, 800) : undefined,
       learnerName: typeof learnerName === 'string' ? learnerName.slice(0, 60) : undefined,
-      plan: typeof plan === 'string' ? plan.slice(0, 800) : undefined,
+      plan: typeof plan === 'string' ? plan.slice(0, 1400) : undefined,
       pace: paceVal,
       evaluation: evaluation === true,
     });
@@ -166,7 +166,7 @@ router.post('/realtime', verifyToken, tutorRealtimeLimiter, async (req: AuthRequ
       strengths: strList(b.strengths),
       profileSummary: typeof b.profileSummary === 'string' ? b.profileSummary.slice(0, 800) : undefined,
       learnerName: typeof b.learnerName === 'string' ? b.learnerName.slice(0, 60) : undefined,
-      plan: typeof b.plan === 'string' ? b.plan.slice(0, 800) : undefined,
+      plan: typeof b.plan === 'string' ? b.plan.slice(0, 1400) : undefined,
       pace: b.pace === 'slow' || b.pace === 'brisk' ? b.pace : undefined,
       evaluation: b.evaluation === true,
       lastSessionNote: typeof b.lastSessionNote === 'string' ? b.lastSessionNote.slice(0, 200) : undefined,
