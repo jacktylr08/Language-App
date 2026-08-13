@@ -10,6 +10,7 @@ import { checkSentence, buildSkeleton, buildTiles, type SentenceResult } from '@
 import { sentenceWords, getSentenceBank } from '@/lib/sentence-bank';
 import { recordSentenceResult } from '@/lib/progress';
 import { nextStage, type ScopedSentence, type SentenceStage } from '@/lib/sentence-scope';
+import { getActiveLanguage } from '@/lib/languages';
 
 /**
  * Saying something, one rung at a time.
@@ -338,7 +339,7 @@ export function SentenceBuilder({ queue: initialQueue, onDone, onExit }: Sentenc
                 onChange={(e) => setTyped(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && canSubmit && submit()}
                 disabled={!!result}
-                placeholder="Escríbelo en español…"
+                placeholder={`${getActiveLanguage().name}…`}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}

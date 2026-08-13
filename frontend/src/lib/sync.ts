@@ -13,17 +13,36 @@
 import { api } from './api';
 import { getAuth, isAuthenticated } from './auth';
 import { progressKeyFor, tutorProfileKeyFor, ONBOARDING_KEY, LEARNER_GOAL_KEY, ACTIVE_LANGUAGE_KEY } from './keys';
-import { LANGUAGES, getActiveLanguageId } from './languages';
+import { LANGUAGES } from './languages';
 import type { ProgressState } from './progress';
 import type { LearnerProfile } from './tutor-memory';
 import type { LearnerGoal } from './learner-goal';
 
+/** One course's synced state. */
+interface LanguageState {
+  progress?: ProgressState;
+  tutorProfile?: LearnerProfile | null;
+}
+
+/**
+ * The account's whole synced state.
+ *
+ * Spanish deliberately stays at the TOP LEVEL, exactly where it has always
+ * been. Every existing account's server row is already this shape, so moving
+ * it under `languages` would need a migration and would strand anyone whose
+ * client is older than the change. Every other course lives under `languages`.
+ */
 interface SyncBlob {
   progress?: ProgressState;
   tutorProfile?: LearnerProfile | null;
   onboardingComplete?: boolean;
   learnerGoal?: LearnerGoal | null;
+  /** Courses other than the default one, keyed by language id. */
+  languages?: Record<string, LanguageState>;
 }
+
+/** Spanish — the course whose state lives at the top level of the blob. */
+const DEFAULT_LANGUAGE_ID = 'es';
 
 // ---------- localStorage helpers (read/write raw, no cross-imports) ----------
 
@@ -85,19 +104,53 @@ function writeGoal(goal: LearnerGoal): void {
   }
 }
 
-// Syncs only the ACTIVE language's progress/tutor memory. With a single
-// registered language this is everything there is to sync; once a second
-// language exists, syncing every language at once would need the server's
-// state blob to become language-keyed too (POST /api/v1/state currently
-// stores one flat blob per account) — a backend change, out of scope here.
+/**
+ * Everything this device knows, for EVERY course.
+ *
+ * This used to sync only the active language, with a note saying that a second
+ * course would need the blob to become language-keyed. Italian then shipped
+ * without that change, and the result was worse than "Italian doesn't sync":
+ * the server holds one flat blob, so pulling it while Italian was active wrote
+ * the account's SPANISH progress into the Italian key. Switching course showed
+ * Italian lessons carrying Spanish stars and streaks, and the next push sent
+ * the blend back to the server. Reading and writing every course at once is
+ * what makes them genuinely independent.
+ */
 function localBlob(): SyncBlob {
-  const languageId = getActiveLanguageId();
+  const languages: Record<string, LanguageState> = {};
+  for (const l of LANGUAGES) {
+    if (l.id === DEFAULT_LANGUAGE_ID) continue;
+    const progress = readJSON<ProgressState>(progressKeyFor(l.id)) ?? undefined;
+    const tutorProfile = readJSON<LearnerProfile>(tutorProfileKeyFor(l.id));
+    // Don't invent an entry for a course the learner has never opened.
+    if (progress || tutorProfile) languages[l.id] = { progress, tutorProfile };
+  }
+
   return {
-    progress: readJSON<ProgressState>(progressKeyFor(languageId)) ?? undefined,
-    tutorProfile: readJSON<LearnerProfile>(tutorProfileKeyFor(languageId)),
+    progress: readJSON<ProgressState>(progressKeyFor(DEFAULT_LANGUAGE_ID)) ?? undefined,
+    tutorProfile: readJSON<LearnerProfile>(tutorProfileKeyFor(DEFAULT_LANGUAGE_ID)),
     onboardingComplete: readOnboarding(),
     learnerGoal: readGoal(),
+    ...(Object.keys(languages).length ? { languages } : {}),
   };
+}
+
+/**
+ * Test seams for the language-splitting behaviour.
+ *
+ * localBlob/applyBlob/hasAnythingToSave are the three places where a course
+ * can leak into another, and all three are internal. Exporting thin wrappers
+ * is cheaper than exporting the network plumbing around them, and lets the
+ * tests assert on what actually goes over the wire and what lands in storage.
+ */
+export function buildSyncPayloadForTest(): SyncBlob {
+  return localBlob();
+}
+export function applySyncPayloadForTest(blob: SyncBlob): void {
+  applyBlob(blob);
+}
+export function syncPayloadHasContentForTest(): boolean {
+  return hasAnythingToSave(localBlob());
 }
 
 // ---------- merges (idempotent) ----------
@@ -218,19 +271,39 @@ export function mergeProfile(
 }
 
 function mergeBlob(a: SyncBlob, b: SyncBlob): SyncBlob {
+  // Each course merges only against ITSELF. Merging across languages would
+  // union two unrelated vocabularies into one progress object.
+  const ids = new Set([...Object.keys(a.languages ?? {}), ...Object.keys(b.languages ?? {})]);
+  const languages: Record<string, LanguageState> = {};
+  for (const id of ids) {
+    const la = a.languages?.[id];
+    const lb = b.languages?.[id];
+    languages[id] = {
+      progress: mergeProgress(la?.progress, lb?.progress),
+      tutorProfile: mergeProfile(la?.tutorProfile, lb?.tutorProfile),
+    };
+  }
+
   return {
     progress: mergeProgress(a.progress, b.progress),
     tutorProfile: mergeProfile(a.tutorProfile, b.tutorProfile),
     onboardingComplete: !!(a.onboardingComplete || b.onboardingComplete),
     // Set once at onboarding and rarely revisited — first non-empty value wins.
     learnerGoal: a.learnerGoal ?? b.learnerGoal ?? null,
+    ...(ids.size ? { languages } : {}),
   };
 }
 
 function applyBlob(blob: SyncBlob): void {
-  const languageId = getActiveLanguageId();
-  if (blob.progress) writeJSON(progressKeyFor(languageId), blob.progress);
-  if (blob.tutorProfile) writeJSON(tutorProfileKeyFor(languageId), blob.tutorProfile);
+  // Writes each course to ITS OWN key rather than to whichever course happens
+  // to be on screen — see localBlob for what that cost.
+  if (blob.progress) writeJSON(progressKeyFor(DEFAULT_LANGUAGE_ID), blob.progress);
+  if (blob.tutorProfile) writeJSON(tutorProfileKeyFor(DEFAULT_LANGUAGE_ID), blob.tutorProfile);
+  for (const [id, state] of Object.entries(blob.languages ?? {})) {
+    if (id === DEFAULT_LANGUAGE_ID) continue;
+    if (state?.progress) writeJSON(progressKeyFor(id), state.progress);
+    if (state?.tutorProfile) writeJSON(tutorProfileKeyFor(id), state.tutorProfile);
+  }
   if (blob.onboardingComplete) writeOnboarding(true);
   if (blob.learnerGoal) writeGoal(blob.learnerGoal);
 }
@@ -315,10 +388,18 @@ function getAuthToken(): string | null {
 }
 
 function hasAnythingToSave(blob: SyncBlob): boolean {
+  const worthSaving = (s?: LanguageState): boolean =>
+    Object.keys(s?.progress?.lessons ?? {}).length > 0 ||
+    Object.keys(s?.progress?.words ?? {}).length > 0 ||
+    !!s?.tutorProfile;
+
+  // Every course counts, not just the one at the top level. Checking Spanish
+  // alone meant a learner who had only ever studied Italian looked like an
+  // empty device, so the guard below refused to push and their work never
+  // left the phone.
   return (
-    Object.keys(blob.progress?.lessons ?? {}).length > 0 ||
-    Object.keys(blob.progress?.words ?? {}).length > 0 ||
-    !!blob.tutorProfile
+    worthSaving({ progress: blob.progress, tutorProfile: blob.tutorProfile }) ||
+    Object.values(blob.languages ?? {}).some(worthSaving)
   );
 }
 

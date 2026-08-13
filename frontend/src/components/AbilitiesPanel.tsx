@@ -1,11 +1,13 @@
 'use client';
 
+import { getActiveLanguage } from '@/lib/languages';
+
 import { useEffect, useState } from 'react';
 import { getAbilities, type Ability } from '@/lib/abilities';
 import { Icon } from '@/components/icons/Icon';
 
 /**
- * "What you can do in Spanish" — progress measured as real, practical abilities
+ * "What you can do" — progress measured as real, practical abilities
  * rather than XP or streaks. Shows what the learner can already do, what
  * they're working on now, and a peek at what's next.
  */
@@ -35,7 +37,7 @@ export function AbilitiesPanel() {
         </span>
       </div>
       <p className="text-xs text-ink-soft dark:text-stone-400 mb-4">
-        Real things you can say and do in Spanish.
+        Real things you can say and do in {getActiveLanguage().name}.
       </p>
 
       <ul className="space-y-2.5">

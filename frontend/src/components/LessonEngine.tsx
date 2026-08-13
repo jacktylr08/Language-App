@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAllVocab } from '@/lib/curriculum';
+import { getActiveLanguage } from '@/lib/languages';
 import { listenOnce, matchAnswer, matchSpoken, speechRecognitionSupported, MatchQuality } from '@/lib/speech';
 import { speakNeural as speak, stopSpeaking } from '@/lib/tts';
 import { loadProgress, currentStreak } from '@/lib/progress';
@@ -99,6 +100,12 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
     []
   );
   const allVocab = useMemo(() => getAllVocab(), []);
+  // Exercise instructions used to say "Type this in Spanish" and prompt with
+  // "Escribe en español…" whatever course you were in, so an Italian lesson
+  // asked you to answer in Spanish.
+  const language = useMemo(() => getActiveLanguage(), []);
+  const languageName = language.name;
+  const writePrompt = language.id === 'it' ? 'Scrivi in italiano…' : 'Escribe en español…';
 
   const {
     queue,
@@ -753,7 +760,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
             prompt={current.type === 'mcq_es_en' ? current.word.es : current.word.en}
             promptLang={current.type === 'mcq_es_en' ? 'es' : 'en'}
             instruction={
-              current.type === 'mcq_es_en' ? 'What does this mean?' : 'Choose the Spanish'
+              current.type === 'mcq_es_en' ? 'What does this mean?' : `Choose the ${languageName}`
             }
             options={current.options!}
             selected={selected}
@@ -779,7 +786,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
         {current.type === 'type_es' && (
           <div className="flex-1 flex flex-col justify-center">
             <p className="text-center text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
-              Type this in Spanish
+              Type this in {languageName}
             </p>
             <p className="font-display text-center text-4xl font-black text-ink dark:text-white mb-8">
               {current.word.en}
@@ -791,7 +798,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               onChange={(e) => setTyped(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submitTyped()}
               disabled={!!feedback}
-              placeholder="Escribe en español…"
+              placeholder={writePrompt}
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
@@ -988,7 +995,7 @@ export function LessonEngine({ lesson, mode = 'lesson' }: LessonEngineProps) {
               value={writingText}
               onChange={(e) => setWritingText(e.target.value)}
               disabled={!!feedback || gradingWriting}
-              placeholder="Escribe en español…"
+              placeholder={writePrompt}
               rows={3}
               autoCapitalize="none"
               autoCorrect="off"

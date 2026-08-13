@@ -15,7 +15,18 @@ import {
   hasLanguageChoice,
 } from '../languages';
 import { progressKeyFor, tutorProfileKeyFor, PROGRESS_KEY } from '../keys';
-import { loadProgress, completeLessonLocal, currentStreak } from '../progress';
+import {
+  loadProgress,
+  completeLessonLocal,
+  currentStreak,
+  localDay,
+  type ProgressState,
+} from '../progress';
+import {
+  buildSyncPayloadForTest,
+  applySyncPayloadForTest,
+  syncPayloadHasContentForTest,
+} from '../sync';
 import { getCurriculum, getCurriculumFor, getRegisteredCurriculumLanguages } from '../curriculum';
 import { getReadings } from '../readings';
 import { curriculum as italian } from '../curriculum/it';
@@ -121,5 +132,105 @@ describe('progress is kept per course, and never lost', () => {
     completeLessonLocal('greetings-essentials', 100);
     setActiveLanguageId('it');
     expect(loadProgress().lessons['greetings-essentials']).toBeUndefined();
+  });
+});
+
+describe('syncing keeps the courses apart', () => {
+  /**
+   * The bug this exists for, reported with screenshots: switching to Italian
+   * showed Italian lesson titles carrying SPANISH stars, streak and word
+   * counts. Local storage was correctly per-language — but the server holds
+   * ONE flat blob per account, and applyBlob wrote it to whichever course
+   * happened to be active. So the first sync after switching copied the
+   * learner's Spanish progress into the Italian key, and the next push sent
+   * the blend back up.
+   *
+   * mergeBlob/applyBlob aren't exported, so these drive the observable
+   * contract instead: what localBlob puts on the wire, and what a pulled blob
+   * does to local storage.
+   */
+  it('puts every course on the wire, not just the active one', () => {
+    completeLessonLocal('greetings-essentials', 95);
+    setActiveLanguageId('it');
+    completeLessonLocal('essere-identity', 80);
+
+    const blob = buildSyncPayloadForTest();
+    // Spanish stays where every existing account's row already has it.
+    expect(Object.keys(blob.progress?.lessons ?? {})).toContain('greetings-essentials');
+    // Italian is namespaced, not overwriting it.
+    expect(Object.keys(blob.languages?.it?.progress?.lessons ?? {})).toContain('essere-identity');
+    expect(Object.keys(blob.languages?.it?.progress?.lessons ?? {})).not.toContain(
+      'greetings-essentials'
+    );
+  });
+
+  it('a pulled blob lands in the right course, whichever one is on screen', () => {
+    // Exactly the reported failure: pull the account's Spanish row while
+    // Italian is the active course.
+    setActiveLanguageId('it');
+    applySyncPayloadForTest({
+      progress: {
+        streak: 9,
+        bestStreak: 9,
+        lastActiveDay: '2026-01-01',
+        activeDays: ['2026-01-01'],
+        lessons: { 'greetings-essentials': { completed: true, bestAccuracy: 100, timesCompleted: 1 } },
+        words: {},
+      } as ProgressState,
+    });
+
+    // Italian must still be untouched...
+    expect(loadProgress().lessons['greetings-essentials']).toBeUndefined();
+    expect(currentStreak(loadProgress())).toBe(0);
+
+    // ...and Spanish must have received it.
+    setActiveLanguageId('es');
+    expect(loadProgress().lessons['greetings-essentials']?.bestAccuracy).toBe(100);
+  });
+
+  it('restores each course to its own key from a namespaced blob', () => {
+    setActiveLanguageId('es');
+    applySyncPayloadForTest({
+      progress: {
+        streak: 3,
+        bestStreak: 3,
+        // Today, because currentStreak correctly lapses a stale one — a fixed
+        // past date would be testing the calendar, not the sync split.
+        lastActiveDay: localDay(),
+        activeDays: [localDay()],
+        lessons: { 'greetings-essentials': { completed: true, bestAccuracy: 90, timesCompleted: 1 } },
+        words: {},
+      } as ProgressState,
+      languages: {
+        it: {
+          progress: {
+            streak: 7,
+            bestStreak: 7,
+            lastActiveDay: localDay(),
+            activeDays: [localDay()],
+            lessons: { 'essere-identity': { completed: true, bestAccuracy: 70, timesCompleted: 1 } },
+            words: {},
+          } as ProgressState,
+        },
+      },
+    });
+
+    expect(loadProgress().lessons['greetings-essentials']?.bestAccuracy).toBe(90);
+    expect(currentStreak(loadProgress())).toBe(3);
+
+    setActiveLanguageId('it');
+    expect(loadProgress().lessons['essere-identity']?.bestAccuracy).toBe(70);
+    expect(loadProgress().lessons['greetings-essentials']).toBeUndefined();
+    expect(currentStreak(loadProgress())).toBe(7);
+  });
+
+  it('counts an Italian-only learner as having something worth pushing', () => {
+    // hasAnythingToSave checked only the top-level (Spanish) progress, so a
+    // learner who had studied nothing but Italian looked like an empty device
+    // and the "never let an empty device overwrite a full account" guard
+    // silently refused to ever push their work.
+    setActiveLanguageId('it');
+    completeLessonLocal('greetings-essentials', 88);
+    expect(syncPayloadHasContentForTest()).toBe(true);
   });
 });
