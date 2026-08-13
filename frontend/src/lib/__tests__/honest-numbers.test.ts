@@ -103,22 +103,29 @@ describe('word counts', () => {
   });
 });
 
-describe('the language picker is skipped, not deleted', () => {
-  it('is not asked while one course exists', () => {
-    // A menu of one is a step, not a choice.
-    expect(hasLanguageChoice()).toBe(false);
+describe('the language picker is availability-driven', () => {
+  /**
+   * Written when Spanish was the only course, to pin that the picker was
+   * SKIPPED rather than deleted and would return by itself once a second
+   * course existed. Italian has now shipped and it did exactly that — so the
+   * first assertion has been inverted to match reality rather than deleted,
+   * and the mechanism is still pinned from the other direction below.
+   */
+  it('is asked now that there is a genuine choice', () => {
+    expect(hasLanguageChoice()).toBe(true);
   });
 
-  it('comes back on its own the moment a second course is finished', () => {
-    // This is the whole justification for skipping rather than removing it:
-    // marking a second language available must be the only change required.
-    const french = LANGUAGES.find((l) => l.id === 'fr')!;
-    const was = french.available;
+  it('is driven purely by availability, so it disappears again if a course is pulled', () => {
+    // The same one-line switch that brought the picker back has to be able to
+    // take it away — otherwise a course withdrawn for repairs leaves a menu
+    // pointing at nothing.
+    const italian = LANGUAGES.find((l) => l.id === 'it')!;
+    const was = italian.available;
     try {
-      french.available = true;
-      expect(hasLanguageChoice()).toBe(true);
+      italian.available = false;
+      expect(hasLanguageChoice()).toBe(false);
     } finally {
-      french.available = was;
+      italian.available = was;
     }
   });
 });

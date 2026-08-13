@@ -107,7 +107,7 @@ export const LANGUAGES: CourseLanguage[] = [
     nativeName: 'Italiano',
     locale: 'it-IT',
     flag: '🇮🇹',
-    available: false,
+    available: true,
     greeting: 'Ciao!',
     flagBands: [
       { color: '#008C45', weight: 0.34 },

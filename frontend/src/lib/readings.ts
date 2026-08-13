@@ -8,6 +8,8 @@
  */
 import { getAllVocab } from './curriculum';
 import { recordWordResult } from './progress';
+import { getActiveLanguageId } from './languages';
+import { READINGS_IT } from './readings-it';
 
 export interface ReadingPassage {
   slug: string;
@@ -2641,8 +2643,21 @@ Y eso, al final, era todo lo que necesitaba.`,
   },
 ];
 
+/**
+ * The passages for whichever course the learner is actually in.
+ *
+ * READINGS above stays exported and Spanish, because a great deal of the
+ * module (and its tests) reasons about that one set directly. Everything that
+ * renders a list or resolves a slug must go through here instead — reading an
+ * Italian course and being shown Spanish passages is the kind of bug that
+ * makes the whole language switch feel broken.
+ */
+export function getReadings(languageId: string = getActiveLanguageId()): ReadingPassage[] {
+  return languageId === 'it' ? READINGS_IT : READINGS;
+}
+
 export function getReading(slug: string): ReadingPassage | undefined {
-  return READINGS.find((r) => r.slug === slug);
+  return getReadings().find((r) => r.slug === slug);
 }
 
 export function normalizeToken(raw: string): string {

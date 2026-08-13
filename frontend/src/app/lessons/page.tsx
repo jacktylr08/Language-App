@@ -19,7 +19,7 @@ import { REVIEW_SESSION_SIZE } from '@/lib/exercise-engine';
 import { coursePositionFor } from '@/lib/course-progress';
 import { combinedMistakeCount } from '@/lib/learner-insights';
 import { buildTutorContext } from '@/lib/tutor-context';
-import { CourseChip } from '@/components/CourseChip';
+import { CourseSwitcher } from '@/components/CourseSwitcher';
 import { SCENARIOS } from '@/lib/scenarios';
 import { DashboardSkeleton } from '@/components/Skeleton';
 import { Icon, type IconName } from '@/components/icons/Icon';
@@ -506,7 +506,7 @@ export default function LessonsPage() {
             <Link href="/" aria-label="Fluenta home">
               <BrandLockup />
             </Link>
-            <CourseChip />
+            <CourseSwitcher />
           </div>
           <div className="flex items-center gap-3 text-sm font-extrabold">
             <span

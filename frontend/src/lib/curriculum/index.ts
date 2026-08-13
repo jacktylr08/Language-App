@@ -7,6 +7,7 @@
  * so this refactor changes no call site outside this directory.
  */
 import * as es from './es';
+import * as it from './it';
 import { getActiveLanguageId } from '../languages';
 
 export type {
@@ -27,7 +28,7 @@ interface CurriculumModule {
   getPriorLessons: (typeof es)['getPriorLessons'];
 }
 
-const REGISTRY: Record<string, CurriculumModule> = { es };
+const REGISTRY: Record<string, CurriculumModule> = { es, it };
 
 /** Every language with curriculum content actually registered. */
 export function getRegisteredCurriculumLanguages(): string[] {

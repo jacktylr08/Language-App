@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRequireAuth } from '@/lib/hooks';
 import { loadProgress, weekReachedFor } from '@/lib/progress';
-import { READINGS } from '@/lib/readings';
+import { getReadings } from '@/lib/readings';
+import { getActiveLanguage } from '@/lib/languages';
 import { ReadingListSkeleton } from '@/components/Skeleton';
 
 export default function ReadingListPage() {
@@ -36,7 +37,7 @@ export default function ReadingListPage() {
             Reading
           </p>
           <h1 className="font-display text-4xl font-black text-ink dark:text-white leading-[1.05]">
-            Read in Spanish
+            Read in {getActiveLanguage().name}
           </h1>
           <p className="text-ink-soft dark:text-stone-400 mt-2">
             Short passages, real comprehension. Tap any word you don't know instead of reading a
@@ -45,7 +46,7 @@ export default function ReadingListPage() {
         </header>
 
         <div className="space-y-3.5">
-          {READINGS.map((r) => {
+          {getReadings().map((r) => {
             const unlocked = weekReached >= r.minWeek;
             const card = (
               <div

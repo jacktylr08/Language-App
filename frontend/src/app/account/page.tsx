@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { getAuth, clearAuth } from '@/lib/auth';
 import { clearLocalLearnerState, flushSync } from '@/lib/sync';
 import { TutorProfilePanel } from '@/components/TutorProfilePanel';
-import { CourseChip } from '@/components/CourseChip';
+import { CourseSwitcher } from '@/components/CourseSwitcher';
 import {
   loadProgress,
   currentStreak,
@@ -227,7 +227,7 @@ export default function AccountPage() {
             <Link href="/" className="font-display text-xl font-black text-brand-600 dark:text-brand-400">
               Fluenta
             </Link>
-            <CourseChip />
+            <CourseSwitcher />
           </div>
         </div>
       </nav>

@@ -8,9 +8,23 @@
  * FillBlankExercise's split() find nothing, print the whole sentence
  * (answer included) and leave an empty blank dangling after it.
  */
-import { curriculum } from '../curriculum/es';
+import { curriculum as es } from '../curriculum/es';
+// NOT aliased to `it` — that shadows Jest's own it() and every test in the
+// file silently becomes a call to the curriculum array.
+import { curriculum as italian } from '../curriculum/it';
 
-describe('fill-in-the-blank sentences', () => {
+/**
+ * Both courses, same invariants. Running these against Spanish alone meant a
+ * second course could ship with a broken blank, a duplicate vocab id or a
+ * missing dialogue and nothing would go red — and content bugs are exactly
+ * the kind that render fine and quietly teach the wrong thing.
+ */
+const COURSES: Array<[string, typeof es]> = [
+  ['es', es],
+  ['it', italian],
+];
+
+describe.each(COURSES)('%s — fill-in-the-blank sentences', (_id, curriculum) => {
   it('every blank appears verbatim in its own sentence', () => {
     // FillBlankExercise renders via sentence.es.split(sentence.blank). A blank
     // that isn't found produces a one-element array — the whole sentence,
@@ -60,7 +74,7 @@ describe('fill-in-the-blank sentences', () => {
   });
 });
 
-describe('concept checks', () => {
+describe.each(COURSES)('%s — concept checks', (_id, curriculum) => {
   it('every correct answer is one of the options offered', () => {
     // Otherwise the question is unanswerable: no option matches, so the
     // learner is marked wrong whatever they pick.
@@ -82,7 +96,7 @@ describe('concept checks', () => {
   });
 });
 
-describe('vocabulary', () => {
+describe.each(COURSES)('%s — vocabulary', (_id, curriculum) => {
   const allVocab = curriculum.flatMap((l) => l.vocab.map((v) => ({ ...v, lesson: l.slug })));
 
   it('ids are unique across the whole course', () => {
@@ -154,7 +168,7 @@ describe('vocabulary', () => {
   });
 });
 
-describe('course structure', () => {
+describe.each(COURSES)('%s — course structure', (_id, curriculum) => {
   it('has no gap in the week sequence', () => {
     const weeks = new Set(curriculum.map((l) => l.week));
     const missing = [];
