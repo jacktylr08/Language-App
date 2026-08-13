@@ -380,4 +380,144 @@ Alla fine torno a Roma. Il lavoro ricomincia a settembre, ma non ci penso ancora
       ancora: 'yet',
     },
   },
+  {
+    slug: 'il-colloquio',
+    title: 'Il colloquio',
+    emoji: '💼',
+    minWeek: 17,
+    blurb: 'A job interview, with pronouns doing the work.',
+    text: `Stamattina avevo un colloquio importante. Mi sono svegliato presto e mi sono vestito bene.
+
+Quando sono arrivato, la segretaria mi ha accolto e mi ha detto di aspettare. L'ho ringraziata e mi sono seduto.
+
+Il direttore mi ha fatto molte domande. Gliele ho risposte con calma. Mi ha chiesto dei miei progetti e gli ho spiegato tutto.
+
+Alla fine mi ha detto: «La richiameremo». Non so cosa significhi, ma sono contento di come è andata.`,
+    glossary: {
+      colloquio: 'interview',
+      svegliato: 'woken up',
+      vestito: 'dressed',
+      segretaria: 'secretary',
+      accolto: 'welcomed',
+      aspettare: 'to wait',
+      ringraziata: 'thanked (her)',
+      seduto: 'sat down',
+      direttore: 'director, manager',
+      gliele: 'them to him',
+      risposte: 'answered',
+      calma: 'calm',
+      chiesto: 'asked',
+      spiegato: 'explained',
+      richiameremo: 'we will call back',
+      significhi: 'it means',
+      andata: 'gone',
+    },
+  },
+  {
+    slug: 'una-giornata-storta',
+    title: 'Una giornata storta',
+    emoji: '🌧️',
+    minWeek: 19,
+    blurb: 'Everything goes wrong — told with the imperative and a lot of feeling.',
+    text: `Ieri è stata una giornata storta. Mi sono svegliato tardi perché la sveglia non ha suonato.
+
+Sono uscito di corsa. «Non correre!» mi ha gridato mia madre. «Fai colazione!» Ma non avevo tempo.
+
+Alla stazione ho scoperto che avevo dimenticato il portafoglio. Sono tornato a casa, l'ho preso, e ho perso il treno.
+
+Quando finalmente sono arrivato in ufficio, il mio capo mi ha guardato e ha detto solo: «Stai tranquillo, capita a tutti».`,
+    glossary: {
+      storta: 'crooked (giornata storta = a bad day)',
+      sveglia: 'alarm clock',
+      suonato: 'rung',
+      uscito: 'gone out',
+      corsa: 'run (di corsa = in a rush)',
+      correre: 'to run',
+      gridato: 'shouted',
+      scoperto: 'discovered',
+      dimenticato: 'forgotten',
+      portafoglio: 'wallet',
+      perso: 'missed, lost',
+      finalmente: 'finally',
+      capo: 'boss',
+      guardato: 'looked at',
+      tranquillo: 'calm',
+      capita: 'it happens',
+      tutti: 'everyone',
+    },
+  },
+  {
+    slug: 'se-avessi-piu-tempo',
+    title: 'Se avessi più tempo',
+    emoji: '🌠',
+    minWeek: 21,
+    blurb: 'Daydreaming in the conditional and the subjunctive.',
+    text: `Se avessi più tempo libero, farei molte cose diverse.
+
+Imparerei a suonare il pianoforte. Viaggerei in tutta l'Italia, non solo nelle grandi città. Andrei nei paesi piccoli, dove la gente parla ancora il dialetto.
+
+Se fossi più coraggioso, lascerei il mio lavoro e aprirei un piccolo ristorante. Penso che sarebbe difficile, ma credo che ne varrebbe la pena.
+
+Comunque, magari un giorno. Intanto studio l'italiano — è già un buon inizio.`,
+    glossary: {
+      avessi: 'I had (subjunctive)',
+      farei: 'I would do',
+      imparerei: 'I would learn',
+      suonare: 'to play (an instrument)',
+      pianoforte: 'piano',
+      viaggerei: 'I would travel',
+      tutta: 'all',
+      solo: 'only',
+      paesi: 'villages, towns',
+      dialetto: 'dialect',
+      fossi: 'I were (subjunctive)',
+      coraggioso: 'brave',
+      lascerei: 'I would leave',
+      aprirei: 'I would open',
+      varrebbe: 'it would be worth',
+      pena: 'trouble (valere la pena = to be worth it)',
+      magari: 'maybe',
+      intanto: 'in the meantime',
+      inizio: 'start',
+    },
+  },
+  {
+    slug: 'la-lettera-di-nonna',
+    title: 'La lettera di nonna',
+    emoji: '📜',
+    minWeek: 23,
+    blurb: 'A grandmother writes — the whole course, in one letter.',
+    text: `Caro nipote,
+
+come stai? Spero che tu stia bene e che il lavoro vada come vuoi.
+
+Qui tutto tranquillo. Il tempo è cambiato, fa più freddo, però il giardino è ancora bello. Ieri ho raccolto gli ultimi pomodori.
+
+Mi ha telefonato tua sorella. Mi ha detto che verrà a trovarmi a Natale. Sarebbe bello se venissi anche tu. Non ci vediamo da troppo tempo.
+
+Comunque, non ti preoccupare se sei occupato. Capisco benissimo. Ma sappi che qui c'è sempre un piatto per te.
+
+Ti abbraccio forte,
+Nonna`,
+    glossary: {
+      nipote: 'grandson, nephew',
+      stia: 'you are (subjunctive)',
+      vada: 'it goes (subjunctive)',
+      cambiato: 'changed',
+      giardino: 'garden',
+      raccolto: 'picked, harvested',
+      ultimi: 'last',
+      pomodori: 'tomatoes',
+      telefonato: 'phoned',
+      trovarmi: 'to visit me',
+      natale: 'Christmas',
+      venissi: 'you came (subjunctive)',
+      troppo: 'too',
+      occupato: 'busy',
+      sappi: 'know (imperative)',
+      piatto: 'plate, dish',
+      abbraccio: 'I hug',
+      forte: 'strongly, tightly',
+    },
+  },
 ];

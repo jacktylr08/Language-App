@@ -5,6 +5,7 @@ import {
   lookupWord,
   reconcileReadingProgress,
 } from '../readings';
+import { READINGS_IT } from '../readings-it';
 import { loadProgress } from '../progress';
 
 describe('READINGS content', () => {
@@ -42,6 +43,35 @@ describe('READINGS content', () => {
     // it's a translation exercise.
     const thin = READINGS.filter((r) => Object.keys(r.glossary ?? {}).length < 8).map((r) => r.slug);
     expect(thin).toEqual([]);
+  });
+
+  /**
+   * The Italian set is deliberately held to the structural invariants but NOT
+   * to the Spanish volume bar. Spanish has 50+ passages built up over time;
+   * Italian has 14, which is honest for a course that has just shipped — and
+   * asserting parity it does not have would either force filler or sit red.
+   * What must hold is that it is ordered, unique and actually glossed.
+   */
+  it('the Italian set is ordered and uniquely slugged too', () => {
+    const slugs = READINGS_IT.map((r) => r.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    const weeks = READINGS_IT.map((r) => r.minWeek);
+    expect(weeks).toEqual([...weeks].sort((a, b) => a - b));
+  });
+
+  it('glosses the Italian passages properly as well', () => {
+    const thin = READINGS_IT.filter((r) => Object.keys(r.glossary ?? {}).length < 8).map(
+      (r) => r.slug
+    );
+    expect(thin).toEqual([]);
+  });
+
+  it('spreads Italian reading across the whole course, not just the start', () => {
+    // A learner who reaches week 20 and finds nothing new to read stops
+    // reading. Volume can grow later; coverage has to exist now.
+    const weeks = READINGS_IT.map((r) => r.minWeek);
+    expect(Math.min(...weeks)).toBeLessThanOrEqual(2);
+    expect(Math.max(...weeks)).toBeGreaterThanOrEqual(20);
   });
 
   it('getReading resolves a real slug and returns undefined for an unknown one', () => {
