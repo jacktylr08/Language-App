@@ -17,6 +17,7 @@ import { LANGUAGES } from './languages';
 import type { ProgressState } from './progress';
 import type { LearnerProfile } from './tutor-memory';
 import type { LearnerGoal } from './learner-goal';
+import { repairProgressForLanguage } from './course-repair';
 
 /** One course's synced state. */
 interface LanguageState {
@@ -116,18 +117,33 @@ function writeGoal(goal: LearnerGoal): void {
  * the blend back to the server. Reading and writing every course at once is
  * what makes them genuinely independent.
  */
+/**
+ * Reads one course's progress, with anything belonging to another course
+ * stripped out first.
+ *
+ * Applied on BOTH sides of the wire. Repairing only on read would leave the
+ * corrected sync happily uploading data that leaked in before the fix, which
+ * would make it permanent; repairing only on upload would let a pull put it
+ * straight back. See lib/course-repair.ts.
+ */
+function cleanProgress(languageId: string): ProgressState | undefined {
+  const raw = readJSON<ProgressState>(progressKeyFor(languageId));
+  if (!raw) return undefined;
+  return repairProgressForLanguage(languageId, raw).state;
+}
+
 function localBlob(): SyncBlob {
   const languages: Record<string, LanguageState> = {};
   for (const l of LANGUAGES) {
     if (l.id === DEFAULT_LANGUAGE_ID) continue;
-    const progress = readJSON<ProgressState>(progressKeyFor(l.id)) ?? undefined;
+    const progress = cleanProgress(l.id);
     const tutorProfile = readJSON<LearnerProfile>(tutorProfileKeyFor(l.id));
     // Don't invent an entry for a course the learner has never opened.
     if (progress || tutorProfile) languages[l.id] = { progress, tutorProfile };
   }
 
   return {
-    progress: readJSON<ProgressState>(progressKeyFor(DEFAULT_LANGUAGE_ID)) ?? undefined,
+    progress: cleanProgress(DEFAULT_LANGUAGE_ID),
     tutorProfile: readJSON<LearnerProfile>(tutorProfileKeyFor(DEFAULT_LANGUAGE_ID)),
     onboardingComplete: readOnboarding(),
     learnerGoal: readGoal(),
@@ -296,12 +312,19 @@ function mergeBlob(a: SyncBlob, b: SyncBlob): SyncBlob {
 
 function applyBlob(blob: SyncBlob): void {
   // Writes each course to ITS OWN key rather than to whichever course happens
-  // to be on screen — see localBlob for what that cost.
-  if (blob.progress) writeJSON(progressKeyFor(DEFAULT_LANGUAGE_ID), blob.progress);
+  // to be on screen — see localBlob for what that cost. Each course is also
+  // repaired on arrival, because an account whose server row was written
+  // before the fix still holds the leaked copy.
+  const write = (id: string, progress?: ProgressState): void => {
+    if (!progress) return;
+    writeJSON(progressKeyFor(id), repairProgressForLanguage(id, progress).state);
+  };
+
+  write(DEFAULT_LANGUAGE_ID, blob.progress);
   if (blob.tutorProfile) writeJSON(tutorProfileKeyFor(DEFAULT_LANGUAGE_ID), blob.tutorProfile);
   for (const [id, state] of Object.entries(blob.languages ?? {})) {
     if (id === DEFAULT_LANGUAGE_ID) continue;
-    if (state?.progress) writeJSON(progressKeyFor(id), state.progress);
+    write(id, state?.progress);
     if (state?.tutorProfile) writeJSON(tutorProfileKeyFor(id), state.tutorProfile);
   }
   if (blob.onboardingComplete) writeOnboarding(true);

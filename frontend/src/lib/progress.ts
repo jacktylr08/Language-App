@@ -110,6 +110,7 @@ import { progressKeyFor } from './keys';
 import { scheduleSync } from './sync';
 import { getCurriculum } from './curriculum';
 import { getActiveLanguageId } from './languages';
+import { repairProgressForLanguage } from './course-repair';
 
 /**
  * Resolved fresh on every read/write (not cached) — the active language is
@@ -168,12 +169,41 @@ function yesterday(): string {
   return localDay(d);
 }
 
+/**
+ * Languages already checked for cross-course contamination this page-load.
+ *
+ * The scan itself is cheap, but loadProgress runs on nearly every render and
+ * the repair also writes back, so it must not repeat once a course is known
+ * clean. Cleared on a language switch, which is a full page load anyway.
+ */
+const verifiedClean = new Set<string>();
+
 export function loadProgress(): ProgressState {
   if (typeof window === 'undefined') return defaultState();
   try {
     const raw = localStorage.getItem(activeKey());
     if (!raw) return defaultState();
-    return { ...defaultState(), ...JSON.parse(raw) };
+    const parsed: ProgressState = { ...defaultState(), ...JSON.parse(raw) };
+
+    // Clear out any progress that leaked in from another course before it
+    // reaches the UI. Without this, the sync fix would faithfully upload the
+    // copied data under the right language and make it permanent — see
+    // lib/course-repair.ts.
+    const languageId = getActiveLanguageId();
+    if (verifiedClean.has(languageId)) return parsed;
+    const { state, repaired } = repairProgressForLanguage(languageId, parsed);
+    verifiedClean.add(languageId);
+    if (repaired) {
+      // Persist immediately, and let it sync, so the correction reaches the
+      // account rather than being re-applied on every device forever.
+      try {
+        localStorage.setItem(activeKey(), JSON.stringify(state));
+        scheduleSync();
+      } catch {
+        /* storage unavailable — the in-memory repair still stands */
+      }
+    }
+    return state;
   } catch {
     return defaultState();
   }
