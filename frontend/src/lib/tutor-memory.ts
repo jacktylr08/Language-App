@@ -53,6 +53,9 @@ export interface SessionEntry {
 }
 
 export interface LearnerProfile {
+  /** Which course this memory belongs to. Absent on profiles written before
+   *  courses could be switched — see belongsToAnotherCourse. */
+  languageId?: string;
   summary: string;
   /** Cumulative, ongoing strengths across every session — not specific to any one. */
   strengths: string[];
@@ -97,6 +100,35 @@ export function trimTranscript(
   }));
 }
 
+/**
+ * Discards a profile that belongs to a different course.
+ *
+ * Profe was greeting Italian learners with what they had done "last time" in
+ * Spanish. The keys were already per-language; the damage came from the sync
+ * bug, which copied the account's single stored profile into whichever course
+ * was active. Progress could be repaired by checking vocabulary ids, but a
+ * profile is free text with nothing to check against — so it carries a stamp.
+ *
+ * Stamped and mismatched: definitely foreign, drop it.
+ * Unstamped (written before this): only suspect for a NON-default course, and
+ * only when it is byte-identical to the default course's profile, which is
+ * exactly what a copy looks like. That leaves a genuine Spanish profile — and
+ * any genuinely different Italian one — untouched.
+ */
+function belongsToAnotherCourse(parsed: { languageId?: unknown }, raw: string): boolean {
+  const languageId = getActiveLanguageId();
+  if (typeof parsed.languageId === 'string') return parsed.languageId !== languageId;
+  if (languageId === DEFAULT_PROFILE_LANGUAGE) return false;
+  try {
+    return localStorage.getItem(tutorProfileKeyFor(DEFAULT_PROFILE_LANGUAGE)) === raw;
+  } catch {
+    return false;
+  }
+}
+
+/** Spanish — the course whose profile predates language stamping. */
+const DEFAULT_PROFILE_LANGUAGE = 'es';
+
 export function loadProfile(): LearnerProfile | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -104,7 +136,18 @@ export function loadProfile(): LearnerProfile | null {
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p || typeof p !== 'object') return null;
+    if (belongsToAnotherCourse(p, raw)) {
+      // Remove it rather than just ignoring it, so it can't be re-uploaded
+      // and can't come back on the next read.
+      try {
+        localStorage.removeItem(activeKey());
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
     return {
+      languageId: getActiveLanguageId(),
       summary: typeof p.summary === 'string' ? p.summary : '',
       strengths: Array.isArray(p.strengths) ? p.strengths : [],
       weaknesses: Array.isArray(p.weaknesses) ? p.weaknesses : [],
@@ -125,7 +168,12 @@ export function loadProfile(): LearnerProfile | null {
 export function saveProfile(profile: LearnerProfile): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(activeKey(), JSON.stringify(profile));
+    // Stamped so a copy can never again be mistaken for this course's own —
+    // see belongsToAnotherCourse.
+    localStorage.setItem(
+      activeKey(),
+      JSON.stringify({ ...profile, languageId: getActiveLanguageId() })
+    );
     scheduleSync();
   } catch {
     /* storage full/unavailable — memory just won't persist */

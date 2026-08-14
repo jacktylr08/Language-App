@@ -20,7 +20,13 @@
  * benefit.
  */
 
-import { LESSON_CHECKPOINT_KEY } from './keys';
+import { lessonCheckpointKeyFor } from './keys';
+import { getActiveLanguageId } from './languages';
+
+/** Resolved per call — the active course can change between reads. */
+function checkpointKey(): string {
+  return lessonCheckpointKeyFor(getActiveLanguageId());
+}
 import type { Exercise } from './exercise-engine';
 import type { SessionStats } from '@/components/lesson-engine/useLessonSession';
 
@@ -50,7 +56,7 @@ export function saveCheckpoint(checkpoint: Omit<LessonCheckpoint, 'savedAt'>): v
   }
   try {
     localStorage.setItem(
-      LESSON_CHECKPOINT_KEY,
+      checkpointKey(),
       JSON.stringify({ ...checkpoint, savedAt: Date.now() })
     );
   } catch {
@@ -63,7 +69,7 @@ export function saveCheckpoint(checkpoint: Omit<LessonCheckpoint, 'savedAt'>): v
 export function loadCheckpoint(slug: string): LessonCheckpoint | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(LESSON_CHECKPOINT_KEY);
+    const raw = localStorage.getItem(checkpointKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw) as LessonCheckpoint;
 
@@ -87,10 +93,10 @@ export function clearCheckpoint(slug?: string): void {
   try {
     if (slug) {
       // Don't wipe another lesson's checkpoint on this lesson's completion.
-      const raw = localStorage.getItem(LESSON_CHECKPOINT_KEY);
+      const raw = localStorage.getItem(checkpointKey());
       if (raw && (JSON.parse(raw) as LessonCheckpoint).slug !== slug) return;
     }
-    localStorage.removeItem(LESSON_CHECKPOINT_KEY);
+    localStorage.removeItem(checkpointKey());
   } catch {
     /* nothing to clear */
   }

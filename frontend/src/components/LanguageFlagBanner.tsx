@@ -30,14 +30,29 @@ const NO_FLAG = ['/', '/login', '/register'];
 
 export function LanguageFlagBanner() {
   const pathname = usePathname();
-  const [language, setLanguage] = useState<CourseLanguage>(() => getActiveLanguage());
+  /**
+   * Deliberately starts as null and is filled in after mount, rather than
+   * reading the active language in a useState initialiser.
+   *
+   * These pages are statically prerendered, so the server HTML is generated at
+   * build time — when there is no localStorage and the language always resolves
+   * to the default. Seeding state from that initialiser produced markup React
+   * then had to reconcile against a different client value, and the flag could
+   * be left showing Spain's colours after switching to Italian and back.
+   * Painting nothing until the client has actually read the preference removes
+   * the mismatch entirely; the flag is ambient decoration, so one frame without
+   * it costs nothing.
+   */
+  const [language, setLanguage] = useState<CourseLanguage | null>(null);
 
   useEffect(() => {
-    const refresh = () => setLanguage(getActiveLanguage());
+    const refresh = (): void => setLanguage(getActiveLanguage());
+    refresh();
     window.addEventListener(LANGUAGE_CHANGE_EVENT, refresh);
     return () => window.removeEventListener(LANGUAGE_CHANGE_EVENT, refresh);
   }, []);
 
+  if (!language) return null;
   if (NO_FLAG.includes(pathname)) return null;
 
   let y = 0;

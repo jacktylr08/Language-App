@@ -48,7 +48,7 @@ export function Profe({ mood = 'idle', size = 96, className = '', animate = fals
       height={size}
       className={`${animate ? 'animate-bounce-slow' : ''} ${className}`}
       role="img"
-      aria-label="Profe, your Spanish tutor"
+      aria-label="Profe, your language tutor"
     >
       {/* Shoulders and scarf — enough body to stop the head floating */}
       <path d="M22 120c0-17 17-28 38-28s38 11 38 28Z" fill={SCARF} />

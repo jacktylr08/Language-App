@@ -33,12 +33,17 @@ import { feedback } from '@/lib/feedback';
  * a learner is never offered a menu with one item in it.
  */
 export function CourseSwitcher() {
-  const [language, setLanguage] = useState<CourseLanguage>(() => getActiveLanguage());
+  // Filled in after mount, not from a useState initialiser: these pages are
+  // statically prerendered, so the build-time HTML always names the default
+  // course and hydrating over it can leave the badge showing the wrong flag.
+  // See LanguageFlagBanner, which had exactly this bug visibly.
+  const [language, setLanguage] = useState<CourseLanguage | null>(null);
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const refresh = (): void => setLanguage(getActiveLanguage());
+    refresh();
     window.addEventListener(LANGUAGE_CHANGE_EVENT, refresh);
     return () => window.removeEventListener(LANGUAGE_CHANGE_EVENT, refresh);
   }, []);
@@ -55,6 +60,11 @@ export function CourseSwitcher() {
   }, [open]);
 
   const courses = getAvailableLanguages();
+
+  // Nothing until the client has read the stored preference — a badge that
+  // renders the default first and corrects itself is exactly the flicker (and,
+  // when hydration reconciles badly, the wrong flag) this avoids.
+  if (!language) return null;
 
   if (!hasLanguageChoice()) {
     return (

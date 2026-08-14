@@ -343,7 +343,7 @@ export function SentenceBuilder({ queue: initialQueue, onDone, onExit }: Sentenc
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                aria-label="Your sentence in Spanish"
+                aria-label={`Your sentence in ${getActiveLanguage().name}`}
                 className="w-full text-xl px-5 py-4 rounded-2xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-paper-dark-soft text-ink dark:text-white shadow-card dark:shadow-card-dark focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 transition-all"
               />
               <div className="flex flex-wrap gap-2 mt-3 justify-center">

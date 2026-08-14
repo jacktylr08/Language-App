@@ -30,6 +30,17 @@ export const HAPTICS_KEY = 'aprende-haptics-v1';
 // synced — a half-finished lesson belongs to the phone you left it on.
 export const LESSON_CHECKPOINT_KEY = 'aprende-lesson-checkpoint-v1';
 
+/**
+ * The resume checkpoint is per-course too. Sharing one key meant a lesson
+ * abandoned half-way through in Spanish was offered for resume inside the
+ * Italian course, against a completely different lesson of the same slug.
+ */
+export function lessonCheckpointKeyFor(languageId: string): string {
+  return languageId === DEFAULT_LANGUAGE_ID
+    ? LESSON_CHECKPOINT_KEY
+    : `${LESSON_CHECKPOINT_KEY}-${languageId}`;
+}
+
 // Spanish ('es') is the original, default course — its data keeps the exact
 // existing key names so no current learner's progress ever needs migrating.
 // Any OTHER language gets its own namespaced key, so a future second course

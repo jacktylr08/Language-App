@@ -23,6 +23,7 @@ import { placeLearnerAtWeek } from '@/lib/progress';
 import { phaseForWeek } from '@/lib/curriculum';
 import { TasteOfSpanish } from '@/components/onboarding/TasteOfSpanish';
 import { PageSkeleton } from '@/components/Skeleton';
+import { getActiveLanguage } from '@/lib/languages';
 
 const GOAL_OPTIONS = Object.entries(GOAL_LABELS) as Array<[LearnerGoal, string]>;
 const TOTAL_STEPS = 4;
@@ -151,7 +152,7 @@ export default function OnboardingPage() {
           {step === 1 && !quizProgress && (
             <div>
               <h2 className="font-display text-3xl font-black text-ink dark:text-white mb-2">
-                What's your Spanish level?
+                What&rsquo;s your {getActiveLanguage().name} level?
               </h2>
               <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
                 If you've studied before, we'll follow up with a quick 10-question check — not an

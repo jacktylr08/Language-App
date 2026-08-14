@@ -1,5 +1,7 @@
 'use client';
 
+import { getActiveLanguage } from '@/lib/languages';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import {
@@ -271,8 +273,8 @@ export function RealtimeCall({ context, onClose }: RealtimeCallProps) {
           </h1>
           <p className="text-ink-soft dark:text-stone-400 mt-2 max-w-sm">
             {context
-              ? `A live Spanish chat, just at your level — week ${context.weekReached}. Speak naturally; Profe listens and talks back.`
-              : 'A live Spanish chat. Speak naturally; Profe listens and talks back.'}
+              ? `A live ${context.languageName} chat, just at your level — week ${context.weekReached}. Speak naturally; Profe listens and talks back.`
+              : `A live ${getActiveLanguage().name} chat. Speak naturally; Profe listens and talks back.`}
           </p>
           <button
             onClick={startCall}

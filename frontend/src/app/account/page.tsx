@@ -9,6 +9,7 @@ import { getAuth, clearAuth } from '@/lib/auth';
 import { clearLocalLearnerState, flushSync } from '@/lib/sync';
 import { TutorProfilePanel } from '@/components/TutorProfilePanel';
 import { CourseSwitcher } from '@/components/CourseSwitcher';
+import { getActiveLanguage } from '@/lib/languages';
 import {
   loadProgress,
   currentStreak,
@@ -254,7 +255,7 @@ export default function AccountPage() {
               </p>
               {memberSince && (
                 <p className="text-sm text-ink-soft dark:text-stone-400 mt-0.5">
-                  Learning Spanish since {memberSince}
+                  Learning {getActiveLanguage().name} since {memberSince}
                 </p>
               )}
             </div>

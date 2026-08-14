@@ -320,12 +320,21 @@ function applyBlob(blob: SyncBlob): void {
     writeJSON(progressKeyFor(id), repairProgressForLanguage(id, progress).state);
   };
 
+  // A profile carries a languageId stamp (see tutor-memory). One arriving with
+  // the wrong stamp is a copy from the pre-fix sync and must not be written —
+  // otherwise Profe greets an Italian learner with what they did in Spanish.
+  const writeProfile = (id: string, profile?: LearnerProfile | null): void => {
+    if (!profile) return;
+    if (profile.languageId && profile.languageId !== id) return;
+    writeJSON(tutorProfileKeyFor(id), { ...profile, languageId: id });
+  };
+
   write(DEFAULT_LANGUAGE_ID, blob.progress);
-  if (blob.tutorProfile) writeJSON(tutorProfileKeyFor(DEFAULT_LANGUAGE_ID), blob.tutorProfile);
+  writeProfile(DEFAULT_LANGUAGE_ID, blob.tutorProfile);
   for (const [id, state] of Object.entries(blob.languages ?? {})) {
     if (id === DEFAULT_LANGUAGE_ID) continue;
     write(id, state?.progress);
-    if (state?.tutorProfile) writeJSON(tutorProfileKeyFor(id), state.tutorProfile);
+    writeProfile(id, state?.tutorProfile);
   }
   if (blob.onboardingComplete) writeOnboarding(true);
   if (blob.learnerGoal) writeGoal(blob.learnerGoal);
