@@ -11,6 +11,7 @@ import { api } from './api';
 import { tutorProfileKeyFor } from './keys';
 import { scheduleSync } from './sync';
 import { getActiveLanguageId, getLanguage } from './languages';
+import { isSameLearnerMemory } from './profile-identity';
 
 /** Resolved fresh each call — mistakes in one language aren't mistakes in another. */
 function activeKey(): string {
@@ -100,6 +101,21 @@ export function trimTranscript(
   }));
 }
 
+/** Spanish — the course whose profile predates language stamping. */
+const DEFAULT_PROFILE_LANGUAGE = 'es';
+
+/** Read another course's stored profile without going through loadProfile. */
+function readStoredProfile(languageId: string): Partial<LearnerProfile> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(tutorProfileKeyFor(languageId));
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Discards a profile that belongs to a different course.
  *
@@ -107,27 +123,27 @@ export function trimTranscript(
  * Spanish. The keys were already per-language; the damage came from the sync
  * bug, which copied the account's single stored profile into whichever course
  * was active. Progress could be repaired by checking vocabulary ids, but a
- * profile is free text with nothing to check against — so it carries a stamp.
+ * profile is free text with nothing to check against.
  *
- * Stamped and mismatched: definitely foreign, drop it.
- * Unstamped (written before this): only suspect for a NON-default course, and
- * only when it is byte-identical to the default course's profile, which is
- * exactly what a copy looks like. That leaves a genuine Spanish profile — and
- * any genuinely different Italian one — untouched.
+ * Two rules, and the second is the one that matters:
+ *
+ * - A stamp naming another course is definitive.
+ * - A non-default course holding the DEFAULT course's memories is a copy,
+ *   whatever stamp it carries. It has to ignore the stamp, because the sync
+ *   applied one: an unstamped copy uploaded from the Italian key came back
+ *   down stamped `it`, which laundered it into a profile that looked entirely
+ *   legitimate. Checking the sessions themselves is what makes that
+ *   impossible.
+ *
+ * A genuine Spanish profile, and a genuinely different Italian one, are both
+ * untouched — they are made of different conversations.
  */
-function belongsToAnotherCourse(parsed: { languageId?: unknown }, raw: string): boolean {
+function belongsToAnotherCourse(parsed: Partial<LearnerProfile>): boolean {
   const languageId = getActiveLanguageId();
-  if (typeof parsed.languageId === 'string') return parsed.languageId !== languageId;
+  if (typeof parsed.languageId === 'string' && parsed.languageId !== languageId) return true;
   if (languageId === DEFAULT_PROFILE_LANGUAGE) return false;
-  try {
-    return localStorage.getItem(tutorProfileKeyFor(DEFAULT_PROFILE_LANGUAGE)) === raw;
-  } catch {
-    return false;
-  }
+  return isSameLearnerMemory(parsed, readStoredProfile(DEFAULT_PROFILE_LANGUAGE));
 }
-
-/** Spanish — the course whose profile predates language stamping. */
-const DEFAULT_PROFILE_LANGUAGE = 'es';
 
 export function loadProfile(): LearnerProfile | null {
   if (typeof window === 'undefined') return null;
@@ -136,7 +152,7 @@ export function loadProfile(): LearnerProfile | null {
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p || typeof p !== 'object') return null;
-    if (belongsToAnotherCourse(p, raw)) {
+    if (belongsToAnotherCourse(p)) {
       // Remove it rather than just ignoring it, so it can't be re-uploaded
       // and can't come back on the next read.
       try {

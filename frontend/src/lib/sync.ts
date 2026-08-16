@@ -16,6 +16,7 @@ import { progressKeyFor, tutorProfileKeyFor, ONBOARDING_KEY, LEARNER_GOAL_KEY, A
 import { LANGUAGES } from './languages';
 import type { ProgressState } from './progress';
 import type { LearnerProfile } from './tutor-memory';
+import { isSameLearnerMemory } from './profile-identity';
 import type { LearnerGoal } from './learner-goal';
 import { repairProgressForLanguage } from './course-repair';
 
@@ -61,6 +62,15 @@ function writeJSON(key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore */
+  }
+}
+
+function removeKey(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(key);
   } catch {
     /* ignore */
   }
@@ -323,9 +333,28 @@ function applyBlob(blob: SyncBlob): void {
   // A profile carries a languageId stamp (see tutor-memory). One arriving with
   // the wrong stamp is a copy from the pre-fix sync and must not be written —
   // otherwise Profe greets an Italian learner with what they did in Spanish.
-  const writeProfile = (id: string, profile?: LearnerProfile | null): void => {
+  //
+  // The stamp alone is not enough, and trusting it here is what let the bug
+  // survive its first fix. A copy made BEFORE stamping existed carries no
+  // stamp, so it passed the check, and this function then stamped it with the
+  // course it was landing in — turning an obvious copy into one that looked
+  // native to Italian and could never be spotted again. So a non-default
+  // course's profile is also checked against the default course's: same
+  // sessions means it is that profile, not one of its own.
+  const writeProfile = (
+    id: string,
+    profile?: LearnerProfile | null,
+    defaultProfile?: LearnerProfile | null
+  ): void => {
     if (!profile) return;
     if (profile.languageId && profile.languageId !== id) return;
+    if (id !== DEFAULT_LANGUAGE_ID && isSameLearnerMemory(profile, defaultProfile)) {
+      // Drop the device's copy too. Leaving it would only mean the next
+      // localBlob() uploaded it again, and the original is safe in its own
+      // course — this deletes a duplicate, never the last copy of anything.
+      removeKey(tutorProfileKeyFor(id));
+      return;
+    }
     writeJSON(tutorProfileKeyFor(id), { ...profile, languageId: id });
   };
 
@@ -334,7 +363,7 @@ function applyBlob(blob: SyncBlob): void {
   for (const [id, state] of Object.entries(blob.languages ?? {})) {
     if (id === DEFAULT_LANGUAGE_ID) continue;
     write(id, state?.progress);
-    writeProfile(id, state?.tutorProfile);
+    writeProfile(id, state?.tutorProfile, blob.tutorProfile);
   }
   if (blob.onboardingComplete) writeOnboarding(true);
   if (blob.learnerGoal) writeGoal(blob.learnerGoal);

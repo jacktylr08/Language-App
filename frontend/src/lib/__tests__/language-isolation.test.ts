@@ -17,6 +17,8 @@ import {
 } from '../keys';
 import { loadProfile, saveProfile, type LearnerProfile } from '../tutor-memory';
 import { saveCheckpoint, loadCheckpoint, clearCheckpoint } from '../lesson-resume';
+import { buildSyncPayloadForTest, applySyncPayloadForTest } from '../sync';
+import { buildTutorContext } from '../tutor-context';
 
 /** A resumable checkpoint: part-way through a real queue. */
 function checkpointFor(slug: string) {
@@ -89,6 +91,76 @@ describe("Profe's memory belongs to one course", () => {
     expect(loadProfile()?.summary).toContain('weekend plans');
   });
 
+  it('still spots the copy once the Spanish original carries its own stamp', () => {
+    // The first version of this check compared the two stored strings. Saving
+    // the Spanish profile adds `languageId: "es"` to it, so the strings stop
+    // matching and the copy sails through — the check has to compare the
+    // sessions, not the bytes.
+    const copy = profile('Talked about weekend plans; mixed up por/para.');
+    localStorage.setItem(tutorProfileKeyFor('it'), JSON.stringify(copy));
+    saveProfile(copy); // writes the Spanish key, stamped
+
+    expect(localStorage.getItem(tutorProfileKeyFor('es'))).not.toBe(
+      localStorage.getItem(tutorProfileKeyFor('it'))
+    );
+
+    setActiveLanguageId('it');
+    expect(loadProfile()).toBeNull();
+  });
+
+  it('does not let a sync round-trip launder the copy into a real profile', () => {
+    // The chain that kept Profe speaking Spanish in Italian even after the
+    // keys were split. The copy is unstamped, so it uploads happily; applying
+    // the blob used to stamp whatever arrived with the course it landed in,
+    // which turned an obvious copy into one that looked native and could
+    // never be spotted again.
+    const shared = profile('Talked about weekend plans; mixed up por/para.');
+    localStorage.setItem(tutorProfileKeyFor('es'), JSON.stringify(shared));
+    localStorage.setItem(tutorProfileKeyFor('it'), JSON.stringify(shared));
+
+    applySyncPayloadForTest(buildSyncPayloadForTest());
+
+    const stored = localStorage.getItem(tutorProfileKeyFor('it'));
+    expect(stored).toBeNull();
+
+    setActiveLanguageId('it');
+    expect(loadProfile()).toBeNull();
+
+    // And it is gone from what this device would upload next.
+    expect(buildSyncPayloadForTest().languages?.it?.tutorProfile).toBeFalsy();
+
+    setActiveLanguageId('es');
+    expect(loadProfile()?.summary).toContain('weekend plans');
+  });
+
+  it('rejects a copy that a previous sync already stamped as Italian', () => {
+    // Anyone whose device ran the laundering version above already has this
+    // on disk: Spanish memories wearing an Italian stamp. Trusting the stamp
+    // would leave them stuck with it forever.
+    const shared = profile('Talked about weekend plans; mixed up por/para.');
+    localStorage.setItem(tutorProfileKeyFor('es'), JSON.stringify({ ...shared, languageId: 'es' }));
+    localStorage.setItem(tutorProfileKeyFor('it'), JSON.stringify({ ...shared, languageId: 'it' }));
+
+    setActiveLanguageId('it');
+    expect(loadProfile()).toBeNull();
+    expect(localStorage.getItem(tutorProfileKeyFor('it'))).toBeNull();
+  });
+
+  it('does not mistake two empty profiles for copies of each other', () => {
+    const blank: LearnerProfile = {
+      summary: '',
+      strengths: [],
+      weaknesses: [],
+      mistakes: [],
+      updatedAt: '',
+    };
+    localStorage.setItem(tutorProfileKeyFor('es'), JSON.stringify(blank));
+    localStorage.setItem(tutorProfileKeyFor('it'), JSON.stringify({ ...blank, languageId: 'it' }));
+
+    setActiveLanguageId('it');
+    expect(loadProfile()).not.toBeNull();
+  });
+
   it('keeps a genuinely different Italian profile', () => {
     localStorage.setItem(tutorProfileKeyFor('es'), JSON.stringify(profile('Spanish notes')));
     localStorage.setItem(tutorProfileKeyFor('it'), JSON.stringify(profile('Italian notes')));
@@ -99,6 +171,38 @@ describe("Profe's memory belongs to one course", () => {
   it('never treats the default course as a copy of itself', () => {
     localStorage.setItem(tutorProfileKeyFor('es'), JSON.stringify(profile('Spanish notes')));
     expect(loadProfile()?.summary).toBe('Spanish notes');
+  });
+});
+
+describe('what Profe is actually told at the start of a call', () => {
+  // The symptom the learner reported is not something any screen renders —
+  // it only shows up once the call opens and Profe says it out loud. The
+  // note travels in the context object (RealtimeCall passes profileSummary
+  // and lastSessionNote straight to the backend), so that is what has to be
+  // clean, and a DOM check would have passed while the bug was still live.
+  const spanishMemory = () => ({
+    ...profile('Confident with greetings; mixed up por/para.'),
+    sessionNote: 'Talked about weekend plans.',
+    history: [
+      { date: '2026-08-15T10:00:00.000Z', note: 'Talked about weekend plans.', mistakes: [] },
+    ],
+  });
+
+  it('never carries the other course’s last session into this one', () => {
+    const memory = spanishMemory();
+    localStorage.setItem(tutorProfileKeyFor('es'), JSON.stringify({ ...memory, languageId: 'es' }));
+    localStorage.setItem(tutorProfileKeyFor('it'), JSON.stringify({ ...memory, languageId: 'it' }));
+
+    setActiveLanguageId('it');
+    const ctx = buildTutorContext();
+    expect(ctx.lastSessionNote).toBeUndefined();
+    expect(ctx.profileSummary).toBeFalsy();
+    expect(ctx.languageName).toBe('Italian');
+
+    setActiveLanguageId('es');
+    const spanish = buildTutorContext();
+    expect(spanish.lastSessionNote).toBe('Talked about weekend plans.');
+    expect(spanish.languageName).toBe('Spanish');
   });
 });
 
